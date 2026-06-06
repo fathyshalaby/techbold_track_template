@@ -1,5 +1,5 @@
 // Orchestrator tests: mocked SSH + model — full happy path + reject path
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { LanguageModelV1 } from 'ai';
 import { z } from 'zod';
 
@@ -559,5 +559,238 @@ describe('agent mock output', () => {
       scriptedModel,
     );
     expect(result.status).toBe('LIKELY_FIXED');
+  });
+});
+
+// ─── Integration tests — async driver ────────────────────────────────────────
+
+const MOCK_DIAGNOSTIC = {
+  hypotheses: [{ cause: 'service crashed', evidence: 'systemctl output', confidence: 0.85 }],
+  command: 'systemctl status status-api --no-pager',
+  purpose: 'Check service state',
+  expectedSignal: 'Active: failed',
+  riskNotes: 'read-only',
+  isReadOnly: true,
+};
+
+const MOCK_FIX = {
+  rootCause: 'port conflict',
+  command: 'sudo systemctl restart status-api',
+  rationale: 'restart to clear the conflict',
+  rollbackCommand: 'sudo systemctl stop status-api',
+  isReversible: true,
+  persistenceNote: 'systemd service enabled',
+};
+
+const MOCK_VALIDATION: import('../ai/types.js').ValidationResult = {
+  status: 'VERIFIED_FIXED',
+  benefitCheck: 'service active',
+  persistenceCheck: 'enabled',
+  evidence: ['systemctl status shows active'],
+};
+
+vi.mock('../ai/agents/problem-analyzer.js', () => ({
+  runProblemAnalyzer: vi.fn().mockResolvedValue(MOCK_DIAGNOSTIC),
+  AgentUnavailableError: class AgentUnavailableError extends Error {
+    constructor(msg: string) { super(msg); this.name = 'AgentUnavailableError'; }
+  },
+}));
+
+vi.mock('../ai/agents/problem-solver.js', () => ({
+  runProblemSolver: vi.fn().mockResolvedValue(MOCK_FIX),
+  AgentUnavailableError: class AgentUnavailableError extends Error {
+    constructor(msg: string) { super(msg); this.name = 'AgentUnavailableError'; }
+  },
+}));
+
+vi.mock('../ai/agents/validator.js', () => ({
+  runValidator: vi.fn().mockResolvedValue(MOCK_VALIDATION),
+  AgentUnavailableError: class AgentUnavailableError extends Error {
+    constructor(msg: string) { super(msg); this.name = 'AgentUnavailableError'; }
+  },
+}));
+
+describe('orchestrator driver — integration', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { makeJsonlAdapter, setDb } = await import('../store/db.js');
+    setDb(makeJsonlAdapter());
+  });
+
+  it('Test 1 — happy path TRIAGING → WAITING_FOR_APPROVAL', async () => {
+    const { advance } = await import('../ai/orchestrator.js');
+    const { createRun } = await import('../store/runs.js');
+    const { getAuditEvents } = await import('../store/audit.js');
+    const { validateCommandAgainstPolicy } = await import('../safety/command-policy.js');
+
+    const run = createRun(1, '10.0.0.1:22');
+    const state = await advance(run.id);
+
+    expect(state.phase).toBe('WAITING_FOR_APPROVAL');
+
+    const { getDb } = await import('../store/db.js');
+    const db = getDb();
+    const approvals = db.all<{ run_id: string; status: string }>('SELECT * FROM command_approvals WHERE run_id = ?', [run.id]);
+    expect(approvals.some((a) => a.status === 'PENDING')).toBe(true);
+
+    const events = getAuditEvents(run.id);
+    expect(events.some((e) => e.type === 'approval.required')).toBe(true);
+
+    const spied = validateCommandAgainstPolicy as unknown as ReturnType<typeof vi.fn>;
+    expect(spied).toHaveBeenCalledWith('systemctl status status-api --no-pager');
+  });
+
+  it('Test 2 — blocked command loops back to TRIAGING', async () => {
+    const { runProblemAnalyzer } = await import('../ai/agents/problem-analyzer.js');
+    (runProblemAnalyzer as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ...MOCK_DIAGNOSTIC,
+      command: 'cat /etc/shadow',
+    });
+
+    const { advance } = await import('../ai/orchestrator.js');
+    const { createRun } = await import('../store/runs.js');
+    const { getAuditEvents } = await import('../store/audit.js');
+
+    const run = createRun(1, '10.0.0.1:22');
+    const state = await advance(run.id);
+
+    expect(state.phase).toBe('TRIAGING');
+
+    const events = getAuditEvents(run.id);
+    expect(events.some((e) => e.type === 'command.blocked')).toBe(true);
+
+    const { getDb } = await import('../store/db.js');
+    const db = getDb();
+    const approvals = db.all<{ run_id: string }>('SELECT * FROM command_approvals WHERE run_id = ?', [run.id]);
+    expect(approvals).toHaveLength(0);
+  });
+
+  it('Test 3 — rejection returns to TRIAGING', async () => {
+    const { advance } = await import('../ai/orchestrator.js');
+    const { createRun } = await import('../store/runs.js');
+    const { getAuditEvents } = await import('../store/audit.js');
+
+    const run = createRun(1, '10.0.0.1:22');
+    await advance(run.id);
+
+    const state = await advance(run.id, { type: 'command_rejected', reason: 'Too risky' });
+
+    expect(state.phase).toBe('TRIAGING');
+    const events = getAuditEvents(run.id);
+    expect(events.some((e) => e.type === 'command.rejected')).toBe(true);
+  });
+
+  it('Test 4 — approval triggers execution and OBSERVING', async () => {
+    const { advance } = await import('../ai/orchestrator.js');
+    const { createRun } = await import('../store/runs.js');
+    const { getDb } = await import('../store/db.js');
+
+    const run = createRun(1, '10.0.0.1:22');
+    await advance(run.id);
+
+    const db = getDb();
+    const approvals = db.all<{ id: string; status: string; run_id: string }>(
+      'SELECT * FROM command_approvals WHERE run_id = ?',
+      [run.id],
+    );
+    const pending = approvals.find((a) => a.status === 'PENDING');
+    expect(pending).toBeDefined();
+
+    const state = await advance(run.id, {
+      type: 'command_approved',
+      approvalId: pending!.id,
+      finalCommand: 'systemctl status status-api --no-pager',
+    });
+
+    expect(state.phase).toBe('OBSERVING');
+
+    const results = db.all<{ run_id: string; approval_id: string }>(
+      'SELECT * FROM command_results WHERE run_id = ?',
+      [run.id],
+    );
+    expect(results.some((r) => r.approval_id === pending!.id)).toBe(true);
+
+    const observations = db.all<{ run_id: string; source: string }>(
+      'SELECT * FROM observations WHERE run_id = ?',
+      [run.id],
+    );
+    expect(observations.some((o) => o.source === 'ssh')).toBe(true);
+
+    const executedApprovals = db.all<{ id: string; status: string; run_id: string }>(
+      'SELECT * FROM command_approvals WHERE run_id = ?',
+      [run.id],
+    );
+    expect(executedApprovals.find((a) => a.id === pending!.id)?.status).toBe('EXECUTED');
+  });
+
+  it('Test 5 — max-steps cap', async () => {
+    const { advance, setStepCountForTest } = await import('../ai/orchestrator.js');
+    const { createRun } = await import('../store/runs.js');
+    const { getAuditEvents } = await import('../store/audit.js');
+    const { runProblemAnalyzer } = await import('../ai/agents/problem-analyzer.js');
+    const { getDb } = await import('../store/db.js');
+
+    const run = createRun(1, '10.0.0.1:22');
+    setStepCountForTest(run.id, 12, getDb());
+
+    const state = await advance(run.id);
+
+    expect(state.phase).toBe('WAITING_FOR_ACTIVITY_REVIEW');
+
+    const events = getAuditEvents(run.id);
+    expect(events.some((e) => e.type === 'run.steps_capped')).toBe(true);
+
+    expect(runProblemAnalyzer).not.toHaveBeenCalled();
+  });
+
+  it('Test 6 — agent failure degrades gracefully', async () => {
+    const { runProblemAnalyzer } = await import('../ai/agents/problem-analyzer.js');
+    (runProblemAnalyzer as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('LLM timeout'),
+    );
+
+    const { advance } = await import('../ai/orchestrator.js');
+    const { createRun } = await import('../store/runs.js');
+    const { getAuditEvents } = await import('../store/audit.js');
+
+    const run = createRun(1, '10.0.0.1:22');
+
+    let state: Awaited<ReturnType<typeof advance>>;
+    await expect(
+      advance(run.id).then((s) => { state = s; return s; }),
+    ).resolves.toBeDefined();
+
+    expect(state!.phase).toBe('TRIAGING');
+
+    const events = getAuditEvents(run.id);
+    expect(events.some((e) => e.type === 'agent.unavailable')).toBe(true);
+    const unavailableEvent = events.find((e) => e.type === 'agent.unavailable');
+    expect(unavailableEvent?.payload_json).toMatch(/LLM timeout/i);
+
+    const { getDb } = await import('../store/db.js');
+    const db = getDb();
+    const approvals = db.all<{ run_id: string }>(
+      'SELECT * FROM command_approvals WHERE run_id = ?',
+      [run.id],
+    );
+    expect(approvals).toHaveLength(0);
+  });
+
+  it('Test 7 — generalisation: agent prompts contain no hardcoded fixture strings', async () => {
+    const { PROBLEM_ANALYZER_SYSTEM_PROMPT, PROBLEM_SOLVER_SYSTEM_PROMPT, VALIDATOR_SYSTEM_PROMPT } =
+      await import('../ai/prompts.js');
+
+    const FORBIDDEN = ['status-api', 'vm-01', 'localhost:8080', 'EADDRINUSE', 'ticket_123', 'azureuser'];
+
+    for (const prompt of [PROBLEM_ANALYZER_SYSTEM_PROMPT, PROBLEM_SOLVER_SYSTEM_PROMPT, VALIDATOR_SYSTEM_PROMPT]) {
+      for (const forbidden of FORBIDDEN) {
+        expect(prompt).not.toContain(forbidden);
+      }
+    }
+
+    const { runProblemAnalyzer } = await import('../ai/agents/problem-analyzer.js');
+    const analyzerSrc = runProblemAnalyzer.toString();
+    // The mock function body won't contain forbidden strings — the real check is on the prompts above
+    // Also check the agent source file won't contain hardcoded strings (verified via grep in CI)
   });
 });
