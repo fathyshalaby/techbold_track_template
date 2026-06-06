@@ -85,6 +85,38 @@ Adversarially proved **15 dangerous commands bypassed** `validateCommandAgainstP
 - **Noted, acceptable:** base64/`$(...)`/`eval` indirection isn't decoded — but such commands classify `MEDIUM_RISK_CHANGE` (never auto-approved), so a human still gates them. Documented as the intended backstop, not a hole.
 - **Strength confirmed:** redaction's 16 KB output cap + secret regexes, and the deny-list-then-classify ordering, are sound; `classifyCommand` correctly fails closed to MEDIUM for unknown verbs.
 
+### Phase 3 — Deep Audit (test strategy & regression-prevention pass, commit `eeb392b`)
+Second pass with a different lens: *test strategy, invariants, and regression prevention* (the "Repository Deep Audit" prompt) rather than pure red-team. Code treated as source of truth.
+
+**Executive summary.** The safety layer is the cheapest, highest-leverage code in the repo: 4 pure-function modules (~560 LOC) that directly own the C-score (20%) and the hard-fail gates. It is now well-defended at the `validateCommandAgainstPolicy` boundary (166 passing tests) and has no external dependencies, no I/O, and no state — so it is fully unit-testable and deterministic. The one real defect this pass found was a *contract* gap, not a logic gap.
+
+**New issue found & fixed — classifier fails open for standalone callers (commit `eeb392b`).**
+`classifyCommand` is `export`ed and was classifying the **raw** string. Today it is only ever reached *after* the blocklist (inside the gate), so it is safe in the current call graph — but it is a latent landmine for Phase 5/6: the architecture has the orchestrator/approvals route attach a risk badge per command and contemplates an auto-approve tier keyed on `SAFE_READ_ONLY`. Proven (probe): standalone `classifyCommand("cat /etc/sh''adow")` and `classifyCommand("cat $SECRETFILE")` both returned `SAFE_READ_ONLY` → an auto-approve tier would silently run a secret read = C hard-fail. **Fix:** `classifyCommand` now fails safe independently of the gate — unresolved shell expansion (`$VAR`/`${VAR}`/`$()`/`` ` ``) forces `MEDIUM_RISK_CHANGE`, and quotes are stripped before the anchored allowlist match. Clean read-only commands still classify `SAFE_READ_ONLY`. +7 regression tests (159 → 166).
+
+**Invariants now asserted (the things that must never break):**
+1. No command reaching a secret path (`/etc/shadow|gshadow`, SSH host/`id_*` keys, `/proc/*/environ`, `.env`) is ever `allowed`, by any verb/flag/quote/redirect.
+2. No destructive/irreversible command (`rm -rf` system paths, `mkfs`/`dd`, fork bomb, `DROP`/`TRUNCATE`, mass-kill, shutdown) is ever `allowed`.
+3. No security-control-disabling command (ufw/iptables/auditd/apparmor/fail2ban/SELinux) is ever `allowed`.
+4. Unknown verbs and any unresolved expansion classify **≥ MEDIUM** — `classifyCommand` never returns `SAFE`/`LOW` for something it cannot fully see (fail-safe), enforced both at the gate and now standalone.
+5. Redaction is idempotent and never *lowers* protection; output is capped (16 KB) before persistence; redaction runs at the audit sink (`store/audit.ts`) on both payload and command.
+
+**Test gap analysis.** Current 166 tests are all **L1 unit** and cover the blocklist, classifier allowlist, chaining, obfuscation, and redaction patterns well. Gaps (all *deferred*, none blocking Phase 3):
+- **No property-based / fuzz tests.** The blocklist is regex-heavy; example-based tests only prove the cases we imagined. *Recommended add:* `fast-check` generators for (a) secret-path + random verb/flag permutations ⇒ always blocked, (b) random whitespace/quote insertion into a known-bad command ⇒ stays blocked. This is the single highest-value test upgrade and is cheap. **Deferred** to a focused hardening pass (not before freeze unless time allows).
+- **No L2 integration test** that the orchestrator/approvals route actually *calls* the gate on the post-edit command (the "re-check after human edit" invariant). Cannot exist yet — orchestrator lands Phase 5/6. **Owner: Phase 6 audit** — add a test that an edited command is re-validated and a blocked edit cannot execute.
+- **No golden-master** for redaction output. Low value for 4 modules; the per-pattern assertions suffice. **Declined.**
+
+**Risks (ranked).**
+- *Medium:* regex blocklist is inherently enumerative — a novel obfuscation not yet imagined could pass the gate as MEDIUM (never SAFE) and still requires human approval, so it is a defense-in-depth gap, not a hard-fail. Property-based tests shrink this.
+- *Low:* `REDACTION_CAP_BYTES` slices by JS string length (UTF-16 code units), not bytes, despite the name — modest miscount on multibyte output, no security impact (cap only ever drops trailing content, which fails safe). Noted; rename deferred.
+- *Low:* base64/`eval` indirection still undecoded — classifies MEDIUM, human-gated. Accepted.
+
+**Research (justified, not cargo-culted).**
+- `fast-check` (property-based testing) — mature, zero-runtime-dep, used widely for exactly this "invariant holds for all inputs" shape. **Adoption justified** for the blocklist; deferred only on time.
+- `shell-quote` / `tree-sitter-bash` (real shell parsing) — would defeat *all* obfuscation classes, but pulls a parser + new attack surface and is overkill given the MEDIUM-floor + mandatory HITL backstop. **Declined** (consistent with the red-team pass).
+- Atomic Red Team / GTFOBins as a corpus of LOLBins to seed more blocklist cases — **worth a one-time mining pass** for the hardening sprint; not a dependency.
+
+**Verdict.** No feature bloat, no dead code, no premature optimization in the safety layer — it is appropriately minimal for the rubric. One latent contract bug fixed; remaining items are deferred test-depth upgrades, correctly scoped to the phases that introduce their call sites.
+
 ---
 
 ## Cross-phase open items (carry forward)
@@ -92,7 +124,9 @@ Adversarially proved **15 dangerous commands bypassed** `validateCommandAgainstP
 - **`docker compose up` smoke on a real Docker host** — confirm the non-root image + graceful shutdown + (now) the live `createActivity` 422 shape. Mocks ≠ reality.
 - **Confirm with mentors:** R0 (does grading run the HITL flow unattended? → tiered auto-approve) and passwordless `sudo` for `azureuser`.
 - **Per-VM run lock / state-machine race coverage** — due when the run lifecycle lands (Phase 6).
+- **Property-based fuzz tests for the safety blocklist** (`fast-check`) — secret-path×verb/flag permutations + whitespace/quote insertion always blocked. Highest-value test upgrade; do in a hardening pass if time allows before freeze.
+- **Phase-6 integration test: gate re-runs on the edited command** — assert an approval-time edit is re-validated and a blocked edit cannot execute (the "re-check after human edit" invariant; no call site exists until the orchestrator lands).
 
 ---
 
-*Last updated: Phase 3. Append a new section per phase as it is audited.*
+*Last updated: Phase 3 (deep-audit pass). Append a new section per phase as it is audited.*
