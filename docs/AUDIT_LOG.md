@@ -260,19 +260,46 @@ Fourth and final Phase-4 pass: *"what does the SSH-execution domain already know
 
 ---
 
+# Phase 5 — Agent loop & orchestrator (`ai/orchestrator.ts` · agents · tools · `ai/types.ts`)
+
+**Audited:** `gsd/phase-05-agent-loop-orchestrator` @ `df3b3de`. Lens: completeness/critical-path + merge-reconciliation. Then **reconciled and landed on `main`** (merge `4954f34`).
+
+### What it is
+The agent loop: a state-machine `orchestrator.ts` (`reduce()` pure reducer + `advance()` async driver with side-effects), four structured-output agents (problem-analyzer, customer-system-analyzer, problem-solver, validator) + activity-log-generator, `prompts.ts`, `model.ts` (AI SDK v4, mock-model for offline), `ai/types.ts`, new tools (audit/phoenix/safety/ssh), schema/db additions, `orchestrator.test.ts` (795), `ssh-tools-guard.test.ts`. Substantial, real work.
+
+### Headline finding — parallel divergence on Phase 4
+Phase 5 branched from `ac59e16` (Phase-4 tip) **before** the Phase-4 work landed on `main`, so Julian re-implemented the SSH layer independently. His copy **failed 13 executor tests** (old test harness with the nextTick-ordering bug; no stdin-close / signal capture) where `main` passes all. Per decision *"keep my executor, take his orchestrator,"* the merge resolved `ssh/{executor,client}.ts`, `tests/ssh-{executor,mock}.test.ts`, `ai/tools/ssh-tools.ts` to **main's** hardened versions and took all of Phase 5's new files. His `ssh-tools-guard.test.ts` (text-scan of `ssh-tools.ts`) passes against main's minimal `ssh-tools` (proposeSshCommand only). Nothing in Phase 5 imported the dropped `ssh-tools` exports.
+
+### Issue found & repaired (commit `4954f34`)
+**🔴 Orchestrator could not run against a real VM.** `advance()` hard-wired `new MockSshExecutor()` and a hardcoded `username:'azureuser'` / `privateKeyPath:'/keys/id_rsa'` — so the real agent loop *always* used the mock and ignored config. Classic "works-in-mock, breaks-on-real" at the orchestration layer (would zero the B-score on real VMs). **Fix:** dependency-injected executor defaulting to `createSshExecutor()` (env-selected mock|real via `resolveClientMode`), constructed **lazily** only on the execute path so non-executing transitions never touch env; SSH user/key now read from `env` (`SSH_USERNAME` / `SSH_PRIVATE_KEY_PATH`, documented defaults). The one execute-path test injects a `MockSshExecutor`.
+
+### Strengths confirmed (no change)
+- **Safety gate re-runs before execution** — `advance()` calls `validateCommandAgainstPolicy(finalCommand)` on `command_approved` and blocks if denied (resolves the **gate-recheck-on-edit** carry-forward).
+- **Redaction at the sink** — `redactSecrets()` applied to stdout/stderr before `appendCommandResult` (resolves the **redaction-at-sink** carry-forward).
+- **Bounded loop** — `MAX_STEPS = 12` cap prevents runaway agent loops.
+- **AI SDK v4** retained deliberately (clean mock-model for offline/CI) — resolves the **v4-vs-v5** carry-forward as "stay on v4."
+
+### Verification
+Full backend suite **419 pass / 0 fail** (main 359 + Phase-5 orchestrator/agent tests; the 13 diverged-executor failures eliminated), **`tsc --noEmit` clean**.
+
+### Deferred / for the deeper Phase-5 audit passes
+Domain/test-strategy/research lenses on the agents + prompts + state machine not yet run (this was the land-and-reconcile check). Candidate areas: agent prompt robustness (batch-flag steering, bounded reads — see carry-forwards), state-machine invariants (valid transitions only, no orphan phases), per-run concurrency/locking, and the activity-draft-from-audit-trail-only rule.
+
+---
+
 ## Cross-phase open items (carry forward)
-- **AI SDK v4 vs v5/v6** — pin/reconcile before the Phase-5 agent loop.
+- ~~**AI SDK v4 vs v5/v6**~~ ✅ **resolved in Phase 5** — stayed on v4 (`ai@^4.3.16`, `LanguageModelV1`), clean mock-model; no upgrade churn.
 - **`docker compose up` smoke on a real Docker host** — confirm the non-root image + graceful shutdown + (now) the live `createActivity` 422 shape. Mocks ≠ reality.
 - **Confirm with mentors:** R0 (does grading run the HITL flow unattended? → tiered auto-approve) and passwordless `sudo` for `azureuser`.
 - **Per-VM run lock / state-machine race coverage** — due when the run lifecycle lands (Phase 6).
 - **Property-based fuzz tests for the safety blocklist** (`fast-check`) — secret-path×verb/flag permutations + whitespace/quote insertion always blocked. Highest-value test upgrade; do in a hardening pass if time allows before freeze.
-- **Phase-6 integration test: gate re-runs on the edited command** — assert an approval-time edit is re-validated and a blocked edit cannot execute (the "re-check after human edit" invariant; no call site exists until the orchestrator lands).
+- ~~**Gate re-runs on the edited command**~~ ✅ **resolved in Phase 5** (`4954f34`) — `advance()` re-validates `finalCommand` via `validateCommandAgainstPolicy` on `command_approved` and blocks if denied.
 - **Prefer bounded tail reads in agent prompt** (Phase 5) — `cat <huge log>` returns a truncated *head*; real errors are at the tail. Steer the model to `tail -n` / `journalctl -n`.
 - **Steer agent to non-interactive/batch flags** (Phase 5) — no PTY, so the model must use `--no-pager` (systemctl/journalctl), `top -b -n1`, `ps` (not `top`), and always pass a file to `grep`/`cat` (stdin is now EOF'd, so a missing file fails fast rather than hanging — but a batch flag is still cleaner output).
 - ~~**Per-command timeout for follow/stream commands**~~ ✅ **resolved in Phase 4** (`1d811fd`) — the 30 s channel-kill timeout makes `tail -f`/`journalctl -f`/`ping` time out cleanly instead of hanging the run.
-- **Redaction-at-sink integration test** (Phase 5/6) — the SSH executor returns RAW output by design; assert the orchestrator runs `redactSecrets()` before audit/SSE/UI/model (no call site exists until the orchestrator lands).
+- ~~**Redaction-at-sink**~~ ✅ **resolved in Phase 5** (`4954f34`) — `advance()` runs `redactSecrets()` on stdout/stderr before persisting; a dedicated assertion test is still worth adding in the Phase-5 deep audit.
 - **Document safe disk-full-via-logs playbook** for demo/operators — `logrotate -f` / `gzip` / `mv`, never `truncate`/`rm` on `/var/log` (hard-fail).
 
 ---
 
-*Last updated: Phase 4 (research/reuse pass — 4 lenses complete; signal-exit capture; SSH suite 46, full suite 359 pass). Append a new section per phase as it is audited.*
+*Last updated: Phase 5 (agent loop reconciled + landed on main; real-VM wiring fixed; full suite 419 pass). Append a new section per phase as it is audited.*
