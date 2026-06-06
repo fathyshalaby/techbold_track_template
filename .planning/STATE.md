@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "06-01 complete — run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)"
-last_updated: "2026-06-06T22:53:45.251Z"
-last_activity: 2026-06-07 -- Phase 06 Plan 01 complete (run lifecycle routes)
+stopped_at: "06-03 complete — SSE events route (createSseStream, eventsRouter, audit↔bus symmetry test)"
+last_updated: "2026-06-07T00:56:35Z"
+last_activity: 2026-06-07 -- Phase 06 Plan 03 complete (SSE events route)
 progress:
   total_phases: 9
   completed_phases: 5
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-06)
 ## Current Position
 
 Phase: 06 (run-api-approvals-sse) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-06-07 -- Phase 06 Plan 01 complete (run lifecycle routes)
 
