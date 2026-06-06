@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: 05-04 complete — pure orchestrator reducer (state machine transitions)
-last_updated: "2026-06-06T23:55:30.000Z"
-last_activity: 2026-06-06 -- Phase 05 Plan 04 complete
+stopped_at: 05-05 complete — async orchestrator driver (advance/createInitialState/setStepCountForTest)
+last_updated: "2026-06-07T00:04:30.000Z"
+last_activity: 2026-06-07 -- Phase 05 Plan 05 complete
 progress:
   total_phases: 9
   completed_phases: 4
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-06)
 
 ## Current Position
 
-Phase: 05 (agent-loop-orchestrator) — EXECUTING
+Phase: 05 (agent-loop-orchestrator) — COMPLETE
 Plan: 5 of 5
-Status: Ready to execute
-Last activity: 2026-06-06 -- Phase 05 Plan 04 complete
+Status: Phase complete — all 5 plans executed
+Last activity: 2026-06-07 -- Phase 05 Plan 05 complete
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -67,6 +67,9 @@ Recent decisions affecting current work:
 - [Phase ?]: Reverse-flush process.nextTick queue in runCommand to fix ssh2 mock event-before-listener timing
 - [Phase 05]: Agents accept optional model param for test injection — getModel() used as default, enabling scripted mock responses in tests without env setup — Degradation and mock-output tests require injecting a LanguageModelV1 directly; optional param keeps production callers unchanged
 - [Phase 05]: AgentUnavailableError exported from problem-analyzer.ts as the shared error class — avoids a separate shared file for a single error type — All four agents share the same error class; co-locating with problem-analyzer keeps the surface small and tests can import it alongside runProblemAnalyzer
+- [Phase 05-05]: setDb/resetDb exported from store/db.ts for test isolation — module-level singleton pattern requires explicit injection for JSONL adapter in integration tests; no architectural change to production path
+- [Phase 05-05]: emitEvent side effect also writes to audit log — event bus fans out to SSE, but audit log is the queryable source of truth; tests verify approval.required via getAuditEvents rather than the bus
+- [Phase 05-05]: vi.spyOn used for integration test mocking rather than vi.mock — vi.mock is file-scoped and hoisted, breaking pre-existing agent tests that inject real model instances; spyOn is describe-scoped and restoreable
 
 ### Pending Todos
 
