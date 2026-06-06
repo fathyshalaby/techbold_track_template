@@ -29,7 +29,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetDb();
-  vi.restoreAllMocks();
+  vi.clearAllMocks();
 });
 
 describe('POST /api/runs', () => {
