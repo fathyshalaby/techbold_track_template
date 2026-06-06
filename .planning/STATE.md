@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: "06-01 complete — run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)"
-last_updated: "2026-06-06T23:39:59.065Z"
-last_activity: 2026-06-07 -- Phase 06 Plan 01 complete (run lifecycle routes)
+last_updated: "2026-06-06T23:40:45.427Z"
+last_activity: 2026-06-06 -- Phase 07 execution started
 progress:
   total_phases: 9
-  completed_phases: 5
-  total_plans: 24
-  completed_plans: 22
-  percent: 56
+  completed_phases: 6
+  total_plans: 27
+  completed_plans: 24
+  percent: 67
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-06)
 
 **Core value:** Win B+C (55 pts) — solve hidden Linux-service incidents on fresh VMs, safely and auditably
-**Current focus:** Phase 06 — run-api-approvals-sse
+**Current focus:** Phase 07 — activity-generation
 
 ## Current Position
 
-Phase: 06 (run-api-approvals-sse) — EXECUTING
-Plan: 4 of 4
-Status: Ready to execute
-Last activity: 2026-06-07 -- Phase 06 Plan 01 complete (run lifecycle routes)
+Phase: 07 (activity-generation) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 07
+Last activity: 2026-06-06 -- Phase 07 execution started
 
 Progress: [██░░░░░░░░] 25%
 

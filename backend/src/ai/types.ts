@@ -43,6 +43,15 @@ export const ValidationResultSchema = z
     }
   });
 
+export const ActivityDraftFieldsSchema = z.object({
+  summary: z.string(),
+  rootCause: z.string(),
+  actionsTaken: z.string(),
+  commandsSummary: z.string(),
+  validationResult: z.string(),
+});
+
 export type DiagnosticProposal = z.infer<typeof DiagnosticProposalSchema>;
 export type FixProposal = z.infer<typeof FixProposalSchema>;
 export type ValidationResult = z.infer<typeof ValidationResultSchema>;
+export type ActivityDraftFields = z.infer<typeof ActivityDraftFieldsSchema>;
