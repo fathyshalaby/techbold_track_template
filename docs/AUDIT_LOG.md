@@ -237,6 +237,27 @@ Third pass with the *"how does SSH command execution actually behave on a broken
 
 **Verdict.** The executor now matches how a careful technician runs commands non-interactively over SSH: deterministic shell, no input hang, hard timeout, capped output, faithful exit code. One real operational defect fixed; remaining items are deliberate, documented trade-offs. Full suite **357 pass / 0 fail**, `tsc` clean.
 
+### Phase 4 — Research / Reuse Audit (OSINT & adjacent-knowledge lens, commit `ec77a1d`)
+Fourth and final Phase-4 pass: *"what does the SSH-execution domain already know, and is `ssh2` + a hand-rolled executor the right build?"* — guilty-until-proven-necessary.
+
+**Is the custom executor justified, or reinvention?** *Justified.* `ssh2` (mscdex) is the de-facto pure-JS SSH client for Node; the alternatives are thin wrappers over it. **node-ssh** (steelbrain) was the strongest reuse candidate — a Promise wrapper whose `execCommand` returns `{stdout, stderr, code, signal}` — but it has **no built-in per-command timeout or output cap**, which are our two hardest requirements; adopting it would mean re-adding that exact logic plus a dependency, for no net gain. `ssh2-exec`/`node-ssh2-exec` are similar. **Verdict: keep `ssh2` + our executor; borrow the one piece of knowledge node-ssh encodes that we missed (signal capture).**
+
+**Issue found & repaired — signal-terminated exits lost (commit `ec77a1d`).** Research of `ssh2`'s API + RFC 4254 §6.10 confirmed the `'exit'` event fires as `(null, signalName, didCoreDump, description)` when the remote process is **killed by a signal**. Our handler only kept numeric codes, so an **OOM-kill (SIGKILL) or segfault (SIGSEGV)** — a top Linux incident class ("the service keeps getting OOM-killed") — surfaced as a meaningless `exitCode -1`. **Fix:** encode the signal the way `bash` itself does — `exitCode = 128 + signum` — so SIGKILL→**137**, SIGSEGV→**139**, SIGTERM→**143**. Chosen over adding a `signal` field because it preserves the fixed 5-key result contract (ARCHITECTURE §3) and 137/139 are exactly what a technician reads off a shell. +2 regression tests; suite 357 → 359, `tsc` clean.
+
+**Reuse opportunities evaluated & declined (with reason):**
+- **node-ssh / ssh2-promise** — wrap the same `ssh2`; lack timeout+cap; we'd reimplement those anyway. Borrowed the signal-capture lesson instead. Declined as a dependency.
+- **`keepaliveInterval` for long commands** (ssh2 supports it; default off) — our commands are ≤30 s and the 30 s timeout backstops a stall; enabling it risks spurious "keepalive timeout" errors (ssh2 issue #367). Declined for v1; revisit only if a command budget exceeds a network idle window.
+- **`channel.close()` after hitting the output cap** to stop receiving early — saves bandwidth on a runaway `cat`, but output is already bounded by the command and the 30 s timeout; marginal. Deferred.
+- **`set -o pipefail` in the wrap** — would make `a | b` report a failed `a`; but it changes shell semantics and the agent proposes mostly single commands. Declined; noted.
+
+**Adjacent-knowledge borrowed (Nebenwissenschaft):** *SSH protocol standard* (RFC 4251-4254): channel `exit-status` vs `exit-signal` messages — the basis of the fix. *Failure analysis / RCA:* 137/139/143 are the canonical fingerprints operators pattern-match (OOM vs segfault vs graceful-term) — surfacing them feeds the diagnosis loop. *Reliability eng.:* the known ssh2 gotcha "remote process may survive `.end()`/`.signal('KILL')`" (issues #382/#513) — accepted because our model already reports `timedOut` and the run advances.
+
+**Strategic recommendations (ranked):** (1) *Done:* signal capture. (2) *Phase 5:* steer the agent to batch flags + bounded reads (already logged). (3) *Strategic / real-VM:* the one thing no unit test can prove is behaviour against a live sshd — schedule the `docker compose` + real-VM smoke before freeze (the recurring "works-in-mock, breaks-on-real" risk). (4) *If commands ever exceed ~30 s:* revisit keepalive + a longer per-command budget.
+
+**Verdict.** The executor is the correct build (validated against `ssh2`/node-ssh/RFC 4254), now enriched with the protocol's own signal semantics rather than only the happy path. Four lenses (completeness, test-strategy, ops, research/reuse) have exercised Phase 4; full suite **359 pass / 0 fail**.
+
+*Sources: [ssh2 (mscdex)](https://github.com/mscdex/ssh2) · [node-ssh (steelbrain)](https://github.com/steelbrain/node-ssh) · RFC 4254 §6.10 (SSH exit-signal) · ssh2 issues [#367](https://github.com/mscdex/ssh2/issues/367) (keepalive) / [#382](https://github.com/mscdex/ssh2/issues/382) (closing long-running processes).*
+
 ---
 
 ## Cross-phase open items (carry forward)
@@ -254,4 +275,4 @@ Third pass with the *"how does SSH command execution actually behave on a broken
 
 ---
 
-*Last updated: Phase 4 (ops-audit pass — stdin-hang fix; SSH suite 44, full suite 357 pass). Append a new section per phase as it is audited.*
+*Last updated: Phase 4 (research/reuse pass — 4 lenses complete; signal-exit capture; SSH suite 46, full suite 359 pass). Append a new section per phase as it is audited.*
