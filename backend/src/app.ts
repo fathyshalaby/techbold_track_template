@@ -5,6 +5,7 @@ import { healthRouter } from './routes/health.js';
 import { ticketsRouter } from './routes/tickets.js';
 import { runsRouter } from './routes/runs.js';
 import { approvalsRouter } from './routes/approvals.js';
+import { eventsRouter } from './routes/events.js';
 
 // Log details server-side; return a generic message so internal details (and any
 // secret-bearing error text) never leak to the client. Exported so it is unit-testable.
@@ -22,6 +23,7 @@ app.route('/health', healthRouter);
 app.route('/api/tickets', ticketsRouter);
 app.route('/api/runs', runsRouter);
 app.route('/api/runs', approvalsRouter);
+app.route('/api/runs', eventsRouter);
 
 app.onError((err, c) => {
   console.error(err);
