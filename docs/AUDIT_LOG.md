@@ -117,6 +117,27 @@ Second pass with a different lens: *test strategy, invariants, and regression pr
 
 **Verdict.** No feature bloat, no dead code, no premature optimization in the safety layer — it is appropriately minimal for the rubric. One latent contract bug fixed; remaining items are deferred test-depth upgrades, correctly scoped to the phases that introduce their call sites.
 
+### Phase 3 — Ops Audit (senior Linux/ERP technician lens, commit `4056445`)
+Third pass with the *"understand the manual repair first, then check the automation matches expert behaviour"* lens (veteran sysadmin / ERP ops). The first two passes hunted **under-blocking** (security hard-fails). This pass hunted the opposite failure that those miss: **over-blocking legitimate repairs**, which silently destroys the B-score (troubleshooting, 35%) by making real incidents unfixable.
+
+**Manual-process baseline.** How a senior tech fixes the top Linux-service incidents on a fresh VM: *service down* → `systemctl status` / `journalctl -u` → fix config (`nginx -t` then reload/restart); *disk full* → `df -h`, `du -sh`, then `logrotate -f` / `gzip` / move a file / delete a *specific* file; *permission denied on web root* → `chown -R <svc-user> /var/www/...` + `chmod -R 755 ...`; *port not listening* → `ss -tulpn`, check bind/firewall. The gate must permit these (gated to human approval), not hard-block them.
+
+**Issue found & repaired — recursive chmod/chown over-block (commit `4056445`).**
+Proven by probe: **6 of the most common legitimate permission repairs were `HIGH_RISK_BLOCKED`** (not even human-approvable), including `chown -R www-data:www-data /var/www/html`, `chown -R nginx:nginx /var/lib/myapp`, `chmod -R 755 /var/www/html`, `chown -R user:user /home/user/app`. The old rules blocked *any* recursive chmod/chown under `/var|/home|/srv|/usr` — but application code/data lives exactly there. Per the hackathon hard-fail list, only `chmod 777` is a hard-fail; the rest is normal expert work. **Fix:** reworked to block only the genuinely dangerous shapes — `777` anywhere; chmod/chown on `/` or a *bare* top-level dir; recursive chmod/chown under a critical system tree (`/etc /boot /bin /sbin /lib /root /dev /proc /sys`, `/usr` except `/usr/local`), anchored to the top-level path component so `/var/lib/<app>` is not falsely caught by the `/lib/` substring. App-path repairs now classify `MEDIUM` (human-approved, never auto-run). **+22 regression tests** (allowed-repairs + dangerous-still-blocked); suite 166 → 188; all prior hard-fail blocks re-verified intact.
+
+**Automation-vs-expert gaps documented as accepted (not bugs):**
+- **Disk-full via logs has no *destructive* automated path — by design.** `truncate`/`> /var/log/...`/`rm /var/log/...`/`journalctl --vacuum-*` are all blocked as the log-wiping hard-fail. This is correct for the rubric, but it means the *destructive* expert remedy is unavailable. The **non-destructive** expert remedies survive and are the intended path: `logrotate -f`, `gzip <log>`, `mv <log> <other-vol>` (all allowed → MEDIUM). Operators/demo must know to use these; a pure "journal is full" incident may require a human acting outside the tool.
+- **`find … -delete` and `rm -rf` are blocked even on `/tmp`.** Conservative (these are the classic footguns); scratch cleanup is done via specific `rm <file>` or `find … -print` then targeted removal. Accepted.
+- **`env`/`printenv` and inline interpreters (`python3 -c`) blocked.** Slightly aggressive but defensible (env dumps secrets; `-c` = arbitrary code). Expert alternative for service env: `systemctl show <svc> -p Environment` (allowed). Accepted.
+- **Leading `sudo` demotes read-only diagnostics from SAFE to MEDIUM** (anchored allowlist). Harmless (just more approvals); on a sudo-required VM, SAFE auto-approve rarely fires. *Consideration:* strip a leading `sudo ` before classifying if an auto-approve tier ever lands (tied to the R0/unattended-grading question). Deferred.
+
+**Operational risk register (failure modes a tech would watch):**
+- *Misleading truncated reads:* `cat <huge log>` is SAFE but the 16 KB redaction cap (and the Phase-4 executor cap) keep the **head**; real errors are at the **tail**. Agent prompt + executor must prefer bounded tail reads (`tail -n`, `journalctl -n`). **Carry-forward to Phase 4/5.**
+- *Hang on follow commands:* `tail -f`, `journalctl -f`, `ping` (no `-c`) never return — needs the Phase-4 per-command timeout. **Carry-forward to Phase 4.**
+- *Validation after fix:* the gate doesn't verify a repair worked (`systemctl is-active`, re-curl) — that's the validator agent's job. **Carry-forward to Phase 5.**
+
+**Verdict.** The layer now matches expert behaviour in both directions: it blocks what a careful tech would never run unguarded, and permits (under approval) what a tech routinely does to fix incidents. No remaining over-blocks on core repair workflows; residual blocks are deliberate hard-fail boundaries with documented safe alternatives.
+
 ---
 
 ## Cross-phase open items (carry forward)
@@ -126,7 +147,10 @@ Second pass with a different lens: *test strategy, invariants, and regression pr
 - **Per-VM run lock / state-machine race coverage** — due when the run lifecycle lands (Phase 6).
 - **Property-based fuzz tests for the safety blocklist** (`fast-check`) — secret-path×verb/flag permutations + whitespace/quote insertion always blocked. Highest-value test upgrade; do in a hardening pass if time allows before freeze.
 - **Phase-6 integration test: gate re-runs on the edited command** — assert an approval-time edit is re-validated and a blocked edit cannot execute (the "re-check after human edit" invariant; no call site exists until the orchestrator lands).
+- **Prefer bounded tail reads in agent prompt + executor** (Phase 4/5) — `cat <huge log>` returns a truncated *head*; real errors are at the tail. Steer the model to `tail -n` / `journalctl -n`.
+- **Per-command timeout for follow/stream commands** (Phase 4) — `tail -f`, `journalctl -f`, `ping` without `-c` never return; executor must enforce a hard timeout + output cap.
+- **Document safe disk-full-via-logs playbook** for demo/operators — `logrotate -f` / `gzip` / `mv`, never `truncate`/`rm` on `/var/log` (hard-fail).
 
 ---
 
-*Last updated: Phase 3 (deep-audit pass). Append a new section per phase as it is audited.*
+*Last updated: Phase 3 (ops-audit pass). Append a new section per phase as it is audited.*
