@@ -166,6 +166,31 @@ Legit text-processing (`awk '{print $1}'`), app start (`node server.js`), and do
 
 ---
 
+# Phase 4 — SSH executor (`ssh/{client,executor,factory,mock,types}.ts`, `ai/tools/ssh-tools.ts`)
+
+**Audited:** `gsd/phase-04-ssh-executor` @ `ac59e16`. Lens: completeness/critical-path + "works-in-mock, breaks-on-real". Then **completed and landed on `main`** (merge `3d67a74` + impl `1d811fd`).
+
+### Headline finding — the phase was incomplete (executor unimplemented)
+The branch shipped the executor **test spec** (`ssh-executor.test.ts`, 244 lines — excellent) and the **mock** (`mock.ts`, 14/14 green), but `ssh/executor.ts` was still a stub (`export {}`). The phase's own `04-04-SUMMARY` admitted it: *"271 pass, 13 fail — pre-existing RED state from the 04-02 executor stub."* This is the single critical-path component for the B-score (acting on a real VM); without it only mock mode works. Plans `04-03` (preflight) and `04-05` (tools factory) were also unexecuted (no summaries). **Decision (with user): implement the full phase + land on `main` with no regressions.**
+
+### What was good (kept as-is)
+`types.ts` clean (`CommandResult` matches ARCHITECTURE §3; `SshConnectionError` with ES5 prototype fix). `mock.ts` solid — 11 fixtures driving the full diagnose→fix→validate loop, zero `ssh2` import, identical interface to real. The RED spec encoded the right contract (5-key result, per-stream 16 KB cap, 30 s timeout, `bash -lc`, `LANG=C`, anti-pattern A1 guard).
+
+### Issues found & repaired (commit `1d811fd`, on `main`)
+1. **🔴 Real executor missing → implemented.** `ssh/client.ts` `openSshConnection()` (fresh key-auth, 10 s connect timeout, `SshConnectionError`, key path/bytes never logged, tolerant key read). `ssh/executor.ts` `executeApprovedCommand()` (`bash -lc` wrap + `LANG=C`, per-stream 16 KB cap = `REDACTION_CAP_BYTES`, 30 s timeout that **kills the channel and resolves `timedOut:true` — never hangs**, exact 5-key shape, returns RAW output so the caller redacts) + `runPreflight()` (`sudo -n true`/`LANG=C`/PATH; sudo failure **non-fatal** per G7) + `RealSshExecutor`/`createRealSshExecutor`. `ssh/factory.ts` `createSshExecutor()` selects mock/real via `resolveClientMode('ssh')` (mirrors phoenix). `ai/tools/ssh-tools.ts` `proposeSshCommand` tool with **no `execute`** — `executeApprovedCommand` intentionally absent here (anti-pattern A1).
+2. **🟠 Test-harness bug that hid the gap → fixed.** The ssh2 mock delivered the channel *after* its `data`/`exit`/`close` emits (a `process.nextTick` race), so any real executor's listeners attached too late and never saw `close` → infinite hang (13 tests × 5 s timeout = 65 s). Because GREEN was never implemented, nobody caught it. Fixed the mock to deliver the channel synchronously, matching real ssh2 (callback first, then stream events).
+3. **🟠 Non-portable guard tests → fixed.** Both guards used `execSync('grep … 2>/dev/null || true')` (bash-only; threw under Windows `cmd.exe`, green only on Linux/CI). Replaced with a cross-platform `fs` recursive scan (excludes comment lines).
+4. **🟡 Spec gaps → filled.** Added `runPreflight` tests (sudo-ok and sudo-unavailable-non-fatal) and a connection-failure test (`SshConnectionError`). The mock's `DEFAULT_FALLBACK_RESULT` returning `exitCode 0` (could mask "command not found" in an offline demo) is **noted, accepted** (mock-only).
+
+**Verification:** full backend suite **346 pass / 0 fail / 1 skipped** (was 13 RED), **`tsc --noEmit` clean**, SSH tests 33/33. Merge brought Julian's types+mock+planning into `main` with **no conflict** with the Phase-3 safety fixes (`socat` etc. confirmed intact). Native `better-sqlite3` build needs the Docker toolchain locally (pre-existing env limitation, not a regression).
+
+### Considerations (research/upgrade lens)
+- **Connection reuse:** stateless fresh-connect-per-command is correct for v1 (matches the one-approval-one-exec gate); pooling explicitly deferred. Sound.
+- **Carry-forward now partly addressed:** the 30 s channel-kill timeout resolves the earlier "follow/stream commands hang" risk (`tail -f`, `journalctl -f`, `ping` without `-c`) at the executor level — they now time out cleanly rather than hanging the run.
+- **Still open for Phase 5/6:** the executor returns RAW output **by design** — the orchestrator MUST call `redactSecrets()` before audit/SSE/UI/model (the redaction-at-sink invariant); add an integration test for that when the call site lands. Bounded *tail* reads should be steered by the agent prompt (a `cat` of a huge log returns a truncated head).
+
+---
+
 ## Cross-phase open items (carry forward)
 - **AI SDK v4 vs v5/v6** — pin/reconcile before the Phase-5 agent loop.
 - **`docker compose up` smoke on a real Docker host** — confirm the non-root image + graceful shutdown + (now) the live `createActivity` 422 shape. Mocks ≠ reality.
@@ -173,10 +198,11 @@ Legit text-processing (`awk '{print $1}'`), app start (`node server.js`), and do
 - **Per-VM run lock / state-machine race coverage** — due when the run lifecycle lands (Phase 6).
 - **Property-based fuzz tests for the safety blocklist** (`fast-check`) — secret-path×verb/flag permutations + whitespace/quote insertion always blocked. Highest-value test upgrade; do in a hardening pass if time allows before freeze.
 - **Phase-6 integration test: gate re-runs on the edited command** — assert an approval-time edit is re-validated and a blocked edit cannot execute (the "re-check after human edit" invariant; no call site exists until the orchestrator lands).
-- **Prefer bounded tail reads in agent prompt + executor** (Phase 4/5) — `cat <huge log>` returns a truncated *head*; real errors are at the tail. Steer the model to `tail -n` / `journalctl -n`.
-- **Per-command timeout for follow/stream commands** (Phase 4) — `tail -f`, `journalctl -f`, `ping` without `-c` never return; executor must enforce a hard timeout + output cap.
+- **Prefer bounded tail reads in agent prompt** (Phase 5) — `cat <huge log>` returns a truncated *head*; real errors are at the tail. Steer the model to `tail -n` / `journalctl -n`.
+- ~~**Per-command timeout for follow/stream commands**~~ ✅ **resolved in Phase 4** (`1d811fd`) — the 30 s channel-kill timeout makes `tail -f`/`journalctl -f`/`ping` time out cleanly instead of hanging the run.
+- **Redaction-at-sink integration test** (Phase 5/6) — the SSH executor returns RAW output by design; assert the orchestrator runs `redactSecrets()` before audit/SSE/UI/model (no call site exists until the orchestrator lands).
 - **Document safe disk-full-via-logs playbook** for demo/operators — `logrotate -f` / `gzip` / `mv`, never `truncate`/`rm` on `/var/log` (hard-fail).
 
 ---
 
-*Last updated: Phase 3 (research/reuse pass — 4 lenses complete, 201 safety tests). Append a new section per phase as it is audited.*
+*Last updated: Phase 4 (SSH executor implemented + landed on main; full suite 346 pass). Append a new section per phase as it is audited.*
