@@ -254,4 +254,4 @@ Third pass with the *"how does SSH command execution actually behave on a broken
 
 ---
 
-*Last updated: Phase 4 (ops-audit pass — stdin-hang fix; SSH suite 45, full suite 357 pass). Append a new section per phase as it is audited.*
+*Last updated: Phase 4 (ops-audit pass — stdin-hang fix; SSH suite 44, full suite 357 pass). Append a new section per phase as it is audited.*
