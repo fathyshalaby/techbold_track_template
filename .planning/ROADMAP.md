@@ -140,7 +140,7 @@ Plans:
 Plans:
 **Wave 1** *(independent)*
 
-- [ ] 05-01-PLAN.md — RunPhase enum migration + agent Zod schemas (DiagnosticProposal, FixProposal, ValidationResult)
+- [x] 05-01-PLAN.md — RunPhase enum migration + agent Zod schemas (DiagnosticProposal, FixProposal, ValidationResult)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -225,7 +225,7 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 | 2. ERP Client + Ticket Routes | 3/3 | Complete    | 2026-06-06 |
 | 3. Safety Layer + Run Store | 4/4 | Complete    | 2026-06-06 |
 | 4. SSH Executor | 5/5 | Complete    | 2026-06-06 |
-| 5. Agent Loop + Orchestrator | 0/TBD | Not started | - |
+| 5. Agent Loop + Orchestrator | 1/5 | In progress | - |
 | 6. Run API + Approvals + SSE | 0/TBD | Not started | - |
 | 7. Activity Generation | 0/TBD | Not started | - |
 | 8. Frontend | 0/TBD | Not started | - |
