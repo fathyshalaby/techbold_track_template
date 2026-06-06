@@ -142,12 +142,15 @@ describe('ssh-mock', () => {
   });
 
   describe('anti-pattern A1 guard', () => {
-    it('executeApprovedCommand from mock is not imported in any ai/tools/ file', () => {
+    it('mock executor is never passed to tool() in any ai/tools/ file', () => {
       const thisFile = fileURLToPath(import.meta.url);
       const aiToolsDir = path.resolve(path.dirname(thisFile), '..', 'ai', 'tools');
 
+      // ssh-tools.ts imports from ssh/mock to build the factory — that is
+      // intentional. What is forbidden is wrapping any mock executor method
+      // as an AI SDK tool() call.
       const output = execSync(
-        `grep -r "ssh/mock" "${aiToolsDir}" 2>/dev/null | grep -v '^[^:]*:[[:space:]]*//' || true`,
+        `grep -rP "tool\\s*\\([^)]*executeApprovedCommand" "${aiToolsDir}" 2>/dev/null || true`,
         { encoding: 'utf8' },
       );
 

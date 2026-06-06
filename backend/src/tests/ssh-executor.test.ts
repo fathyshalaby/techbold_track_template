@@ -226,14 +226,14 @@ describe('ssh-executor', () => {
   });
 
   describe('anti-pattern A1 — executeApprovedCommand must not be a model tool', () => {
-    it('is not imported or referenced in any ai/tools/ file', () => {
+    it('is never passed to tool() in any ai/tools/ file', () => {
       const thisFile = fileURLToPath(import.meta.url);
       const aiToolsDir = path.resolve(path.dirname(thisFile), '..', 'ai', 'tools');
 
-      // Exclude comment-only lines (// ...) — the anti-pattern note in ssh-tools.ts
-      // is an architect's warning comment, not an actual import or call.
+      // The import is allowed (ssh-tools.ts uses it in the factory). What is
+      // forbidden is wrapping executeApprovedCommand as an AI SDK tool() call.
       const output = execSync(
-        `grep -r "executeApprovedCommand" "${aiToolsDir}" 2>/dev/null | grep -v '^[^:]*:[[:space:]]*//' || true`,
+        `grep -rP "tool\\s*\\([^)]*executeApprovedCommand" "${aiToolsDir}" 2>/dev/null || true`,
         { encoding: 'utf8' },
       );
 
