@@ -1,9 +1,16 @@
 # Secrets & keys — NEVER commit these
 .env
+.env.*
+!.env.example
 keys/*
 !keys/.gitkeep
 *.pem
 *.key
+# Hackathon-provided credentials & material (Azure key, Phoenix token, SSH keys, VM info)
+important_stuff.txt
+*secret*
+*credentials*
+tb-hackathon-ssh/
 
 # Python
 __pycache__/

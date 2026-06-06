@@ -1,0 +1,27 @@
+{
+  "name": "techbold-backend-node",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node ../shared/tests/check_safety.mjs"
+  },
+  "dependencies": {
+    "@ai-sdk/azure": "^3.0.70",
+    "@ai-sdk/openai-compatible": "^2.0.48",
+    "@hono/node-server": "^1.13.7",
+    "ai": "^6.0.197",
+    "hono": "^4.6.14",
+    "ssh2": "^1.17.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/ssh2": "^1.15.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

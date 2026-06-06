@@ -1,23 +1,44 @@
 services:
-  backend:
-    build: ./backend
+  # ---- Python build (FastAPI + paramiko + openai SDK) — port 8000 ----
+  backend-py:
+    build: ./backend-py
     env_file:
       - path: .env
         required: false   # copy .env.example -> .env; the stack still starts without it
+    environment:
+      SHARED_DIR: /shared
     ports:
       - "8000:8000"
     volumes:
-      # Your SSH private key(s). Put your .pem in ./keys (git-ignored).
-      - ./keys:/keys:ro
+      - ./keys:/keys:ro          # your SSH private key(s) — git-ignored
+      - ./shared:/shared:ro      # safety rules + prompts (single source of truth)
     extra_hosts:
-      # Lets the container reach a Phoenix mock running on the host, if you run one.
+      - "host.docker.internal:host-gateway"   # reach a host-run Phoenix mock / local LLM
+
+  # ---- Node build (Vercel AI SDK + ssh2) — port 8001 ----
+  backend-node:
+    build: ./backend-node
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SHARED_DIR: /shared
+      PORT: "8001"
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./keys:/keys:ro
+      - ./shared:/shared:ro
+    extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # ---- React technician workspace (Vite) — port 5173 ----
   frontend:
     build: ./frontend
     environment:
+      # Point at backend-py (8000) or backend-node (8001) to demo either build.
       VITE_API_BASE: http://localhost:8000
     ports:
       - "5173:5173"
     depends_on:
-      - backend
+      - backend-py
