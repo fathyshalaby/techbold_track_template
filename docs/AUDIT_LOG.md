@@ -66,6 +66,27 @@ First phase with real domain content: a resilient REST client consuming the Phoe
 
 ---
 
+## Phase 3 — Safety layer (command policy gate · classifier · redaction)
+
+**Audited:** `backend/src/safety/{command-policy,classifier,redaction,risk-levels}.ts` + their tests. Lens: adversarial red-team (treat the gate as an attacker would) + scoring lens (C = safety/audit, 20% — and a single secret-exposure / destructive command auto-approved is a **hard-fail that zeros the incident**).
+
+### Issues found & repaired (commit `6a62e7c`, on `main`)
+Adversarially proved **15 dangerous commands bypassed** `validateCommandAgainstPolicy` — several classified `SAFE_READ_ONLY` (i.e. auto-approvable while reading secrets). All now `HIGH_RISK_BLOCKED`.
+
+1. **Embedded-quote obfuscation defeated the literal blocklist.** `cat /etc/sh''adow`, `cat /etc/sh"a"dow`, `r"m" -rf /etc` slipped through because `normalizeCommand` only stripped *wrapping* quotes per token. → Now strips **all** quote chars (`result.replace(/['"]/g, '')`) for detection only; the original command is what executes.
+2. **Secret-file rules keyed only on `cat`.** Any other reader/verb/flag/redirect touching a secret path was allowed: `grep . /etc/shadow`, `head -n 5 /etc/shadow`, `tac`, `cat -n`, `cat < /etc/shadow`, `xxd`, `cp /etc/shadow /tmp/x`, `/etc/gshadow`, SSH host keys, `id_*` private keys, `/proc/self/environ`, `.env`/`/etc/environment`. → Added **path-based `secret-file-access` rules** that block ANY command referencing those paths regardless of verb.
+3. **`ufw disable` bypassed by a flag.** `ufw --force disable` matched neither `/\bufw\s+disable\b/`. → Made flag-tolerant (`/\bufw\b[^;&|]*\bdisable\b/i`) and added `service <ufw|firewalld|auditd|apparmor|fail2ban> stop`.
+4. **Log truncation via redirect.** `> /var/log/auth.log`, `: > /var/log/syslog` wipe the audit trail but only `truncate`/`journalctl --vacuum` were caught. → Added `>\s*/var/log/` redirect rule.
+
+**Verification:** added **17 permanent regression tests** (`safety-policy.test.ts` → `audit regression` block) covering every proven bypass; full safety suite **142 → 159 passing**; re-ran the adversarial proof harness — all 15 now blocked, then deleted it. Targeted-safe variants (`chmod 755 /srv/app/uploads`, `systemctl restart nginx`) confirmed still allowed (no over-blocking).
+
+### Considerations (research/upgrade lens)
+- **Declined (over-engineering):** full shell-AST parsing (`bash -n` / tree-sitter) to defeat *every* obfuscation — the strip-and-match approach + "unknown ⇒ MEDIUM, never SAFE" default + mandatory HITL covers the realistic threat surface for graded VMs; a parser is a large dependency + new attack surface for marginal gain.
+- **Noted, acceptable:** base64/`$(...)`/`eval` indirection isn't decoded — but such commands classify `MEDIUM_RISK_CHANGE` (never auto-approved), so a human still gates them. Documented as the intended backstop, not a hole.
+- **Strength confirmed:** redaction's 16 KB output cap + secret regexes, and the deny-list-then-classify ordering, are sound; `classifyCommand` correctly fails closed to MEDIUM for unknown verbs.
+
+---
+
 ## Cross-phase open items (carry forward)
 - **AI SDK v4 vs v5/v6** — pin/reconcile before the Phase-5 agent loop.
 - **`docker compose up` smoke on a real Docker host** — confirm the non-root image + graceful shutdown + (now) the live `createActivity` 422 shape. Mocks ≠ reality.
@@ -74,4 +95,4 @@ First phase with real domain content: a resilient REST client consuming the Phoe
 
 ---
 
-*Last updated: Phase 2. Append a new section per phase as it is audited.*
+*Last updated: Phase 3. Append a new section per phase as it is audited.*
