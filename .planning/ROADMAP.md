@@ -63,7 +63,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 02-03-PLAN.md — In-memory mock + ticket route wiring
+- [x] 02-03-PLAN.md — In-memory mock + ticket route wiring
 
 **UI hint**: yes
 
@@ -178,7 +178,7 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Repo Foundation | 3/3 | Complete    | 2026-06-06 |
-| 2. ERP Client + Ticket Routes | 2/3 | In progress | - |
+| 2. ERP Client + Ticket Routes | 3/3 | Complete    | 2026-06-06 |
 | 3. Safety Layer + Run Store | 0/TBD | Not started | - |
 | 4. SSH Executor | 0/TBD | Not started | - |
 | 5. Agent Loop + Orchestrator | 0/TBD | Not started | - |
