@@ -11,7 +11,7 @@ Nine phases derived directly from the locked build-order critical path in docs/T
 - Integer phases (1–9): The locked hackathon build order
 - Decimal phases: Inserted only under /gsd-phase --insert if urgent work appears mid-stream
 
-- [ ] **Phase 1: Repo Foundation** - Migrate to Node 22 + Hono + TS; validated env; mock mode toggle
+- [x] **Phase 1: Repo Foundation** - Migrate to Node 22 + Hono + TS; validated env; mock mode toggle (completed 2026-06-06)
 - [ ] **Phase 2: ERP Client + Ticket Routes** - Phoenix client with auth/retry/mock; ticket list + detail endpoints
 - [ ] **Phase 3: Safety Layer + Run Store** - Deterministic blocklist/classifier/redaction + tests; append-only SQLite audit log
 - [ ] **Phase 4: SSH Executor** - ssh2 single-command executor with timeout/redaction/output-cap + mock + preflight hardening
@@ -164,7 +164,7 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Repo Foundation | 2/3 | In Progress|  |
+| 1. Repo Foundation | 3/3 | Complete   | 2026-06-06 |
 | 2. ERP Client + Ticket Routes | 0/TBD | Not started | - |
 | 3. Safety Layer + Run Store | 0/TBD | Not started | - |
 | 4. SSH Executor | 0/TBD | Not started | - |
