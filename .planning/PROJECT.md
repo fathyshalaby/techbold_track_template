@@ -14,14 +14,14 @@ Win the scoring rubric. 55 of 100 points are **B (troubleshooting, 35) + C (safe
 
 ### Validated
 
-(None yet — backend is a dead FastAPI skeleton to be replaced; frontend is a placeholder. Nothing ships until P0-1 migration lands.)
+- [x] Repo migrated to Node 22 + Hono + TypeScript; `docker compose up` serves `GET /health` — *Validated in Phase 1: Repo Foundation*
+- [x] Zod-validated env config; `.env.example` with placeholders only, no committed secrets — *Validated in Phase 1: Repo Foundation*
+- [x] Mock mode (`MOCK_MODE`) drives the full loop offline for Phoenix, SSH, and LLM — *Validated in Phase 1: Repo Foundation*
+- [x] Typed Phoenix ERP client (list tickets, get customer-system, create activity) + in-memory mock — *Validated in Phase 2: ERP Client + Ticket Routes*
+- [x] Ticket routes with title/customer/priority/status + sort/filter; detail + SSH-target view; graceful 401/404/empty handling — *Validated in Phase 2: ERP Client + Ticket Routes*
 
 ### Active
 
-- [ ] Repo migrated to Node 22 + Hono + TypeScript; `docker compose up` serves `GET /health`
-- [ ] Zod-validated env config; `.env.example` with placeholders only, no committed secrets
-- [ ] Typed Phoenix ERP client (list tickets, get customer-system, create activity) + in-memory mock
-- [ ] Ticket list with title/customer/priority/status + sort/filter; detail + SSH-target view
 - [ ] Deterministic safety layer: blocklist, risk classifier, secret redaction — tested
 - [ ] Run store + append-only audit log (SQLite, JSONL fallback)
 - [ ] ssh2 single-command executor (timeout, output cap, exit code, redaction) + mock
@@ -91,4 +91,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-06 after initialization*
+*Last updated: 2026-06-06 after Phase 2 (ERP Client + Ticket Routes) completion*
