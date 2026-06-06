@@ -138,6 +138,32 @@ Proven by probe: **6 of the most common legitimate permission repairs were `HIGH
 
 **Verdict.** The layer now matches expert behaviour in both directions: it blocks what a careful tech would never run unguarded, and permits (under approval) what a tech routinely does to fix incidents. No remaining over-blocks on core repair workflows; residual blocks are deliberate hard-fail boundaries with documented safe alternatives.
 
+### Phase 3 — Research / Reuse Audit (OSINT & adjacent-knowledge lens, commit `8242bd9`)
+Fourth and final Phase-3 pass with the *"discover everything that already exists before building"* lens — treat the custom safety layer as guilty until proven necessary, and borrow accumulated industry/community knowledge instead of re-deriving it.
+
+**Is the custom gate justified, or reinvention?** *Justified — with external validation.* The pattern we built (a deterministic runtime layer that intercepts every proposed command and returns permit / deny / defer-to-human) is exactly what the 2025 agent-security literature and the **OWASP Agentic Top 10** converge on ("runtime enforcement intercepts tool calls before execution… deterministic permit/deny/defer; prompt guardrails are suggestions, not enforcement"). The **allowlist-for-auto-approve + blocklist-for-deny + MEDIUM-default** shape matches the documented least-privilege best practice for restricted command execution (RHEL sudo hardening: "allowing specific commands is more secure than disallowing"). Off-the-shelf alternatives were considered and **declined for the hackathon**: restricted shells (`rbash`) are trivially escaped; full sandboxing (seccomp/AppArmor/SELinux/`bubblewrap`/Firejail) governs *our* process, not commands on the *remote* VM, so they don't fit the SSH-executor model; a generic policy engine (OPA/Rego) is real infra overhead for ~25 rules. **Conclusion: keep the custom gate; reuse the corpora, not a framework.**
+
+**Issues found & repaired — borrowed-corpus gaps (commit `8242bd9`).** The deny-list caught wrapped commands only when the *inner* payload was itself blocklisted (substring matching); a tool-based exec escape with a benign-looking inner command slipped through to MEDIUM. Sourced concrete gaps from **GTFOBins** (curated LOLBin corpus), **MITRE ATT&CK T1059** (command/scripting interpreter), and **gitleaks/trufflehog** secret rulesets:
+- `socat` (reverse/bind shells, tunnels) — was MEDIUM → now blocked wholesale (like `nc`).
+- `node -e/-p/--eval/--print`, `php -r`, `lua -e` — added to the inline-interpreter rule next to python/perl/ruby.
+- `awk/gawk/mawk 'BEGIN{system(...)}'` — the canonical GTFOBins exec escape; was MEDIUM → blocked.
+- `/dev/udp/` reverse shell — literal-rule symmetry with `/dev/tcp/`.
+- **Redaction:** standalone **JWT** (`eyJ….eyJ….sig`) — borrowed gitleaks pattern; catches a bare token in a log/config not prefixed by `Bearer`.
+Legit text-processing (`awk '{print $1}'`), app start (`node server.js`), and dotted identifiers (`service.unit.name`) verified unaffected. **+13 regression tests; suite 188 → 201.**
+
+**Reuse opportunities evaluated & declined (with reason):**
+- **Adopt a secret-scanning lib as a dependency** (gitleaks/detect-secrets) rather than hand-rolled regexes — declined: those are CLI/Go tools or heavier Python deps; we *borrowed the high-value patterns* (JWT) instead, keeping the layer dependency-free and deterministic. Revisit only if secret surface grows.
+- **`shell-quote`/`tree-sitter-bash` real parsing** — re-confirmed declined (consistent across all four passes): parser + attack surface for marginal gain over strip-and-match + MEDIUM-floor + HITL.
+- **OPA/Rego, restricted shells, seccomp/AppArmor/Firejail** — wrong layer or disproportionate (see above).
+
+**Adjacent-knowledge borrowed (Nebenwissenschaft):** *Reliability eng.* — fail-safe defaults (unknown ⇒ MEDIUM, never SAFE) = the "fail closed" principle. *Cybersecurity* — defense-in-depth (deny-list ∧ classifier ∧ redaction ∧ HITL), least privilege, LOLBin/living-off-the-land awareness. *Decision science / HCI* — the four-tier risk ladder mirrors graded-autonomy / human-in-the-loop escalation; the residual `sudo`-demotes-to-MEDIUM friction is a deliberate safety-over-throughput trade. *Auditability* — append-only redacted trail = traceability/explainability for the C-score.
+
+**Strategic recommendations (ranked):** (1) *Quick win, deferred:* property-based fuzz over the deny-list (`fast-check`) — already logged. (2) *Quick win:* periodically diff our rules against the GTFOBins list as a corpus (one-time mining done this pass; re-mine if rules grow). (3) *Strategic:* if an unattended/auto-approve tier ever lands (R0), revisit `sudo`-stripping and a tighter SAFE allowlist — tie to the mentor R0 answer. (4) *Hidden risk:* the gate governs the *command*, not the *remote effect* — a human still owns the blast radius; keep the approval UX showing the matched rule + risk tier so approvals are informed.
+
+**Verdict.** The custom safety layer is the correct build (validated against OWASP/industry practice), now hardened with the community's accumulated LOLBin/secret knowledge rather than only our own imagination. Four independent lenses (red-team under-block, test-strategy/contract, ops over-block, research/reuse) have now exercised it; 201 tests green.
+
+*Sources: [GTFOBins](https://gtfobins.org/) · [OWASP Agentic Top 10 / agent-security literature](https://arxiv.org/pdf/2605.24309) · [RHEL sudo hardening](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/security_hardening/managing-sudo-access) · gitleaks/trufflehog secret rulesets.*
+
 ---
 
 ## Cross-phase open items (carry forward)
@@ -153,4 +179,4 @@ Proven by probe: **6 of the most common legitimate permission repairs were `HIGH
 
 ---
 
-*Last updated: Phase 3 (ops-audit pass). Append a new section per phase as it is audited.*
+*Last updated: Phase 3 (research/reuse pass — 4 lenses complete, 201 safety tests). Append a new section per phase as it is audited.*
