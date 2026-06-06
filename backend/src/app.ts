@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { healthRouter } from './routes/health.js';
+import { ticketsRouter } from './routes/tickets.js';
 
 export const app = new Hono();
 
@@ -8,6 +9,7 @@ export const app = new Hono();
 app.use('*', cors());
 
 app.route('/health', healthRouter);
+app.route('/api/tickets', ticketsRouter);
 
 app.onError((err, c) => {
   return c.json({ error: err.message }, 500);
