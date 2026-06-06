@@ -218,3 +218,49 @@ describe('Agent Zod schemas', () => {
     ).toThrow(z.ZodError);
   });
 });
+
+describe('Prompt generalization (DIAG-02 / SC2)', () => {
+  it('PROBLEM_ANALYZER_SYSTEM_PROMPT does not contain hardcoded incident identifiers', async () => {
+    const { PROBLEM_ANALYZER_SYSTEM_PROMPT } = await import('../ai/prompts.js');
+    expect(PROBLEM_ANALYZER_SYSTEM_PROMPT).not.toMatch(/\b(status-api|vm-01|EADDRINUSE)\b/i);
+  });
+
+  it('CUSTOMER_SYSTEM_ANALYZER_SYSTEM_PROMPT does not contain hardcoded incident identifiers', async () => {
+    const { CUSTOMER_SYSTEM_ANALYZER_SYSTEM_PROMPT } = await import('../ai/prompts.js');
+    expect(CUSTOMER_SYSTEM_ANALYZER_SYSTEM_PROMPT).not.toMatch(/\b(status-api|vm-01|ticket[_-]?\d+)\b/i);
+  });
+
+  it('PROBLEM_SOLVER_SYSTEM_PROMPT does not contain hardcoded incident identifiers', async () => {
+    const { PROBLEM_SOLVER_SYSTEM_PROMPT } = await import('../ai/prompts.js');
+    expect(PROBLEM_SOLVER_SYSTEM_PROMPT).not.toMatch(/\b(status-api|vm-01|8080)\b/i);
+  });
+
+  it('VALIDATOR_SYSTEM_PROMPT does not contain hardcoded incident identifiers', async () => {
+    const { VALIDATOR_SYSTEM_PROMPT } = await import('../ai/prompts.js');
+    expect(VALIDATOR_SYSTEM_PROMPT).not.toMatch(/\b(is-active|vm-01|status-api)\b/i);
+  });
+
+  it('each prompt is non-trivial (length > 200)', async () => {
+    const {
+      PROBLEM_ANALYZER_SYSTEM_PROMPT,
+      CUSTOMER_SYSTEM_ANALYZER_SYSTEM_PROMPT,
+      PROBLEM_SOLVER_SYSTEM_PROMPT,
+      VALIDATOR_SYSTEM_PROMPT,
+    } = await import('../ai/prompts.js');
+    expect(PROBLEM_ANALYZER_SYSTEM_PROMPT.length).toBeGreaterThan(200);
+    expect(CUSTOMER_SYSTEM_ANALYZER_SYSTEM_PROMPT.length).toBeGreaterThan(200);
+    expect(PROBLEM_SOLVER_SYSTEM_PROMPT.length).toBeGreaterThan(200);
+    expect(VALIDATOR_SYSTEM_PROMPT.length).toBeGreaterThan(200);
+  });
+
+  it('VALIDATOR_SYSTEM_PROMPT distinguishes LIKELY_FIXED from VERIFIED_FIXED', async () => {
+    const { VALIDATOR_SYSTEM_PROMPT } = await import('../ai/prompts.js');
+    expect(VALIDATOR_SYSTEM_PROMPT).toMatch(/LIKELY_FIXED/);
+    expect(VALIDATOR_SYSTEM_PROMPT).toMatch(/VERIFIED_FIXED/);
+  });
+
+  it('VALIDATOR_SYSTEM_PROMPT does not instruct using is-active as sole proof', async () => {
+    const { VALIDATOR_SYSTEM_PROMPT } = await import('../ai/prompts.js');
+    expect(VALIDATOR_SYSTEM_PROMPT).not.toMatch(/\bis-active\b/);
+  });
+});
