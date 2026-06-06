@@ -12,7 +12,7 @@ Nine phases derived directly from the locked build-order critical path in docs/T
 - Decimal phases: Inserted only under /gsd-phase --insert if urgent work appears mid-stream
 
 - [x] **Phase 1: Repo Foundation** - Migrate to Node 22 + Hono + TS; validated env; mock mode toggle (completed 2026-06-06)
-- [ ] **Phase 2: ERP Client + Ticket Routes** - Phoenix client with auth/retry/mock; ticket list + detail endpoints
+- [x] **Phase 2: ERP Client + Ticket Routes** - Phoenix client with auth/retry/mock; ticket list + detail endpoints (completed 2026-06-06)
 - [ ] **Phase 3: Safety Layer + Run Store** - Deterministic blocklist/classifier/redaction + tests; append-only SQLite audit log
 - [ ] **Phase 4: SSH Executor** - ssh2 single-command executor with timeout/redaction/output-cap + mock + preflight hardening
 - [ ] **Phase 5: Agent Loop + Orchestrator** - problem_analyzer, problem_solver, validator agents + deterministic state machine
@@ -51,7 +51,20 @@ Nine phases derived directly from the locked build-order critical path in docs/T
   4. A 401, 404, or empty ticket list from Phoenix degrades gracefully without crashing the server
   5. The in-memory mock returns valid fixtures for every client method used in the agent loop
 
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1**
+
+- [x] 02-01-PLAN.md — Phoenix Zod type schemas (TDD: schema parsing contracts)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 02-02-PLAN.md — Phoenix HTTP client with auth/retry/timeout + rubric-E tests (TDD)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 02-03-PLAN.md — In-memory mock + ticket route wiring
+
 **UI hint**: yes
 
 ### Phase 3: Safety Layer + Run Store
@@ -164,8 +177,8 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Repo Foundation | 3/3 | Complete   | 2026-06-06 |
-| 2. ERP Client + Ticket Routes | 0/TBD | Not started | - |
+| 1. Repo Foundation | 3/3 | Complete    | 2026-06-06 |
+| 2. ERP Client + Ticket Routes | 3/3 | Complete    | 2026-06-06 |
 | 3. Safety Layer + Run Store | 0/TBD | Not started | - |
 | 4. SSH Executor | 0/TBD | Not started | - |
 | 5. Agent Loop + Orchestrator | 0/TBD | Not started | - |

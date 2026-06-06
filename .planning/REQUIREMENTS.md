@@ -11,19 +11,19 @@ Requirements for the hackathon submission (code freeze Sun Jun 7, 14:00). Each m
 
 ### Platform (Repo, Env, Reproducibility)
 
-- [ ] **PLAT-01**: Backend migrated to Node 22 + Hono + TypeScript; `docker compose up` serves `GET /health → {status:"ok"}` and the frontend still loads at :5173 — *E*
-- [ ] **PLAT-02**: Zod-validated env config fails fast with a readable message on a missing required var — *E*
-- [ ] **PLAT-03**: `.env.example` present with placeholders only; `.env` and `keys/` git-ignored; no secrets committed — *C/E*
-- [ ] **PLAT-04**: Mock mode (`MOCK_MODE`) drives the full loop offline for Phoenix, SSH, and LLM — *E*
+- [x] **PLAT-01**: Backend migrated to Node 22 + Hono + TypeScript; `docker compose up` serves `GET /health → {status:"ok"}` and the frontend still loads at :5173 — *E*
+- [x] **PLAT-02**: Zod-validated env config fails fast with a readable message on a missing required var — *E*
+- [x] **PLAT-03**: `.env.example` present with placeholders only; `.env` and `keys/` git-ignored; no secrets committed — *C/E*
+- [x] **PLAT-04**: Mock mode (`MOCK_MODE`) drives the full loop offline for Phoenix, SSH, and LLM — *E*
 
 ### ERP Workflow (Phoenix Client + Tickets)
 
-- [ ] **ERP-01**: Typed Phoenix client lists assigned tickets via the ERP API (auth, 8s timeout, 1 retry on 5xx) — *A*
-- [ ] **ERP-02**: Ticket list shows title, customer, priority, and status — *A*
-- [ ] **ERP-03**: Ticket list supports sort/filter by at least status, priority, or date — *A*
-- [ ] **ERP-04**: Customer-system (SSH target) information loads for a ticket — *A*
-- [ ] **ERP-05**: Auth (401), 404, and empty states degrade gracefully without breaking the workflow — *A*
-- [ ] **ERP-06**: In-memory Phoenix mock returns fixtures for every client method used in the loop — *E*
+- [x] **ERP-01**: Typed Phoenix client lists assigned tickets via the ERP API (auth, 8s timeout, 1 retry on 5xx) — *A*
+- [x] **ERP-02**: Ticket list shows title, customer, priority, and status — *A*
+- [x] **ERP-03**: Ticket list supports sort/filter by at least status, priority, or date — *A*
+- [x] **ERP-04**: Customer-system (SSH target) information loads for a ticket — *A*
+- [x] **ERP-05**: Auth (401), 404, and empty states degrade gracefully without breaking the workflow — *A*
+- [x] **ERP-06**: In-memory Phoenix mock returns fixtures for every client method used in the loop — *E*
 
 ### Safety & Audit
 
@@ -113,16 +113,16 @@ Explicitly excluded (PRD §6.3, §11). Documented to prevent scope creep.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PLAT-01 | Phase 1 | Pending |
-| PLAT-02 | Phase 1 | Pending |
-| PLAT-03 | Phase 1 | Pending |
-| PLAT-04 | Phase 1 | Pending |
-| ERP-01 | Phase 2 | Pending |
-| ERP-02 | Phase 2 | Pending |
-| ERP-03 | Phase 2 | Pending |
-| ERP-04 | Phase 2 | Pending |
-| ERP-05 | Phase 2 | Pending |
-| ERP-06 | Phase 2 | Pending |
+| PLAT-01 | Phase 1 | Complete |
+| PLAT-02 | Phase 1 | Complete |
+| PLAT-03 | Phase 1 | Complete |
+| PLAT-04 | Phase 1 | Complete |
+| ERP-01 | Phase 2 | Complete |
+| ERP-02 | Phase 2 | Complete |
+| ERP-03 | Phase 2 | Complete |
+| ERP-04 | Phase 2 | Complete |
+| ERP-05 | Phase 2 | Complete |
+| ERP-06 | Phase 2 | Complete |
 | SAFE-01 | Phase 3 | Pending |
 | SAFE-02 | Phase 3 | Pending |
 | SAFE-03 | Phase 3 | Pending |
@@ -154,6 +154,7 @@ Explicitly excluded (PRD §6.3, §11). Documented to prevent scope creep.
 | ENG-04 | Phase 9 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 39 total (REQUIREMENTS.md header said 36 — that count was stale; actual count is 39 after PLAT/ERP/SAFE/DIAG/API/ACT/UX/ENG IDs enumerated)
 - Mapped to phases: 39/39
 - Unmapped: 0
