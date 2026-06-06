@@ -113,8 +113,13 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
   // ── Disable security controls ─────────────────────────────────────────────
   {
     ruleName: 'disable-security',
-    pattern: /\bufw\s+disable\b/i,
+    pattern: /\bufw\b[^;&|]*\bdisable\b/i,
     reason: 'Disabling the firewall is forbidden',
+  },
+  {
+    ruleName: 'disable-security',
+    pattern: /\bservice\s+(ufw|firewalld|auditd|apparmor|fail2ban)\s+stop\b/i,
+    reason: 'Stopping a security service via `service` is forbidden',
   },
   {
     ruleName: 'disable-security',
@@ -206,6 +211,35 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
     reason: 'printenv/env may expose secrets; use specific non-secret reads instead',
   },
 
+  // ── Secret-FILE access (ANY command/verb, not just `cat`) ──────────────────
+  // The rules above keyed on `cat`; these block reading a secret PATH with any
+  // reader (head/tac/less/grep/awk/xxd/strings/cp/scp/dd/redirect/…) or flag.
+  {
+    ruleName: 'secret-file-access',
+    pattern: /\/etc\/(shadow|gshadow)\b/i,
+    reason: 'Accessing the shadow password file (any command) is forbidden',
+  },
+  {
+    ruleName: 'secret-file-access',
+    pattern: /\/etc\/ssh\/ssh_host_[a-z0-9]+_key\b/i,
+    reason: 'Accessing SSH host private keys is forbidden',
+  },
+  {
+    ruleName: 'secret-file-access',
+    pattern: /(?:^|[\s\/=])id_(rsa|dsa|ecdsa|ed25519)\b|\.ssh\/[^\s]*id_/i,
+    reason: 'Accessing SSH private keys is forbidden',
+  },
+  {
+    ruleName: 'secret-file-access',
+    pattern: /\/proc\/(self|\d+)\/environ\b/i,
+    reason: 'Reading process environment (any command) exposes secrets',
+  },
+  {
+    ruleName: 'secret-file-access',
+    pattern: /(?:^|[\s\/=])\.env(?:\.[\w-]+)?(?=$|[\s|;&])|\/etc\/environment\b/i,
+    reason: 'Reading .env or system environment files (any command) exposes secrets',
+  },
+
   // ── Hide tracks ───────────────────────────────────────────────────────────
   {
     ruleName: 'hide-tracks',
@@ -226,6 +260,12 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
     ruleName: 'hide-tracks',
     pattern: /\brm\b.*(\/var\/log\/|~\/\.bash_history)/i,
     reason: 'Deleting log files or shell history is forbidden',
+  },
+  {
+    ruleName: 'hide-tracks',
+    // `> /var/log/x` or `: > /var/log/x` truncates a log via redirect
+    pattern: />\s*\/var\/log\//i,
+    reason: 'Truncating a log file via redirect is forbidden',
   },
   {
     ruleName: 'hide-tracks',
@@ -302,10 +342,10 @@ function normalizeCommand(cmd: string): string {
   // 2. Collapse runs of whitespace to single space
   result = result.replace(/\s+/g, ' ');
 
-  // 3. Strip wrapping single/double quotes around individual tokens
-  //    e.g. 'rm' → rm, "chmod" → chmod
-  result = result.replace(/(?<!\S)'([^\s']+)'(?!\S)/g, '$1');
-  result = result.replace(/(?<!\S)"([^\s"]+)"(?!\S)/g, '$1');
+  // 3. Strip ALL quote characters so embedded-quote obfuscation cannot hide a
+  //    keyword or path from the blocklist (e.g. cat /etc/sh''adow, r"m" -rf /etc).
+  //    Normalisation is detection-only — the original command is what executes.
+  result = result.replace(/['"]/g, '');
 
   // 4. Handle $() and backtick subshell wrappers
   //    Simple literal: $(echo foo) → foo

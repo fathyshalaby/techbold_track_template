@@ -244,4 +244,34 @@ describe('safety — policy and classifier', () => {
     expect(dangerousEditResult.matchedRule).toBeTruthy();
   });
 
+  // ─── Regression: bypasses found in the Phase-3 adversarial audit ──────────
+  // These all ALLOWED before the fix (quote-obfuscation defeated the literal
+  // blocklist; secret-file rules only matched `cat`). Must stay blocked.
+  describe('audit regression — obfuscation & secret-file bypasses', () => {
+    it.each([
+      "cat /etc/sh''adow",                 // embedded-quote obfuscation
+      'cat /etc/sh"a"dow',
+      'r"m" -rf /etc',
+      'grep . /etc/shadow',                // non-cat reader of a secret path
+      'head -n 5 /etc/shadow',
+      'tac /etc/shadow',
+      'cat -n /etc/shadow',                // cat with a flag
+      'cat < /etc/shadow',                 // cat via redirect
+      'xxd /etc/shadow',
+      'cp /etc/shadow /tmp/x',             // copy a secret out
+      'cat /etc/gshadow',
+      'cat /etc/ssh/ssh_host_rsa_key',     // host private key
+      'cat /proc/self/environ',
+      'ufw --force disable',               // firewall disable with a flag
+      'service firewalld stop',
+      '> /var/log/auth.log',               // log truncation via redirect
+      ': > /var/log/syslog',
+    ])('blocks "%s"', (cmd) => {
+      const result = validateCommandAgainstPolicy(cmd);
+      expect(result.allowed).toBe(false);
+      expect(result.riskLevel).toBe(RiskLevel.HIGH_RISK_BLOCKED);
+      expect(result.matchedRule).toBeTruthy();
+    });
+  });
+
 });
