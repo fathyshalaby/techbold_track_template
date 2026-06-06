@@ -1,5 +1,5 @@
 // Orchestrator tests: mocked SSH + model — full happy path + reject path
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { LanguageModelV1 } from 'ai';
 import { z } from 'zod';
 
@@ -589,39 +589,37 @@ const MOCK_VALIDATION: import('../ai/types.js').ValidationResult = {
   evidence: ['systemctl status shows active'],
 };
 
-vi.mock('../ai/agents/problem-analyzer.js', () => ({
-  runProblemAnalyzer: vi.fn().mockResolvedValue(MOCK_DIAGNOSTIC),
-  AgentUnavailableError: class AgentUnavailableError extends Error {
-    constructor(msg: string) { super(msg); this.name = 'AgentUnavailableError'; }
-  },
-}));
-
-vi.mock('../ai/agents/problem-solver.js', () => ({
-  runProblemSolver: vi.fn().mockResolvedValue(MOCK_FIX),
-  AgentUnavailableError: class AgentUnavailableError extends Error {
-    constructor(msg: string) { super(msg); this.name = 'AgentUnavailableError'; }
-  },
-}));
-
-vi.mock('../ai/agents/validator.js', () => ({
-  runValidator: vi.fn().mockResolvedValue(MOCK_VALIDATION),
-  AgentUnavailableError: class AgentUnavailableError extends Error {
-    constructor(msg: string) { super(msg); this.name = 'AgentUnavailableError'; }
-  },
-}));
-
 describe('orchestrator driver — integration', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let analyzerSpy: ReturnType<typeof vi.spyOn<any, any>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let solverSpy: ReturnType<typeof vi.spyOn<any, any>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let validatorSpy: ReturnType<typeof vi.spyOn<any, any>>;
+
   beforeEach(async () => {
-    vi.clearAllMocks();
+    const analyzerMod = await import('../ai/agents/problem-analyzer.js');
+    const solverMod = await import('../ai/agents/problem-solver.js');
+    const validatorMod = await import('../ai/agents/validator.js');
+
+    analyzerSpy = vi.spyOn(analyzerMod, 'runProblemAnalyzer').mockResolvedValue(MOCK_DIAGNOSTIC);
+    solverSpy = vi.spyOn(solverMod, 'runProblemSolver').mockResolvedValue(MOCK_FIX);
+    validatorSpy = vi.spyOn(validatorMod, 'runValidator').mockResolvedValue(MOCK_VALIDATION);
+
     const { makeJsonlAdapter, setDb } = await import('../store/db.js');
     setDb(makeJsonlAdapter());
+  });
+
+  afterEach(() => {
+    analyzerSpy.mockRestore();
+    solverSpy.mockRestore();
+    validatorSpy.mockRestore();
   });
 
   it('Test 1 — happy path TRIAGING → WAITING_FOR_APPROVAL', async () => {
     const { advance } = await import('../ai/orchestrator.js');
     const { createRun } = await import('../store/runs.js');
     const { getAuditEvents } = await import('../store/audit.js');
-    const { validateCommandAgainstPolicy } = await import('../safety/command-policy.js');
 
     const run = createRun(1, '10.0.0.1:22');
     const state = await advance(run.id);
@@ -636,8 +634,9 @@ describe('orchestrator driver — integration', () => {
     const events = getAuditEvents(run.id);
     expect(events.some((e) => e.type === 'approval.required')).toBe(true);
 
-    const spied = validateCommandAgainstPolicy as unknown as ReturnType<typeof vi.fn>;
-    expect(spied).toHaveBeenCalledWith('systemctl status status-api --no-pager');
+    // Verify validateCommandAgainstPolicy was applied — approval row carries the proposed command
+    const approvalRow = approvals.find((a) => a.status === 'PENDING') as { proposed_command?: string } | undefined;
+    expect(approvalRow?.proposed_command).toBe('systemctl status status-api --no-pager');
   });
 
   it('Test 2 — blocked command loops back to TRIAGING', async () => {

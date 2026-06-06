@@ -1,5 +1,23 @@
 import type { RunPhaseValue, RunStatusValue, AuditEvent, Observation } from '../store/schema.js';
 import type { DiagnosticProposal, FixProposal, ValidationResult } from './types.js';
+import type { DbAdapter } from '../store/db.js';
+import type { Run } from '../store/schema.js';
+import { getDb, setDb } from '../store/db.js';
+import { getRunById, updateRunPhase, updateRunStatus } from '../store/runs.js';
+import {
+  appendAuditEvent,
+  appendObservation,
+  createPendingApproval,
+  appendCommandResult,
+  updateApprovalStatus,
+} from '../store/audit.js';
+import { runEventBus } from '../events/run-event-bus.js';
+import { validateCommandAgainstPolicy } from '../safety/command-policy.js';
+import { redactSecrets } from '../safety/redaction.js';
+import { runProblemAnalyzer } from './agents/problem-analyzer.js';
+import { runProblemSolver } from './agents/problem-solver.js';
+import { runValidator } from './agents/validator.js';
+import { MockSshExecutor } from '../ssh/mock.js';
 
 export { type DiagnosticProposal, type FixProposal, type ValidationResult };
 
@@ -65,7 +83,6 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
     return { nextState: state, sideEffects: [] };
   }
 
-  // Global: unrecoverable_error transitions any non-terminal phase to FAILED
   if (event.type === 'unrecoverable_error') {
     const nextState = buildState(state, { phase: 'FAILED', status: 'FAILED', errorMessage: event.message });
     return {
@@ -78,7 +95,6 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
     };
   }
 
-  // Global: abort from abortable phases
   if (event.type === 'abort' && ABORTABLE_PHASES.has(state.phase)) {
     const nextState = buildState(state, { phase: 'ABORTED', status: 'ABORTED' });
     return {
@@ -91,7 +107,6 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
     };
   }
 
-  // Max-steps guard: fires before advancing on proposal events
   if (
     (event.type === 'diagnostic_proposal_ready' || event.type === 'fix_proposal_ready') &&
     state.stepCount >= MAX_STEPS
@@ -246,4 +261,374 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
   }
 
   return { nextState: state, sideEffects: [] };
+}
+
+// ─── Step-count persistence ────────────────────────────────────────────────────
+
+const STEP_COUNT_SOURCE = 'system' as const;
+const STEP_COUNT_TYPE = 'stepCount';
+
+function readStepCount(runId: string, db: DbAdapter): number {
+  const rows = db.all<{ source: string; content: string }>(
+    'SELECT * FROM observations WHERE run_id = ?',
+    [runId],
+  );
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i];
+    if (row.source !== STEP_COUNT_SOURCE) continue;
+    try {
+      const parsed = JSON.parse(row.content) as { type?: string; value?: number };
+      if (parsed.type === STEP_COUNT_TYPE) return parsed.value ?? 0;
+    } catch {
+      // ignore malformed
+    }
+  }
+  return 0;
+}
+
+function writeStepCount(runId: string, count: number, db: DbAdapter): void {
+  const id = `obs_sc_${runId}_${count}_${Date.now()}`;
+  const now = new Date().toISOString();
+  db.run(
+    'INSERT INTO observations (id, run_id, source, content, created_at) VALUES (?, ?, ?, ?, ?)',
+    [id, runId, STEP_COUNT_SOURCE, JSON.stringify({ type: STEP_COUNT_TYPE, value: count }), now],
+  );
+}
+
+export function setStepCountForTest(runId: string, count: number, db: DbAdapter): void {
+  writeStepCount(runId, count, db);
+}
+
+export function createInitialState(run: Run): OrchestratorState {
+  return {
+    runId: run.id,
+    phase: run.current_phase,
+    status: run.status,
+    stepCount: 0,
+    ticketId: run.ticket_id,
+    customerSystemId: run.customer_system_id,
+  };
+}
+
+// ─── Side-effect performer ─────────────────────────────────────────────────────
+
+async function performSideEffects(effects: SideEffect[], _db: DbAdapter): Promise<void> {
+  for (const effect of effects) {
+    switch (effect.type) {
+      case 'updateRunPhase':
+        updateRunPhase(effect.runId, effect.phase);
+        break;
+      case 'updateRunStatus':
+        updateRunStatus(effect.runId, effect.status);
+        break;
+      case 'appendAuditEvent':
+        appendAuditEvent(effect.runId, effect.auditType, effect.actor, effect.payload);
+        break;
+      case 'appendObservation':
+        // content is already redacted by the driver before passing to the effect
+        appendObservation(effect.runId, effect.source, effect.content);
+        break;
+      case 'createPendingApproval': {
+        const proposal = effect.proposal;
+        const policyResult = validateCommandAgainstPolicy(proposal.command);
+        const isDiagnostic = 'hypotheses' in proposal;
+        createPendingApproval(effect.runId, {
+          proposedCommand: proposal.command,
+          purpose: isDiagnostic ? proposal.purpose : proposal.rationale,
+          expectedSignal: isDiagnostic ? proposal.expectedSignal : 'Fix applied successfully',
+          riskLevel: policyResult.riskLevel,
+          safetyNotes: policyResult.reason ?? policyResult.matchedRule ?? '',
+        });
+        break;
+      }
+      case 'emitEvent':
+        runEventBus.emit(effect.runId, effect.eventType, effect.payload);
+        // Mirror to audit log so the event is queryable alongside other audit events
+        appendAuditEvent(effect.runId, effect.eventType, 'system', effect.payload);
+        break;
+    }
+  }
+}
+
+// ─── Agent dispatch (auto-advance) ────────────────────────────────────────────
+
+async function agentDispatch(
+  state: OrchestratorState,
+  db: DbAdapter,
+): Promise<OrchestratorState> {
+  const stepCount = readStepCount(state.runId, db);
+  const currentState = { ...state, stepCount };
+
+  switch (currentState.phase) {
+    case 'CREATED': {
+      appendAuditEvent(currentState.runId, 'run.started', 'system', {});
+      updateRunPhase(currentState.runId, 'LOADED_CONTEXT');
+      updateRunStatus(currentState.runId, 'RUNNING');
+      updateRunPhase(currentState.runId, 'TRIAGING');
+      const triagedState: OrchestratorState = {
+        ...currentState,
+        phase: 'TRIAGING',
+        status: 'RUNNING',
+      };
+      return agentDispatch(triagedState, db);
+    }
+
+    case 'LOADED_CONTEXT': {
+      updateRunPhase(currentState.runId, 'TRIAGING');
+      return agentDispatch({ ...currentState, phase: 'TRIAGING' }, db);
+    }
+
+    case 'TRIAGING': {
+      // Max-steps guard fires before calling the agent
+      if (currentState.stepCount >= MAX_STEPS) {
+        const { nextState, sideEffects } = reduce(currentState, {
+          type: 'diagnostic_proposal_ready',
+          // Dummy proposal — reducer will short-circuit to WAITING_FOR_ACTIVITY_REVIEW
+          proposal: {
+            hypotheses: [{ cause: '', evidence: '', confidence: 0 }],
+            command: '',
+            purpose: '',
+            expectedSignal: '',
+            riskNotes: '',
+            isReadOnly: true,
+          },
+        });
+        await performSideEffects(sideEffects, db);
+        return nextState;
+      }
+
+      try {
+        const observations = db
+          .all<{ content: string; source: string }>('SELECT * FROM observations WHERE run_id = ?', [currentState.runId])
+          .filter((o) => o.source !== STEP_COUNT_SOURCE)
+          .map((o) => o.content);
+
+        const proposal = await runProblemAnalyzer({
+          ticketDescription: `Ticket #${currentState.ticketId} — system: ${currentState.customerSystemId}`,
+          observations,
+        });
+
+        const policyResult = validateCommandAgainstPolicy(proposal.command);
+
+        if (!policyResult.allowed) {
+          const { nextState, sideEffects } = reduce(currentState, {
+            type: 'command_blocked',
+            reason: policyResult.reason ?? policyResult.matchedRule ?? 'blocked',
+            command: proposal.command,
+          });
+          await performSideEffects(sideEffects, db);
+          return nextState;
+        }
+
+        const { nextState, sideEffects } = reduce(currentState, {
+          type: 'diagnostic_proposal_ready',
+          proposal,
+        });
+        writeStepCount(currentState.runId, nextState.stepCount, db);
+        await performSideEffects(sideEffects, db);
+        return nextState;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        appendAuditEvent(currentState.runId, 'agent.unavailable', 'system', { message });
+        return currentState;
+      }
+    }
+
+    case 'PLANNING_FIX': {
+      if (currentState.stepCount >= MAX_STEPS) {
+        const { nextState, sideEffects } = reduce(currentState, {
+          type: 'fix_proposal_ready',
+          proposal: {
+            rootCause: '',
+            command: '',
+            rationale: '',
+            rollbackCommand: '',
+            isReversible: true,
+            persistenceNote: '',
+          },
+        });
+        await performSideEffects(sideEffects, db);
+        return nextState;
+      }
+
+      try {
+        const observations = db
+          .all<{ content: string; source: string }>('SELECT * FROM observations WHERE run_id = ?', [currentState.runId])
+          .filter((o) => o.source !== STEP_COUNT_SOURCE)
+          .map((o) => o.content);
+
+        const proposal = await runProblemSolver({
+          ticketDescription: `Ticket #${currentState.ticketId} — system: ${currentState.customerSystemId}`,
+          observations,
+        });
+
+        const policyResult = validateCommandAgainstPolicy(proposal.command);
+
+        if (!policyResult.allowed) {
+          const { nextState, sideEffects } = reduce(currentState, {
+            type: 'command_blocked',
+            reason: policyResult.reason ?? policyResult.matchedRule ?? 'blocked',
+            command: proposal.command,
+          });
+          await performSideEffects(sideEffects, db);
+          // PLANNING_FIX has no command_blocked transition — route back to TRIAGING
+          return { ...nextState, phase: 'TRIAGING' };
+        }
+
+        const { nextState, sideEffects } = reduce(currentState, {
+          type: 'fix_proposal_ready',
+          proposal,
+        });
+        writeStepCount(currentState.runId, nextState.stepCount, db);
+        await performSideEffects(sideEffects, db);
+        return nextState;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        appendAuditEvent(currentState.runId, 'agent.unavailable', 'system', { message });
+        return currentState;
+      }
+    }
+
+    case 'VALIDATING': {
+      try {
+        const observations = db
+          .all<{ content: string; source: string }>('SELECT * FROM observations WHERE run_id = ?', [currentState.runId])
+          .filter((o) => o.source !== STEP_COUNT_SOURCE)
+          .map((o) => o.content);
+
+        const result = await runValidator({
+          ticketDescription: `Ticket #${currentState.ticketId} — system: ${currentState.customerSystemId}`,
+          observations,
+          fixApplied: observations[observations.length - 1] ?? '',
+        });
+
+        const { nextState, sideEffects } = reduce(currentState, {
+          type: 'validation_complete',
+          result,
+        });
+        await performSideEffects(sideEffects, db);
+        return nextState;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        appendAuditEvent(currentState.runId, 'agent.unavailable', 'system', { message });
+        return currentState;
+      }
+    }
+
+    case 'DRAFTING_ACTIVITY': {
+      updateRunPhase(currentState.runId, 'WAITING_FOR_ACTIVITY_REVIEW');
+      appendAuditEvent(currentState.runId, 'activity.draft_ready', 'system', {});
+      return { ...currentState, phase: 'WAITING_FOR_ACTIVITY_REVIEW' };
+    }
+
+    default:
+      return currentState;
+  }
+}
+
+// ─── Async driver — public API ─────────────────────────────────────────────────
+
+export async function advance(
+  runId: string,
+  incomingEvent?: OrchestratorEvent,
+  db?: DbAdapter,
+): Promise<OrchestratorState> {
+  if (db) setDb(db);
+
+  const activeDb = getDb();
+
+  const run = getRunById(runId);
+  if (!run) throw new Error(`Run not found: ${runId}`);
+
+  const stepCount = readStepCount(runId, activeDb);
+  const state: OrchestratorState = {
+    runId,
+    phase: run.current_phase,
+    status: run.status,
+    stepCount,
+    ticketId: run.ticket_id,
+    customerSystemId: run.customer_system_id,
+    errorMessage: run.error_message ?? undefined,
+  };
+
+  if (incomingEvent) {
+    if (incomingEvent.type === 'command_approved') {
+      // T-05-13: re-validate finalCommand before any execution (defence-in-depth)
+      const policyResult = validateCommandAgainstPolicy(incomingEvent.finalCommand);
+      if (!policyResult.allowed) {
+        const { nextState, sideEffects } = reduce(state, {
+          type: 'command_blocked',
+          reason: policyResult.reason ?? policyResult.matchedRule ?? 'blocked',
+          command: incomingEvent.finalCommand,
+        });
+        await performSideEffects(sideEffects, activeDb);
+        return nextState;
+      }
+
+      // Transition WAITING_FOR_APPROVAL → EXECUTING_COMMAND
+      const { nextState: executingState, sideEffects: approvalEffects } = reduce(state, incomingEvent);
+      await performSideEffects(approvalEffects, activeDb);
+
+      const sshExecutor = new MockSshExecutor();
+      const [host, portStr] = run.customer_system_id.split(':');
+      const target = {
+        host: host ?? run.customer_system_id,
+        port: parseInt(portStr ?? '22', 10),
+        username: 'azureuser',
+        privateKeyPath: '/keys/id_rsa',
+      };
+
+      const cmdResult = await sshExecutor.executeApprovedCommand(
+        incomingEvent.approvalId,
+        incomingEvent.finalCommand,
+        target,
+      );
+
+      const stdoutRedacted = redactSecrets(cmdResult.stdout);
+      const stderrRedacted = redactSecrets(cmdResult.stderr);
+
+      appendCommandResult(runId, incomingEvent.approvalId, {
+        command: incomingEvent.finalCommand,
+        exitCode: cmdResult.exitCode,
+        stdoutRedacted,
+        stderrRedacted,
+        durationMs: cmdResult.durationMs,
+        timedOut: cmdResult.timedOut,
+      });
+
+      updateApprovalStatus(incomingEvent.approvalId, {
+        status: 'EXECUTED',
+        executedAt: new Date().toISOString(),
+      });
+
+      // Transition EXECUTING_COMMAND → OBSERVING
+      const commandResultEvent = {
+        type: 'command_result' as const,
+        approvalId: incomingEvent.approvalId,
+        result: {
+          id: `res_${incomingEvent.approvalId}`,
+          run_id: runId,
+          approval_id: incomingEvent.approvalId,
+          command: incomingEvent.finalCommand,
+          exit_code: cmdResult.exitCode,
+          stdout_redacted: stdoutRedacted,
+          stderr_redacted: stderrRedacted,
+          duration_ms: cmdResult.durationMs,
+          timed_out: cmdResult.timedOut ? 1 : 0,
+          created_at: new Date().toISOString(),
+        },
+      };
+
+      const { nextState: observingState, sideEffects: observingEffects } = reduce(executingState, commandResultEvent);
+      await performSideEffects(observingEffects, activeDb);
+      return observingState;
+    }
+
+    // All other incoming events
+    const { nextState, sideEffects } = reduce(state, incomingEvent);
+    await performSideEffects(sideEffects, activeDb);
+    return nextState;
+  }
+
+  return agentDispatch(state, activeDb);
 }

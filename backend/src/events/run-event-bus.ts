@@ -1,40 +1,37 @@
 import { EventEmitter } from 'node:events';
 
-const busMap = new Map<string, EventEmitter>();
+class RunEventBus {
+  private readonly emitters = new Map<string, EventEmitter>();
 
-function getBus(runId: string): EventEmitter {
-  let bus = busMap.get(runId);
-  if (!bus) {
-    bus = new EventEmitter();
-    bus.setMaxListeners(50);
-    busMap.set(runId, bus);
+  private getOrCreate(runId: string): EventEmitter {
+    let emitter = this.emitters.get(runId);
+    if (!emitter) {
+      emitter = new EventEmitter();
+      emitter.setMaxListeners(50);
+      this.emitters.set(runId, emitter);
+    }
+    return emitter;
   }
-  return bus;
-}
 
-export const runEventBus = {
   emit(runId: string, eventType: string, payload: unknown): void {
-    getBus(runId).emit(eventType, payload);
-    getBus(runId).emit('*', { eventType, payload });
-  },
+    this.getOrCreate(runId).emit(eventType, payload);
+  }
 
   on(runId: string, eventType: string, listener: (payload: unknown) => void): void {
-    getBus(runId).on(eventType, listener);
-  },
+    this.getOrCreate(runId).on(eventType, listener);
+  }
 
   off(runId: string, eventType: string, listener: (payload: unknown) => void): void {
-    getBus(runId).off(eventType, listener);
-  },
+    this.emitters.get(runId)?.off(eventType, listener);
+  }
 
-  onAny(runId: string, listener: (event: { eventType: string; payload: unknown }) => void): void {
-    getBus(runId).on('*', listener);
-  },
+  removeAllListeners(runId: string): void {
+    const emitter = this.emitters.get(runId);
+    if (emitter) {
+      emitter.removeAllListeners();
+      this.emitters.delete(runId);
+    }
+  }
+}
 
-  offAny(runId: string, listener: (event: { eventType: string; payload: unknown }) => void): void {
-    getBus(runId).off('*', listener);
-  },
-
-  removeAll(runId: string): void {
-    busMap.delete(runId);
-  },
-};
+export const runEventBus = new RunEventBus();
