@@ -4,16 +4,20 @@ import { z } from 'zod';
 
 export const TicketStatusSchema = z.enum(['OPEN', 'PENDING', 'DONE']);
 
-// .strict() rejects unknown keys at the Phoenix → backend trust boundary (T-02-01)
+// Validate the fields we need; tolerate (strip) unknown fields the live ERP may
+// add. Postel's law for an external API we don't control: the live Phoenix
+// already exposes more than the documented OpenAPI, so .strict() would 502 the
+// entire customer-system load on a single benign extra field.
 export const SystemInfoSchema = z.object({
   ip: z.string(),
   port: z.number(),
   username: z.string(),
   os: z.string(),
   notes: z.string().optional(),
-}).strict();
+});
 
-// .strict() rejects unknown keys at the Phoenix → backend trust boundary (T-02-01)
+// Tolerate (strip) unknown fields — see SystemInfoSchema rationale. A real ERP
+// adding a field must NOT break ticket loading (category A + B depend on it).
 export const TicketSchema = z.object({
   id: z.number(),
   title: z.string(),
@@ -25,14 +29,14 @@ export const TicketSchema = z.object({
   tags: z.array(z.string()).optional(),
   sla_due_at: z.string().nullable().optional(),
   created_at: z.string().nullable().optional(),
-}).strict();
+});
 
-// .strict() rejects unknown keys at the Phoenix → backend trust boundary (T-02-01)
+// Tolerate (strip) unknown fields — see SystemInfoSchema rationale.
 export const CustomerSystemSchema = z.object({
   ticket_id: z.number(),
   customer_id: z.number(),
   system: SystemInfoSchema,
-}).strict();
+});
 
 export const EmployeeSchema = z.object({
   id: z.number(),
