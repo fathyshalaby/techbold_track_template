@@ -990,4 +990,54 @@ describe('orchestrator driver — integration', () => {
     expect(sshObs?.content).toContain('exit_code: 1');
     expect(sshObs?.content).toContain('nginx: configuration file test failed');
   });
+
+  // WORKFLOW/EXPERT INVARIANT: a fix is NEVER marked done without validation.
+  // Full journey: diagnose → observe → root cause → plan fix → approve fix →
+  // VALIDATING (was unreachable) → validate → draft. A technician always
+  // re-checks the fix worked before closing the incident.
+  it('Test 13 — full loop: an approved FIX is validated before drafting', async () => {
+    const { advance } = await import('../ai/orchestrator.js');
+    const { createRun } = await import('../store/runs.js');
+    const { getDb } = await import('../store/db.js');
+    const { getAuditEvents } = await import('../store/audit.js');
+    type SshExecutor = import('../ssh/types.js').SshExecutor;
+    const mkExec = () =>
+      ({
+        executeApprovedCommand: vi.fn().mockResolvedValue({
+          stdout: 'ok', stderr: '', exitCode: 0, durationMs: 1, timedOut: false,
+        }),
+        runPreflight: vi.fn(),
+      }) as unknown as SshExecutor;
+
+    const run = createRun(1, '10.0.0.1:22');
+    const db = getDb();
+    const approveLatest = async (cmd: string) => {
+      const pending = db
+        .all<{ id: string; status: string }>('SELECT * FROM command_approvals WHERE run_id = ?', [run.id])
+        .find((a) => a.status === 'PENDING');
+      return advance(
+        run.id,
+        { type: 'command_approved', approvalId: pending!.id, finalCommand: cmd },
+        undefined,
+        mkExec(),
+      );
+    };
+
+    await advance(run.id);                                  // TRIAGING → WAITING (diagnostic)
+    let state = await approveLatest('systemctl status x');  // → OBSERVING
+    expect(state.phase).toBe('OBSERVING');
+    state = await advance(run.id);                          // OBSERVING → PLANNING_FIX (conf 0.85 ≥ 0.8)
+    expect(state.phase).toBe('PLANNING_FIX');
+    state = await advance(run.id);                          // PLANNING_FIX → WAITING (fix proposed)
+    expect(state.phase).toBe('WAITING_FOR_APPROVAL');
+    state = await approveLatest('sudo systemctl restart x'); // execute FIX → VALIDATING (not OBSERVING)
+    expect(state.phase).toBe('VALIDATING');
+    state = await advance(run.id);                          // VALIDATING → validator (VERIFIED_FIXED) → DRAFTING_ACTIVITY
+    expect(state.phase).toBe('DRAFTING_ACTIVITY');
+    state = await advance(run.id);                          // DRAFTING_ACTIVITY → WAITING_FOR_ACTIVITY_REVIEW
+    expect(state.phase).toBe('WAITING_FOR_ACTIVITY_REVIEW');
+
+    const events = getAuditEvents(run.id);
+    expect(events.some((e) => e.type === 'validation.complete')).toBe(true);
+  });
 });

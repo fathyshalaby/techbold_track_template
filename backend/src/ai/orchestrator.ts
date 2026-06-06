@@ -53,7 +53,7 @@ export type OrchestratorEvent =
   | { type: 'command_blocked'; reason: string; command: string }
   | { type: 'command_approved'; approvalId: string; finalCommand: string }
   | { type: 'command_rejected'; reason: string }
-  | { type: 'command_result'; approvalId: string; result: import('../store/schema.js').CommandResult }
+  | { type: 'command_result'; approvalId: string; result: import('../store/schema.js').CommandResult; wasFix?: boolean }
   | { type: 'root_cause_found'; hypothesis: string }
   | { type: 'more_diagnosis_needed' }
   | { type: 'fix_proposal_ready'; proposal: FixProposal }
@@ -200,13 +200,17 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
 
     case 'EXECUTING_COMMAND': {
       if (event.type === 'command_result') {
-        const nextState = buildState(state, { phase: 'OBSERVING' });
+        // A FIX command must be VALIDATED (verify it worked); a DIAGNOSTIC
+        // command goes to OBSERVING (decide root cause). Without this split the
+        // validator was unreachable and fixes were never verified.
+        const nextPhase: RunPhaseValue = event.wasFix ? 'VALIDATING' : 'OBSERVING';
+        const nextState = buildState(state, { phase: nextPhase });
         return {
           nextState,
           sideEffects: [
             { type: 'appendObservation', runId: state.runId, source: 'ssh', content: formatObservation(event.result) },
             auditEffect(state, 'command.completed', 'ssh', { approvalId: event.approvalId, exitCode: event.result.exit_code }),
-            phaseEffect(state, 'OBSERVING'),
+            phaseEffect(state, nextPhase),
           ],
         };
       }
@@ -338,6 +342,36 @@ export function setStepCountForTest(runId: string, count: number, db: DbAdapter)
   writeStepCount(runId, count, db);
 }
 
+// ─── Pending-command kind ('diagnostic' | 'fix') ───────────────────────────────
+// Recorded when a proposal is created so the post-execution router knows whether
+// to OBSERVE (diagnostic → decide root cause) or VALIDATE (fix → verify it
+// worked). Persisted as a system observation (same mechanism as stepCount) —
+// the command_approvals row has no kind column (and is .strict()).
+const PENDING_KIND_TYPE = 'pendingKind';
+type PendingKind = 'diagnostic' | 'fix';
+
+function writePendingKind(runId: string, kind: PendingKind, db: DbAdapter): void {
+  const id = `obs_pk_${runId}_${kind}_${Date.now()}`;
+  db.run(
+    'INSERT INTO observations (id, run_id, source, content, created_at) VALUES (?, ?, ?, ?, ?)',
+    [id, runId, STEP_COUNT_SOURCE, JSON.stringify({ type: PENDING_KIND_TYPE, value: kind }), new Date().toISOString()],
+  );
+}
+
+function readPendingKind(runId: string, db: DbAdapter): PendingKind {
+  const rows = db.all<{ source: string; content: string }>('SELECT * FROM observations WHERE run_id = ?', [runId]);
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i].source !== STEP_COUNT_SOURCE) continue;
+    try {
+      const parsed = JSON.parse(rows[i].content) as { type?: string; value?: string };
+      if (parsed.type === PENDING_KIND_TYPE) return parsed.value === 'fix' ? 'fix' : 'diagnostic';
+    } catch {
+      /* ignore malformed */
+    }
+  }
+  return 'diagnostic';
+}
+
 export function createInitialState(run: Run): OrchestratorState {
   return {
     runId: run.id,
@@ -464,6 +498,7 @@ async function agentDispatch(
           proposal,
         });
         writeStepCount(currentState.runId, nextState.stepCount, db);
+        writePendingKind(currentState.runId, 'diagnostic', db);
         await performSideEffects(sideEffects, db);
         return nextState;
       } catch (err) {
@@ -520,6 +555,7 @@ async function agentDispatch(
           proposal,
         });
         writeStepCount(currentState.runId, nextState.stepCount, db);
+        writePendingKind(currentState.runId, 'fix', db);
         await performSideEffects(sideEffects, db);
         return nextState;
       } catch (err) {
@@ -647,6 +683,10 @@ export async function advance(
         return nextState;
       }
 
+      // Was the approved command a FIX? Determines post-execution routing
+      // (fix → VALIDATING, diagnostic → OBSERVING). Read before the transition.
+      const wasFix = readPendingKind(runId, activeDb) === 'fix';
+
       // Transition WAITING_FOR_APPROVAL → EXECUTING_COMMAND
       const { nextState: executingState, sideEffects: approvalEffects } = reduce(state, incomingEvent);
       await performSideEffects(approvalEffects, activeDb);
@@ -702,11 +742,12 @@ export async function advance(
           timed_out: cmdResult.timedOut ? 1 : 0,
           created_at: new Date().toISOString(),
         },
+        wasFix, // route a fix to VALIDATING, a diagnostic to OBSERVING
       };
 
-      const { nextState: observingState, sideEffects: observingEffects } = reduce(executingState, commandResultEvent);
-      await performSideEffects(observingEffects, activeDb);
-      return observingState;
+      const { nextState: postState, sideEffects: postEffects } = reduce(executingState, commandResultEvent);
+      await performSideEffects(postEffects, activeDb);
+      return postState;
     }
 
     // All other incoming events
