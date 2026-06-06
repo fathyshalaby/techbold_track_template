@@ -171,7 +171,7 @@ Plans:
 Plans:
 **Wave 1** *(independent — run in parallel)*
 
-- [ ] 06-01-PLAN.md — Run routes TDD (POST /api/runs, GET /api/runs/:id, /next, /abort)
+- [x] 06-01-PLAN.md — Run routes TDD (POST /api/runs, GET /api/runs/:id, /next, /abort)
 - [ ] 06-02-PLAN.md — Approval routes TDD (approve with safety re-check, reject with reason)
 - [ ] 06-03-PLAN.md — SSE events route (streamSSE, backfill, keepalive, bus cleanup)
 
