@@ -46,7 +46,11 @@ def is_blocked(command: str) -> bool:
 _SECRET_PATTERNS = [
     re.compile(r"-----BEGIN [^-]*PRIVATE KEY-----.*?-----END [^-]*PRIVATE KEY-----", re.S),
     re.compile(r"(?i)\b(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key)\b\s*[:=]\s*\S+"),
-    re.compile(r"(?i)\bAuthorization:\s*Bearer\s+\S+"),
+    re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._\-]{8,}"),
+    re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b"),       # emails (PII)
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),                                       # AWS access key id
+    re.compile(r"\beyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+"),     # JWT
+    re.compile(r"\bgh[posru]_[A-Za-z0-9]{20,}\b"),                             # GitHub tokens
 ]
 
 
@@ -58,6 +62,8 @@ def redact(text: str | None) -> str:
     for value in (settings.phoenix_api_token, settings.azure_openai_api_key, settings.openrouter_api_key):
         if value and len(value) >= 6:
             s = s.replace(value, "***REDACTED***")
+    # connection strings: scheme://user:password@host -> scheme://user:***@host
+    s = re.sub(r"([A-Za-z][A-Za-z0-9+.\-]*://[^\s:@/]+):[^\s:@/]+@", r"\1:***@", s)
     for rx in _SECRET_PATTERNS:
         s = rx.sub("***REDACTED***", s)
     return s

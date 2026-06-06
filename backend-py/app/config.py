@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     ssh_connect_timeout: int = 10
     ssh_command_timeout: int = 30
 
+    # ---- behaviour ----
+    # Auto-execute read-only diagnostics; require human approval ONLY for writes (needs_review).
+    # Set false to require approval for EVERY command (strict rubric reading).
+    auto_run_readonly: bool = True
+
     # ---- LLM: azure (primary) | openrouter | local ----
     llm_provider: str = "azure"
     azure_openai_endpoint: str = ""

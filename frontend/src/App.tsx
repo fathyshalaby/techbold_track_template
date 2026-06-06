@@ -1,381 +1,379 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type Health } from "./api";
 import type { ActivityDraft, AuditEntry, Employee, Run, Step, SystemInfo, Ticket } from "./types";
+
+const PHASES = ["Analyze", "Diagnose", "Fix", "Validate", "Document"];
+
+function reachedPhase(run: Run): number {
+  if (run.status === "done") return 4;
+  let r = run.steps.length ? 1 : 0;
+  if (run.steps.some((s) => s.kind === "fix")) r = Math.max(r, 2);
+  if (run.steps.some((s) => s.kind === "validate")) r = Math.max(r, 3);
+  return r;
+}
+
+type Guard = <T>(label: string, fn: () => Promise<T>) => Promise<T | undefined>;
 
 export default function App() {
   const [health, setHealth] = useState<Health | null>(null);
   const [me, setMe] = useState<Employee | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [priorityFilter, setPriorityFilter] = useState<string>("");
-  const [sort, setSort] = useState<string>("date");
-
+  const [statusF, setStatusF] = useState("");
+  const [priorityF, setPriorityF] = useState("");
+  const [sort, setSort] = useState("date");
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [loadingTickets, setLoadingTickets] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [system, setSystem] = useState<SystemInfo | null>(null);
-
   const [run, setRun] = useState<Run | null>(null);
-  const [busy, setBusy] = useState<string | null>(null); // label of in-flight agent action
+  const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
-    api.health().then(setHealth).catch(() => setHealth(null));
+    api.health().then(setHealth).catch(() => {});
     api.me().then(setMe).catch((e) => setError(String(e.message || e)));
   }, []);
 
   useEffect(() => {
-    setLoadingTickets(true);
+    setLoading(true);
     api
-      .tickets({ status: statusFilter, priority: priorityFilter, sort })
+      .tickets({ status: statusF, priority: priorityF, sort })
       .then((t) => { setTickets(t); setError(null); })
       .catch((e) => setError(String(e.message || e)))
-      .finally(() => setLoadingTickets(false));
-  }, [statusFilter, priorityFilter, sort]);
+      .finally(() => setLoading(false));
+  }, [statusF, priorityF, sort]);
 
   async function selectTicket(t: Ticket) {
-    setSelected(t);
-    setSystem(null);
-    setRun(null);
-    setError(null);
-    try {
-      setSystem(await api.system(t.id));
-    } catch (e) {
-      setError(String((e as Error).message));
-    }
+    setSelected(t); setSystem(null); setRun(null); setError(null);
+    try { setSystem(await api.system(t.id)); } catch (e) { setError(String((e as Error).message)); }
   }
 
-  async function guard<T>(label: string, fn: () => Promise<T>): Promise<T | undefined> {
-    setBusy(label);
-    setError(null);
-    try {
-      return await fn();
-    } catch (e) {
-      setError(String((e as Error).message));
-      return undefined;
-    } finally {
-      setBusy(null);
-    }
-  }
+  const guard: Guard = async (label, fn) => {
+    setBusy(label); setError(null);
+    try { return await fn(); }
+    catch (e) { setError(String((e as Error).message)); return undefined; }
+    finally { setBusy(null); }
+  };
 
   async function startRun() {
     if (!selected) return;
-    const r = await guard("Starting run & analysing…", () => api.createRun(selected.id));
+    const r = await guard("analysing incident", () => api.createRun(selected.id));
     if (r) setRun(r);
   }
-
   async function reset() {
     if (!confirm("Reset all your VMs and clear your activities in the ERP?")) return;
-    await guard("Resetting VMs…", () => api.reset());
+    await guard("resetting VMs", () => api.reset());
     setRun(null);
-    // refresh tickets
-    api.tickets({ status: statusFilter, priority: priorityFilter, sort }).then(setTickets).catch(() => {});
+    api.tickets({ status: statusF, priority: priorityF, sort }).then(setTickets).catch(() => {});
   }
 
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand"><span className="brand-dot" /> AI Service Desk Autopilot</div>
+        <div className="brand">
+          <span className="glyph">A</span>
+          <div>
+            <b>Autopilot</b> <span className="sub">service-desk console</span>
+          </div>
+        </div>
         <div className="spacer" />
-        {health && <span className="pill">backend: {health.backend}{health.llm_provider ? ` · ${health.llm_provider}` : ""}</span>}
-        {me && <span className="meta">{me.firstname} {me.lastname} · {me.teamname}</span>}
-        <button className="btn ghost small" onClick={reset}>Reset VMs</button>
+        {health && (
+          <span className="pill"><span className="led" /> {health.backend} · {health.llm_provider}</span>
+        )}
+        {me && <span className="who">{me.firstname} {me.lastname} · {me.teamname}</span>}
+        <button className="btn ghost sm" onClick={reset}>Reset VMs</button>
       </header>
 
       {error && <div className="banner error" style={{ marginTop: 10 }}>⚠ {error}</div>}
 
-      <div className="layout">
-        <aside className="sidebar">
-          <div className="sidebar-head">
-            <h2>Tickets</h2>
-            <div className="filters">
-              <div>
-                <label>Status</label>
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                  <option value="">All</option>
-                  <option value="OPEN">Open</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="DONE">Done</option>
-                </select>
-              </div>
-              <div>
-                <label>Priority</label>
-                <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
-                  <option value="">All</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </select>
-              </div>
-              <div>
-                <label>Sort</label>
-                <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                  <option value="date">Date</option>
-                  <option value="priority">Priority</option>
-                  <option value="status">Status</option>
-                </select>
-              </div>
-            </div>
+      <div className="console">
+        {/* ── ticket queue ── */}
+        <aside className="queue">
+          <div className="filters">
+            <label><div className="micro">Status</div>
+              <select value={statusF} onChange={(e) => setStatusF(e.target.value)}>
+                <option value="">All</option><option value="OPEN">Open</option>
+                <option value="PENDING">Pending</option><option value="DONE">Done</option>
+              </select></label>
+            <label><div className="micro">Priority</div>
+              <select value={priorityF} onChange={(e) => setPriorityF(e.target.value)}>
+                <option value="">All</option><option value="high">High</option>
+                <option value="medium">Medium</option><option value="low">Low</option>
+              </select></label>
+            <label><div className="micro">Sort</div>
+              <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                <option value="date">Date</option><option value="priority">Priority</option>
+                <option value="status">Status</option>
+              </select></label>
           </div>
-          <div className="ticket-list">
-            {loadingTickets && <p className="muted" style={{ padding: 8 }}>Loading…</p>}
-            {!loadingTickets && tickets.length === 0 && <p className="muted" style={{ padding: 8 }}>No tickets.</p>}
+          <div className="tickets">
+            {loading && <div className="micro" style={{ padding: 8 }}>loading…</div>}
+            {!loading && tickets.length === 0 && <div className="micro" style={{ padding: 8 }}>no tickets</div>}
             {tickets.map((t) => (
-              <div key={t.id} className={"ticket-card" + (selected?.id === t.id ? " active" : "")} onClick={() => selectTicket(t)}>
-                <div className="ticket-title">{t.title}</div>
-                <div className="ticket-sub">#{t.id} · {t.customer_name}</div>
-                <div className="badges">
-                  <span className={"badge prio-" + (t.priority || "low").toLowerCase()}>{t.priority}</span>
-                  <span className={"badge status-" + t.status}>{t.status}</span>
+              <button key={t.id} className={`tk p-${(t.priority || "low").toLowerCase()}${selected?.id === t.id ? " active" : ""}`} onClick={() => selectTicket(t)}>
+                <div className="ttl">{t.title}</div>
+                <div className="meta">
+                  <span className="id">#{t.id}</span>
+                  <span className={`badge b-${(t.priority || "low").toLowerCase()}`}>{t.priority}</span>
+                  <span className={`badge b-${t.status}`}>{t.status}</span>
                 </div>
-              </div>
+                <div className="cust">{t.customer_name}</div>
+              </button>
             ))}
           </div>
         </aside>
 
-        <main className="main">
-          {!selected && <div className="empty"><div><p>Select a ticket to begin.</p><p className="muted">The AI proposes each step — you approve, edit, or reject every command.</p></div></div>}
-
+        {/* ── stage ── */}
+        <main className="stage">
+          {!selected && (
+            <div className="empty"><div>
+              <div className="big">Select a ticket to open a session</div>
+              <div className="micro">the agent proposes · you approve every write · all actions traced</div>
+            </div></div>
+          )}
           {selected && (
             <>
-              <TicketDetail ticket={selected} system={system} />
-              {!run && (
-                <div className="panel">
+              <TicketHead ticket={selected} system={system} />
+              {!run ? (
+                <div className="card">
                   <button className="btn primary" disabled={!system || !!busy} onClick={startRun}>
-                    {busy ? <Thinking label={busy} /> : "Start AI troubleshooting run"}
+                    {busy ? <Thinking label={busy} /> : "▸ Start AI troubleshooting session"}
                   </button>
-                  <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
-                    Connects to {system?.ip} over SSH. Every command needs your approval.
+                  <p className="micro" style={{ marginTop: 10 }}>
+                    connects to {system?.ip} over ssh · read-only diagnostics run automatically · writes require your approval
                   </p>
                 </div>
+              ) : (
+                <RunView run={run} busy={busy} setRun={setRun} guard={guard}
+                  onSubmitted={() => api.tickets({ status: statusF, priority: priorityF, sort }).then(setTickets).catch(() => {})} />
               )}
-              {run && <RunPanel run={run} busy={busy} setRun={setRun} guard={guard} onSubmitted={() => api.tickets({ status: statusFilter, priority: priorityFilter, sort }).then(setTickets).catch(() => {})} />}
             </>
           )}
         </main>
+
+        {/* ── observability rail ── */}
+        <aside className="rail">
+          <div className="pane-head"><div className="micro">Observability</div>
+            {run && <span className="micro">{run.audit.length} events</span>}</div>
+          <EventLog audit={run?.audit ?? []} />
+        </aside>
       </div>
     </div>
   );
 }
 
-function TicketDetail({ ticket, system }: { ticket: Ticket; system: SystemInfo | null }) {
+function TicketHead({ ticket, system }: { ticket: Ticket; system: SystemInfo | null }) {
   return (
-    <div className="panel">
-      <div className="row between">
-        <h2>{ticket.title}</h2>
-        <div className="badges">
-          <span className={"badge prio-" + (ticket.priority || "low").toLowerCase()}>{ticket.priority}</span>
-          <span className={"badge status-" + ticket.status}>{ticket.status}</span>
+    <div className="card ticket-head">
+      <div className="row">
+        <div>
+          <h2>{ticket.title}</h2>
+          <div className="micro" style={{ marginTop: 6 }}>#{ticket.id} · {ticket.customer_name}</div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <span className={`badge b-${(ticket.priority || "low").toLowerCase()}`}>{ticket.priority}</span>
+          <span className={`badge b-${ticket.status}`}>{ticket.status}</span>
         </div>
       </div>
-      <p className="muted" style={{ marginTop: 4 }}>#{ticket.id} · {ticket.customer_name}</p>
-      <h3 style={{ marginTop: 14 }}>Customer report</h3>
-      <p className="report">{ticket.description}</p>
-      <h3 style={{ marginTop: 14 }}>Customer system</h3>
-      {!system && <p className="muted">Loading system info…</p>}
+      <p className="report" style={{ marginTop: 12 }}>{ticket.description}</p>
       {system && (
-        <div className="system-grid">
-          <div><div className="k">Host</div><div className="v">{system.ip}:{system.port}</div></div>
-          <div><div className="k">User</div><div className="v">{system.username}</div></div>
-          <div><div className="k">OS</div><div className="v">{system.os}</div></div>
-          <div><div className="k">Notes</div><div className="v">{system.notes || "—"}</div></div>
+        <div className="sysgrid">
+          <div className="cell"><div className="micro">host</div><div className="v">{system.ip}:{system.port}</div></div>
+          <div className="cell"><div className="micro">user</div><div className="v">{system.username}</div></div>
+          <div className="cell"><div className="micro">os</div><div className="v">{system.os}</div></div>
+          <div className="cell"><div className="micro">notes</div><div className="v">{system.notes || "—"}</div></div>
         </div>
       )}
     </div>
   );
 }
 
-function RunPanel({
-  run, busy, setRun, guard, onSubmitted,
-}: {
-  run: Run; busy: string | null; setRun: (r: Run) => void;
-  guard: <T>(label: string, fn: () => Promise<T>) => Promise<T | undefined>;
-  onSubmitted: () => void;
+function RunView({ run, busy, setRun, guard, onSubmitted }: {
+  run: Run; busy: string | null; setRun: (r: Run) => void; guard: Guard; onSubmitted: () => void;
 }) {
-  const pending: Step | undefined = run.pending_step_id ? run.steps.find((s) => s.id === run.pending_step_id) : undefined;
+  const reached = reachedPhase(run);
+  const pending = run.pending_step_id ? run.steps.find((s) => s.id === run.pending_step_id) : undefined;
+  const working = !!busy || (["running", "analyzing", "validating"].includes(run.status) && !pending);
 
   async function abort() {
-    const r = await guard("Aborting…", () => api.abort(run.id));
+    const r = await guard("aborting", () => api.abort(run.id));
     if (r) setRun(r);
   }
 
   return (
     <>
-      <div className="panel">
-        <div className="run-status">
-          <span className={"dot run-" + run.status} />
-          <strong>Run {run.id}</strong>
-          <span className="muted">· {run.status.replace("_", " ")}</span>
+      <div className="card">
+        <div className="runbar">
+          <span className="rid">trace {run.id}</span>
+          <span className={`status-chip s-${run.status}`}><span className="led" /> {run.status.replace("_", " ")}</span>
           <div className="spacer" />
           {busy && <Thinking label={busy} />}
-          {run.status !== "done" && run.status !== "aborted" && (
-            <button className="btn reject small" disabled={!!busy} onClick={abort}>Abort</button>
+          {!["done", "aborted"].includes(run.status) && (
+            <button className="btn reject sm" disabled={!!busy} onClick={abort}>■ Abort</button>
           )}
         </div>
 
-        <div className="steps">
-          {run.steps.map((s) => (
-            <StepCard key={s.id} step={s} isPending={s.id === run.pending_step_id} runId={run.id} busy={busy} setRun={setRun} guard={guard} />
-          ))}
-          {run.steps.length === 0 && <p className="muted">Agent is analysing the incident…</p>}
+        <div className="phases">
+          {PHASES.map((p, i) => {
+            const cls = i < reached ? "done" : i === reached ? (run.status === "done" ? "done active" : "active") : "";
+            return (
+              <div key={p} className={`phase ${cls}`}>
+                <div className="node">{cls.includes("done") ? "✓" : i + 1}</div>
+                <div className="lbl">{p}</div>
+                {i < PHASES.length - 1 && <div className="bar" />}
+              </div>
+            );
+          })}
         </div>
 
-        {!pending && run.status !== "done" && run.status !== "aborted" && run.status !== "error" && !busy && (
-          <p className="muted" style={{ marginTop: 10 }}>Agent is working…</p>
-        )}
+        <div className="trace">
+          {run.steps.map((s) => (
+            <StepNode key={s.id} step={s} pending={s.id === run.pending_step_id} runId={run.id} busy={busy} setRun={setRun} guard={guard} />
+          ))}
+          {working && (
+            <div className="working">
+              <span className="dots"><span /><span /><span /></span>
+              <span>agent is reasoning over the evidence…</span>
+            </div>
+          )}
+          {run.steps.length === 0 && !working && <div className="micro">no steps yet</div>}
+        </div>
       </div>
 
-      {run.status === "done" && <ActivityPanel run={run} setRun={setRun} guard={guard} onSubmitted={onSubmitted} />}
-
-      <AuditLog audit={run.audit} />
+      {run.status === "done" && <ActivityPanel run={run} guard={guard} onSubmitted={onSubmitted} />}
     </>
   );
 }
 
-function StepCard({
-  step, isPending, runId, busy, setRun, guard,
-}: {
-  step: Step; isPending: boolean; runId: string; busy: string | null;
-  setRun: (r: Run) => void;
-  guard: <T>(label: string, fn: () => Promise<T>) => Promise<T | undefined>;
+function StepNode({ step, pending, runId, busy, setRun, guard }: {
+  step: Step; pending: boolean; runId: string; busy: string | null; setRun: (r: Run) => void; guard: Guard;
 }) {
   const [edited, setEdited] = useState(step.command);
   const [reason, setReason] = useState("");
   useEffect(() => { setEdited(step.command); }, [step.command, step.id]);
 
+  const cls = step.safety?.classification || step.risk;
+  const blocked = cls === "blocked";
+  const auto = !pending && (cls === "low_risk") && step.status === "succeeded" && !step.edited_command;
+
   async function approve() {
     const changed = edited.trim() !== step.command.trim();
-    const r = await guard("Approving & running…", () => api.approve(runId, step.id, changed ? edited : undefined));
+    const r = await guard("running command", () => api.approve(runId, step.id, changed ? edited : undefined));
     if (r) setRun(r);
   }
   async function reject() {
-    const r = await guard("Rejecting…", () => api.reject(runId, step.id, reason || undefined));
+    const r = await guard("re-planning", () => api.reject(runId, step.id, reason || undefined));
     if (r) setRun(r);
   }
 
-  const blocked = step.safety?.classification === "blocked";
-
   return (
-    <div className={"step" + (isPending ? " pending" : "")}>
-      <div className="step-head">
-        <span className="badge kind">{step.kind}</span>
-        <span className={"badge risk-" + (step.risk || "needs_review")}>{(step.safety?.classification || step.risk || "needs_review").replace("_", " ")}</span>
-        <span className="muted" style={{ fontSize: 12 }}>{step.id}</span>
-        <div className="spacer" />
-        <span className="muted" style={{ fontSize: 12 }}>{step.status.replace("_", " ")}</span>
-      </div>
+    <div className={`tnode ${step.status}`}>
+      <span className="dot" />
+      <div className="tcard">
+        <div className="top">
+          <span className={`badge b-${step.kind}`}>{step.kind}</span>
+          <span className={`badge b-${cls}`}>{(cls || "").replace("_", " ")}</span>
+          {auto && <span className="auto-tag">auto-run</span>}
+          <div className="spacer" />
+          <span className="micro">{step.status.replace("_", " ")}</span>
+        </div>
+        {step.rationale && <div className="why">{step.rationale}</div>}
 
-      {step.rationale && <div className="step-rationale">{step.rationale}</div>}
+        {pending && !blocked
+          ? <textarea className="cmd-edit" value={edited} onChange={(e) => setEdited(e.target.value)} spellCheck={false} />
+          : <div className="cmd">{step.edited_command || step.command}</div>}
 
-      {isPending && !blocked ? (
-        <textarea className="cmd-edit" value={edited} onChange={(e) => setEdited(e.target.value)} />
-      ) : (
-        <div className="cmd">{step.edited_command || step.command}</div>
-      )}
+        {blocked && <div className="out" style={{ color: "#ff9b97" }}>⛔ blocked by safety: {step.safety?.reason}</div>}
 
-      {blocked && <p className="banner error" style={{ margin: "8px 0" }}>Blocked by safety: {step.safety?.reason}</p>}
+        {step.result && (
+          <div className="out">
+            <span className={step.result.exit_code === 0 ? "exit-ok" : "exit-bad"}>exit {step.result.exit_code}</span>
+            {step.result.stdout ? "\n" + step.result.stdout : ""}
+            {step.result.stderr ? "\n[stderr] " + step.result.stderr : ""}
+          </div>
+        )}
 
-      {step.result && (
-        <pre className="output">
-          <span className={step.result.exit_code === 0 ? "exit-ok" : "exit-bad"}>exit {step.result.exit_code}</span>
-          {step.result.stdout ? "\n" + step.result.stdout : ""}
-          {step.result.stderr ? "\n[stderr] " + step.result.stderr : ""}
-        </pre>
-      )}
-
-      {isPending && !blocked && (
-        <>
+        {pending && !blocked && (
           <div className="actions">
-            <button className="btn approve" disabled={!!busy} onClick={approve}>
-              {edited.trim() !== step.command.trim() ? "Approve edited & run" : "Approve & run"}
+            <button className="btn approve sm" disabled={!!busy} onClick={approve}>
+              ✓ {edited.trim() !== step.command.trim() ? "Approve edited" : "Approve & run"}
             </button>
-            <button className="btn reject" disabled={!!busy} onClick={reject}>Reject</button>
+            <button className="btn reject sm" disabled={!!busy} onClick={reject}>✕ Reject</button>
+            <input className="reason" placeholder="reason / guidance for the agent…" value={reason} onChange={(e) => setReason(e.target.value)} />
+            <span className="gate-note">human gate · write</span>
           </div>
-          <div className="reject-row">
-            <input placeholder="Optional reason for reject / guidance for the agent…" value={reason} onChange={(e) => setReason(e.target.value)} />
-          </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
-function ActivityPanel({
-  run, setRun, guard, onSubmitted,
-}: {
-  run: Run; setRun: (r: Run) => void;
-  guard: <T>(label: string, fn: () => Promise<T>) => Promise<T | undefined>;
-  onSubmitted: () => void;
-}) {
+function ActivityPanel({ run, guard, onSubmitted }: { run: Run; guard: Guard; onSubmitted: () => void }) {
   const [draft, setDraft] = useState<ActivityDraft | null>(run.activity_draft ?? null);
   const [submitted, setSubmitted] = useState(false);
 
   async function generate() {
-    const d = await guard("Drafting activity…", () => api.draftActivity(run.id));
+    const d = await guard("drafting activity", () => api.draftActivity(run.id));
     if (d) setDraft(d);
   }
   async function submit() {
     if (!draft) return;
-    const r = await guard("Submitting to ERP…", () => api.submitActivity(run.id, draft));
+    const r = await guard("submitting to ERP", () => api.submitActivity(run.id, draft));
     if (r) { setSubmitted(true); onSubmitted(); }
   }
-  function field(key: keyof ActivityDraft, label: string, rows = 2) {
-    return (
-      <div className="field">
-        <label>{label}</label>
-        <textarea rows={rows} value={(draft?.[key] as string) || ""} onChange={(e) => setDraft({ ...(draft as ActivityDraft), [key]: e.target.value })} />
-      </div>
-    );
-  }
+  const field = (k: keyof ActivityDraft, label: string, rows = 2) => (
+    <div className="field">
+      <div className="micro">{label}</div>
+      <textarea rows={rows} value={(draft?.[k] as string) || ""} onChange={(e) => setDraft({ ...(draft as ActivityDraft), [k]: e.target.value })} />
+    </div>
+  );
 
   return (
-    <div className="panel">
-      <h3>Activity (documentation → ERP)</h3>
+    <div className="card">
+      <div className="micro" style={{ marginBottom: 10 }}>Activity · documentation → ERP</div>
       {run.conclusion && (
-        <p className="muted" style={{ marginBottom: 10 }}>
-          Root cause: {run.conclusion.root_cause} · Fixed: {String(run.conclusion.fixed)}
+        <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+          <b style={{ color: "var(--ink)" }}>Root cause:</b> {run.conclusion.root_cause}
         </p>
       )}
-      {!draft && <button className="btn primary" onClick={generate}>Generate documentation from the run</button>}
+      {!draft && <button className="btn primary" onClick={generate}>✦ Generate documentation from the trace</button>}
       {draft && (
         <>
-          {field("summary", "Summary", 2)}
-          {field("root_cause", "Root cause (technical)", 2)}
+          {field("summary", "Summary")}
+          {field("root_cause", "Root cause (technical)")}
           {field("actions_taken", "Actions taken (in order)", 3)}
-          {field("commands_summary", "Commands summary (no secrets)", 2)}
-          {field("validation_result", "Validation result (proof)", 2)}
-          {field("description", "Description", 2)}
-          {submitted ? (
-            <div className="banner success">✓ Activity submitted to the ERP and ticket set to DONE.</div>
-          ) : (
-            <button className="btn primary" onClick={submit}>Submit activity to ERP</button>
-          )}
+          {field("commands_summary", "Commands summary (no secrets)")}
+          {field("validation_result", "Validation result (proof)")}
+          {field("description", "Description")}
+          {submitted
+            ? <div className="banner success" style={{ margin: 0 }}>✓ Activity submitted · ticket set to DONE</div>
+            : <button className="btn primary" onClick={submit}>↗ Submit activity to ERP</button>}
         </>
       )}
     </div>
   );
 }
 
-function AuditLog({ audit }: { audit: AuditEntry[] }) {
-  if (!audit.length) return null;
+function EventLog({ audit }: { audit: AuditEntry[] }) {
+  if (!audit.length) return <div className="log"><div className="micro" style={{ padding: 8 }}>start a session to stream agent events</div></div>;
   return (
-    <div className="panel">
-      <h3>Audit trail ({audit.length})</h3>
-      <div className="audit">
-        {audit.map((a, i) => (
-          <div key={i} className="audit-row">
-            <span className="audit-ts">{a.ts.slice(11, 19)}</span>
-            <span className={"audit-actor actor-" + a.actor}>{a.actor}</span>
-            <span>{a.type}</span>
-            <span className="muted">{a.command ? `$ ${a.command}` : a.note || ""}{a.exit_code != null ? ` (exit ${a.exit_code})` : ""}</span>
-          </div>
-        ))}
-      </div>
+    <div className="log">
+      {audit.map((a, i) => (
+        <div key={i} className="ev">
+          <span className="t">{a.ts.slice(11, 19)}</span>
+          <span className={`ac ac-${a.actor}`}>{a.actor}</span>
+          <span className="msg">
+            <span className="ty">{a.type.replace("_", " ")}</span>
+            {a.command ? <> · <span className="mono">{a.command}</span></> : a.note ? ` · ${a.note}` : ""}
+            {a.exit_code != null ? ` (exit ${a.exit_code})` : ""}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
 
 function Thinking({ label }: { label: string }) {
-  return <span className="thinking"><span className="spinner" /> {label}</span>;
+  return <span className="thinking"><span className="spinner" /> {label}…</span>;
 }

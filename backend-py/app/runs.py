@@ -212,14 +212,59 @@ def _advance(run: Run) -> None:
                 )
                 continue  # auto-advance for an alternative
 
+            run.log("agent", "proposed", step_id=step.id, command=safety.redact(command), note=step.rationale)
+
+            # Selective human-in-the-loop: auto-run READ-ONLY diagnostics; gate every write.
+            if (
+                verdict["classification"] == "low_risk"
+                and settings.auto_run_readonly
+                and run._auto < _MAX_AUTO_ADVANCE
+            ):
+                _execute(run, step, command, auto=True)
+                continue  # diagnostic ran automatically; keep going until a write or conclusion
+
             step.status = "pending_approval"
             run.pending_step_id = step.id
             run.status = "awaiting_approval"
-            run.log("agent", "proposed", step_id=step.id, command=safety.redact(command), note=step.rationale)
             return
 
         # No tool call -> nudge the model back to the tools.
         run.messages.append({"role": "user", "content": "Use the run_command tool to propose ONE command, or call conclude."})
+
+
+def _execute(run: Run, step: Step, command: str, auto: bool) -> None:
+    """Run an approved (or auto-approved read-only) command over SSH; feed the redacted result back."""
+    step.status = "running"
+    step.decided_at = _now()
+    run.status = "running"
+    run.pending_step_id = None
+    run.log(
+        "agent" if auto else "technician",
+        "auto_executed" if auto else "approved",
+        step_id=step.id,
+        command=safety.redact(command),
+    )
+    try:
+        result = run._ssh.run(command)  # type: ignore[union-attr]
+    except SSHError as exc:
+        step.status = "failed"
+        step.result = {"exit_code": 255, "stdout": "", "stderr": str(exc), "duration_ms": 0, "truncated": False}
+        run.log("system", "error", step_id=step.id, note=f"ssh error: {exc}")
+        run.messages.append(agent.tool_result_message(step.tool_call_id, f"SSH ERROR: {exc}"))
+        return
+    step.ran_at = _now()
+    redacted = {
+        "exit_code": result.exit_code,
+        "stdout": safety.redact(result.stdout),
+        "stderr": safety.redact(result.stderr),
+        "duration_ms": result.duration_ms,
+        "truncated": result.truncated,
+    }
+    step.result = redacted
+    step.status = "succeeded" if result.exit_code == 0 else "failed"
+    run.log("system", "executed", step_id=step.id, command=safety.redact(command), exit_code=result.exit_code)
+    tool_content = f"exit_code={result.exit_code}\nstdout:\n{redacted['stdout']}\nstderr:\n{redacted['stderr']}"
+    run.messages.append(agent.tool_result_message(step.tool_call_id, tool_content[:8000]))
 
 
 def approve_step(run_id: str, step_id: str, edited_command: Optional[str] = None) -> Run:
@@ -248,36 +293,7 @@ def approve_step(run_id: str, step_id: str, edited_command: Optional[str] = None
         _advance(run)
         return run
 
-    step.status = "running"
-    step.decided_at = _now()
-    run.status = "running"
-    run.pending_step_id = None
-    run.log("technician", "approved", step_id=step.id, command=safety.redact(command))
-
-    try:
-        result = run._ssh.run(command)  # type: ignore[union-attr]
-    except SSHError as exc:
-        step.status = "failed"
-        step.result = {"exit_code": 255, "stdout": "", "stderr": str(exc), "duration_ms": 0, "truncated": False}
-        run.log("system", "error", step_id=step.id, note=f"ssh error: {exc}")
-        run.messages.append(agent.tool_result_message(step.tool_call_id, f"SSH ERROR: {exc}"))
-        _advance(run)
-        return run
-
-    step.ran_at = _now()
-    redacted = {
-        "exit_code": result.exit_code,
-        "stdout": safety.redact(result.stdout),
-        "stderr": safety.redact(result.stderr),
-        "duration_ms": result.duration_ms,
-        "truncated": result.truncated,
-    }
-    step.result = redacted
-    step.status = "succeeded" if result.exit_code == 0 else "failed"
-    run.log("system", "executed", step_id=step.id, command=safety.redact(command), exit_code=result.exit_code)
-
-    tool_content = f"exit_code={result.exit_code}\nstdout:\n{redacted['stdout']}\nstderr:\n{redacted['stderr']}"
-    run.messages.append(agent.tool_result_message(step.tool_call_id, tool_content[:8000]))
+    _execute(run, step, command, auto=False)
     _advance(run)
     return run
 

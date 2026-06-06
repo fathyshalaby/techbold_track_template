@@ -10,6 +10,7 @@ from typing import Any
 
 from openai import AzureOpenAI, OpenAI
 
+from . import safety
 from .config import settings
 
 _client: Any = None
@@ -67,6 +68,27 @@ def _build() -> tuple[Any, str]:
     return _client, _model
 
 
+def _guard(messages: list[dict]) -> list[dict]:
+    """LLM input guard — scrub secrets/PII from EVERY outbound message before it reaches the model.
+    Defense in depth (rubric C): system, user, and tool-result content are all redacted here, so no
+    customer secret/PII can leak to the LLM provider even if a command's output contained one."""
+    guarded: list[dict] = []
+    for m in messages:
+        gm = dict(m)
+        content = gm.get("content")
+        if isinstance(content, str):
+            gm["content"] = safety.redact(content)
+        elif isinstance(content, list):
+            gm["content"] = [
+                {**part, "text": safety.redact(part["text"])}
+                if isinstance(part, dict) and isinstance(part.get("text"), str)
+                else part
+                for part in content
+            ]
+        guarded.append(gm)
+    return guarded
+
+
 def chat(
     messages: list[dict],
     tools: list[dict] | None = None,
@@ -76,7 +98,7 @@ def chat(
 ):
     """Single chat completion. Returns the assistant message object (.content, .tool_calls)."""
     client, model = _build()
-    kwargs: dict[str, Any] = {"model": model, "messages": messages}
+    kwargs: dict[str, Any] = {"model": model, "messages": _guard(messages)}
     if temperature is not None:
         kwargs["temperature"] = temperature
     if tools:
