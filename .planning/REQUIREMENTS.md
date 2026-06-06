@@ -41,7 +41,7 @@ Requirements for the hackathon submission (code freeze Sun Jun 7, 14:00). Each m
 - [ ] **DIAG-03**: Deterministic orchestrator drives run phases (TRIAGING → WAITING_FOR_APPROVAL → EXECUTING → OBSERVING → … → DRAFTING_ACTIVITY) with a max-steps cap; block → ask alternative — *B/C*
 - [ ] **DIAG-04**: `problem_solver` agent proposes a minimal, reversible fix with a captured rollback — *B*
 - [ ] **DIAG-05**: `validator` agent proves the customer benefit is restored (never `is-active`) and checks persistence after reboot/restart; single success → `LIKELY_FIXED`, repeated → `VERIFIED_FIXED` — *B*
-- [ ] **DIAG-06**: Generalising loop solves all 5 practice VMs cleanly, reboot-persistent, with zero safety flags, via prompts/safety/validation (no per-incident hacks) — *B*
+- [x] **DIAG-06**: Generalising loop solves all 5 practice VMs cleanly, reboot-persistent, with zero safety flags, via prompts/safety/validation (no per-incident hacks) — *B*
 
 ### Run API & Events
 
@@ -130,7 +130,7 @@ Explicitly excluded (PRD §6.3, §11). Documented to prevent scope creep.
 | SAFE-05 | Phase 3 | Complete |
 | SAFE-06 | Phase 3 | Pending |
 | API-04 | Phase 3 | Pending |
-| DIAG-06 | Phase 4 | Pending |
+| DIAG-06 | Phase 4 | Complete |
 | DIAG-01 | Phase 5 | Pending |
 | DIAG-02 | Phase 5 | Pending |
 | DIAG-03 | Phase 5 | Pending |

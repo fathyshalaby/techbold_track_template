@@ -117,7 +117,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 04-03-PLAN.md — Real ssh2 client + executor implementation (client.ts + executor.ts)
+- [x] 04-03-PLAN.md — Real ssh2 client + executor implementation (client.ts + executor.ts)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -207,7 +207,7 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 | 1. Repo Foundation | 3/3 | Complete    | 2026-06-06 |
 | 2. ERP Client + Ticket Routes | 3/3 | Complete    | 2026-06-06 |
 | 3. Safety Layer + Run Store | 4/4 | Complete    | 2026-06-06 |
-| 4. SSH Executor | 3/5 | In progress | - |
+| 4. SSH Executor | 4/5 | In Progress|  |
 | 5. Agent Loop + Orchestrator | 0/TBD | Not started | - |
 | 6. Run API + Approvals + SSE | 0/TBD | Not started | - |
 | 7. Activity Generation | 0/TBD | Not started | - |
