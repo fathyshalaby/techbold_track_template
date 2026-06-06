@@ -167,7 +167,17 @@ Plans:
   3. Browser EventSource receives `run.started`, `approval.required`, and `command.completed` events live
   4. Every meaningful side-effect emits and audits the same event (no silent state changes)
 
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+**Wave 1** *(independent — run in parallel)*
+
+- [ ] 06-01-PLAN.md — Run routes TDD (POST /api/runs, GET /api/runs/:id, /next, /abort)
+- [ ] 06-02-PLAN.md — Approval routes TDD (approve with safety re-check, reject with reason)
+- [ ] 06-03-PLAN.md — SSE events route (streamSSE, backfill, keepalive, bus cleanup)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 06-04-PLAN.md — Mount runs + approvals + events routers in app.ts
 
 ### Phase 7: Activity Generation
 
