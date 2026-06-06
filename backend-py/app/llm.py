@@ -26,13 +26,27 @@ def _build() -> tuple[Any, str]:
         return _client, _model
     provider = settings.llm_provider.lower()
     if provider == "azure":
-        _client = AzureOpenAI(
-            azure_endpoint=settings.azure_openai_endpoint,
-            api_key=settings.azure_openai_api_key,
-            api_version=settings.azure_openai_api_version,
-            timeout=60.0,
-            max_retries=2,
-        )
+        endpoint = settings.azure_openai_endpoint.rstrip("/")
+        if "services.ai.azure.com" in endpoint or "/api/projects/" in endpoint:
+            # Azure AI Foundry project endpoint — OpenAI-compatible v1 surface
+            # ({endpoint}/openai/v1/chat/completions), NOT classic deployment URLs + api-version.
+            base = endpoint if endpoint.endswith("/openai/v1") else endpoint + "/openai/v1"
+            _client = OpenAI(
+                base_url=base,
+                api_key=settings.azure_openai_api_key,
+                default_headers={"api-key": settings.azure_openai_api_key},
+                timeout=60.0,
+                max_retries=2,
+            )
+        else:
+            # Classic Azure OpenAI resource (*.openai.azure.com)
+            _client = AzureOpenAI(
+                azure_endpoint=endpoint,
+                api_key=settings.azure_openai_api_key,
+                api_version=settings.azure_openai_api_version,
+                timeout=60.0,
+                max_retries=2,
+            )
         _model = settings.azure_openai_deployment
     elif provider == "openrouter":
         _client = OpenAI(

@@ -29,7 +29,21 @@ export function getModel(): LanguageModel {
     });
     return provider(config.localModel);
   }
-  // azure (default): deployment-based URL + api-version, matching standard Azure OpenAI deployments.
+  // azure (default)
+  const endpoint = config.azureEndpoint.replace(/\/+$/, "");
+  if (endpoint.includes("services.ai.azure.com") || endpoint.includes("/api/projects/")) {
+    // Azure AI Foundry project endpoint — OpenAI-compatible v1 surface
+    // ({endpoint}/openai/v1/chat/completions), NOT classic deployment URLs + api-version.
+    const baseURL = endpoint.endsWith("/openai/v1") ? endpoint : `${endpoint}/openai/v1`;
+    const provider = createOpenAICompatible({
+      name: "azure-foundry",
+      baseURL,
+      apiKey: config.azureApiKey,
+      headers: { "api-key": config.azureApiKey },
+    });
+    return provider(config.azureDeployment);
+  }
+  // Classic Azure OpenAI resource (*.openai.azure.com)
   const azure = createAzure({
     resourceName: azureResourceName(),
     apiKey: config.azureApiKey,
