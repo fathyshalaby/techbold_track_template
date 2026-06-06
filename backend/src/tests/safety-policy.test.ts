@@ -274,4 +274,27 @@ describe('safety — policy and classifier', () => {
     });
   });
 
+  // ─── Regression: classifyCommand must fail safe when called standalone ─────
+  // classifyCommand is exported and may be used WITHOUT the policy gate (e.g. a
+  // UI risk badge or an auto-approve tier). Quote-obfuscation and unresolved
+  // shell expansion must never be classified SAFE_READ_ONLY / LOW_RISK_CHANGE,
+  // or a secret read could be silently auto-approved (a C hard-fail).
+  describe('classifier hardening — never SAFE when obfuscated/expanded', () => {
+    it.each([
+      "cat /etc/sh''adow",   // embedded-quote obfuscation of a secret path
+      'cat /etc/sh"a"dow',
+      'cat $SECRETFILE',     // unresolved variable — target unknown
+      'cat ${HOME}/.ssh/id_rsa',
+      'cat $(echo /etc/shadow)',
+      'cat `echo /etc/shadow`',
+    ])('does not classify "%s" as SAFE_READ_ONLY', (cmd) => {
+      expect(classifyCommand(cmd)).not.toBe(RiskLevel.SAFE_READ_ONLY);
+    });
+
+    it('still classifies a clean read-only command as SAFE_READ_ONLY', () => {
+      expect(classifyCommand('systemctl status nginx --no-pager')).toBe(RiskLevel.SAFE_READ_ONLY);
+      expect(classifyCommand('df -h')).toBe(RiskLevel.SAFE_READ_ONLY);
+    });
+  });
+
 });

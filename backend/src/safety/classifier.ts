@@ -46,16 +46,32 @@ const LOW_RISK_PATTERNS: RegExp[] = [
 ];
 
 export function classifyCommand(command: string): RiskLevel {
+  // Defense-in-depth: classifyCommand is exported and may be called WITHOUT
+  // first passing validateCommandAgainstPolicy (e.g. to render a risk badge in
+  // the UI or to drive an auto-approve tier). It must therefore fail safe on its
+  // own — never award SAFE_READ_ONLY / LOW_RISK_CHANGE to a command whose true
+  // shape is hidden by quoting or shell expansion. The policy gate already does
+  // this; mirroring it here closes the standalone-caller hole.
   const trimmed = command.trim();
 
+  // 1. Any unresolved shell expansion ($VAR, ${VAR}, $(...), `...`) means we
+  //    cannot know what the command actually targets — refuse to lower the risk.
+  if (/\$\{?[A-Za-z_(]|`/.test(trimmed)) {
+    return RiskLevel.MEDIUM_RISK_CHANGE;
+  }
+
+  // 2. Strip quote characters so embedded-quote obfuscation (cat /etc/sh''adow,
+  //    'ls' /etc) cannot dodge the anchored allowlist patterns below.
+  const normalized = trimmed.replace(/['"]/g, '').replace(/\s+/g, ' ');
+
   for (const pattern of SAFE_READ_ONLY_PATTERNS) {
-    if (pattern.test(trimmed)) {
+    if (pattern.test(normalized)) {
       return RiskLevel.SAFE_READ_ONLY;
     }
   }
 
   for (const pattern of LOW_RISK_PATTERNS) {
-    if (pattern.test(trimmed)) {
+    if (pattern.test(normalized)) {
       return RiskLevel.LOW_RISK_CHANGE;
     }
   }
