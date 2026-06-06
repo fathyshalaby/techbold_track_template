@@ -26,6 +26,22 @@ function capToUtf8(chunks: Buffer[], capBytes: number): string {
   return sliced.toString('utf8');
 }
 
+// POSIX signal name → number (ssh2 reports the name WITHOUT the SIG prefix on
+// the exit-signal channel message, RFC 4254 §6.10).
+const SIGNAL_NUMBERS: Record<string, number> = {
+  HUP: 1, INT: 2, QUIT: 3, ILL: 4, TRAP: 5, ABRT: 6, BUS: 7, FPE: 8, KILL: 9,
+  USR1: 10, SEGV: 11, USR2: 12, PIPE: 13, ALRM: 14, TERM: 15,
+};
+
+// When the remote process is killed by a signal, ssh2's 'exit' gives a null code
+// plus a signal name. Encode it the way bash itself does — exit = 128 + signum —
+// so an OOM kill surfaces as 137 (SIGKILL) and a segfault as 139 (SIGSEGV)
+// instead of a meaningless -1. Unknown signals still flag "killed" via 128.
+function signalToExitCode(signalName: string): number {
+  const bare = signalName.replace(/^SIG/i, '').toUpperCase();
+  return 128 + (SIGNAL_NUMBERS[bare] ?? 0);
+}
+
 // Execute a single approved command. Resolves with a CommandResult for normal
 // completion AND for timeout/exec-channel failure (so the run loop can observe
 // and continue). Rejects only when the connection itself cannot be established.
@@ -90,8 +106,9 @@ export async function executeApprovedCommand(
         stderrChunks.push(chunk);
         stderrLen += chunk.length;
       });
-      channel.on('exit', (code: number | null) => {
+      channel.on('exit', (code: number | null, signalName?: string) => {
         if (typeof code === 'number') exitCode = code;
+        else if (signalName) exitCode = signalToExitCode(signalName); // killed by signal (OOM/segfault/…)
       });
       channel.on('close', () => finalize());
 

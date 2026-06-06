@@ -48,6 +48,8 @@ type ChannelOpts = {
   exitCode: number | null;
   // When true, the channel never emits 'exit' or 'close' — simulates timeout.
   hang?: boolean;
+  // When set, the process was killed by a signal: ssh2 emits ('exit', null, name).
+  signal?: string;
 };
 
 // Holds the channel factory for the current test; each test overrides it.
@@ -70,7 +72,8 @@ function makeSshChannel(opts: ChannelOpts) {
     if (opts.stdout !== null) channel.emit('data', opts.stdout);
     if (opts.stderr !== null) channel.stderr.emit('data', opts.stderr);
     if (!opts.hang) {
-      channel.emit('exit', opts.exitCode ?? 0);
+      if (opts.signal) channel.emit('exit', null, opts.signal); // exit-signal (RFC 4254 §6.10)
+      else channel.emit('exit', opts.exitCode ?? 0);
       channel.emit('close');
     }
   });
@@ -383,6 +386,24 @@ describe('ssh-executor', () => {
       const result = await executeApprovedCommand('appr-y', 'bad-cmd', TARGET);
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain('boom');
+    });
+
+    // Research/reuse: ssh2 reports signal deaths as ('exit', null, signalName)
+    // (RFC 4254 §6.10). Encode them the bash way (128 + signum) so an OOM kill
+    // (SIGKILL → 137) or segfault (SIGSEGV → 139) is visible, not a bare -1.
+    it('encodes a signal kill as 128 + signum (SIGKILL → 137, OOM kill)', async () => {
+      channelFactory = () =>
+        makeSshChannel({ stdout: null, stderr: null, exitCode: null, signal: 'KILL' });
+      const result = await executeApprovedCommand('appr-oom', 'big-alloc', TARGET);
+      expect(result.exitCode).toBe(137);
+      expect(result.timedOut).toBe(false);
+    });
+
+    it('encodes SIGSEGV as 139', async () => {
+      channelFactory = () =>
+        makeSshChannel({ stdout: null, stderr: null, exitCode: null, signal: 'SEGV' });
+      const result = await executeApprovedCommand('appr-seg', 'crashy', TARGET);
+      expect(result.exitCode).toBe(139);
     });
   });
 
