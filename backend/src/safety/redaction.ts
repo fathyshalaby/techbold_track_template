@@ -57,6 +57,12 @@ const REDACTION_PATTERNS: RedactionPattern[] = [
     pattern: /(api[_-]?key\s*=\s*)\S+/gi,
     replacement: '$1«redacted»',
   },
+  // JSON-encoded variants: "key":"value" or "key": "value"
+  {
+    name: 'json-token-field',
+    pattern: /("(?:token|secret|password|passwd|api[_-]?key|authorization|credential)"\s*:\s*)"[^"]*"/gi,
+    replacement: '$1"«redacted»"',
+  },
   {
     name: 'env-secret-var',
     // Matches ENV_VAR_NAMES that contain secret-indicator words, not already handled above.
