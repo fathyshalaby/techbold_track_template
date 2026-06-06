@@ -130,12 +130,17 @@ describe('safety', () => {
         'DROP DATABASE myapp',
         'dropdb myapp',
         'TRUNCATE TABLE users',
-        'kill -9 -1',
       ])('blocks "%s"', (cmd) => {
         const r = validateCommandAgainstPolicy(cmd);
         expect(r.allowed).toBe(false);
         expect(r.riskLevel).toBe(RiskLevel.HIGH_RISK_BLOCKED);
       });
+    });
+
+    it('blocks mass-kill: kill -9 -1', () => {
+      const r = validateCommandAgainstPolicy('kill -9 -1');
+      expect(r.allowed).toBe(false);
+      expect(r.riskLevel).toBe(RiskLevel.HIGH_RISK_BLOCKED);
     });
 
   });
