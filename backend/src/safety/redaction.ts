@@ -24,6 +24,14 @@ const REDACTION_PATTERNS: RedactionPattern[] = [
     replacement: 'Bearer «redacted»',
   },
   {
+    name: 'jwt',
+    // JSON Web Token: header.payload.signature; header/payload begin with the
+    // base64url of `{"` = `eyJ`. Distinctive shape, ~zero false positives.
+    // (Pattern borrowed from gitleaks/trufflehog rulesets.)
+    pattern: /\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
+    replacement: '«redacted»',
+  },
+  {
     name: 'db-connection-string',
     pattern: /(postgres(?:ql)?|mysql|mongodb|redis):\/\/[^@\s]+@[^\s]*/gi,
     replacement: '$1://«redacted»',

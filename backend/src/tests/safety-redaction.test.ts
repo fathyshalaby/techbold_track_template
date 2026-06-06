@@ -129,6 +129,22 @@ describe('safety — redaction', () => {
     });
   });
 
+  // ─── JWT standalone (gitleaks-style) ──────────────────────────────────────
+
+  describe('JWT standalone', () => {
+    it('redacts a bare JWT not prefixed by Bearer', () => {
+      const jwt =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NSJ9.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+      const result = redactSecrets(`config: jwt=${jwt}`);
+      expect(result).not.toContain(jwt);
+      expect(result).toContain('«redacted»');
+    });
+
+    it('does not touch ordinary dotted text', () => {
+      expect(redactSecrets('service.unit.name is active')).toBe('service.unit.name is active');
+    });
+  });
+
   // ─── Bearer token standalone ─────────────────────────────────────────────
 
   describe('Bearer token standalone', () => {

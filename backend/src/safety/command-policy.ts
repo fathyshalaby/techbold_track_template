@@ -164,8 +164,8 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
   // ── Reverse shells ────────────────────────────────────────────────────────
   {
     ruleName: 'reverse-shell',
-    pattern: /\/dev\/tcp\//i,
-    reason: 'Bash /dev/tcp reverse shell is forbidden',
+    pattern: /\/dev\/(tcp|udp)\//i,
+    reason: 'Bash /dev/tcp|udp reverse shell is forbidden',
   },
   {
     ruleName: 'reverse-shell',
@@ -174,8 +174,17 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
   },
   {
     ruleName: 'inline-interpreter',
-    pattern: /\b(python3?|perl|ruby)\s+-[ce]\b/i,
+    // python -c, perl/ruby/lua -e, node -e/-p/--eval, php -r — arbitrary code.
+    // (GTFOBins: these are the canonical interpreter shell-escape vectors.)
+    pattern: /\b(python3?|perl|ruby|lua)\s+-[ce]\b|\bnode\s+(?:-e|-p|--eval|--print)\b|\bphp\s+-r\b/i,
     reason: 'Inline interpreter one-liners can execute arbitrary code and are forbidden',
+  },
+  {
+    ruleName: 'inline-interpreter',
+    // awk/gawk/mawk system()/cmd-pipe — a classic GTFOBins exec escape that hides
+    // an arbitrary command inside a "harmless" text-processing tool.
+    pattern: /\b[gm]?awk\b[^;&|]*\bsystem\s*\(/i,
+    reason: 'awk system() executes arbitrary commands and is forbidden',
   },
 
   // ── Setuid / setgid bit ───────────────────────────────────────────────────
@@ -296,6 +305,13 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
     // Block all nc/netcat/ncat usage — redirect, pipe, listener, and -e forms
     pattern: /\b(nc|netcat|ncat)\b/i,
     reason: 'Netcat is forbidden — use curl for probes',
+  },
+  {
+    ruleName: 'exfiltration',
+    // socat: reverse/bind shells, tunnels, and file transfer (GTFOBins). No
+    // diagnostic use here — use curl/ss for probes.
+    pattern: /\bsocat\b/i,
+    reason: 'socat (reverse/bind shells, tunnels) is forbidden — use curl for probes',
   },
 
   // ── DB destruction ────────────────────────────────────────────────────────
