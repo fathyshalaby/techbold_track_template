@@ -392,7 +392,33 @@ The **engine is in excellent shape**: safety layer + SSH executor + agent loop a
 
 ---
 
+# System-Level Ops Audit (deployment & durability, veteran-ops lens — commit `87307e5`)
+Ops/reliability lens applied holistically (Phase 6 still has no code). Reviewed the bits an ops engineer checks before anything runs in production: bootstrap, graceful shutdown, DB durability, container deployment, health, operator visibility.
+
+### Strengths confirmed (no change)
+- **Graceful shutdown** (`index.ts`): SIGTERM/SIGINT → `server.close()` + 5 s force-exit. Good for `docker compose down`.
+- **DB hygiene** (`store/db.ts`): SQLite opened with **WAL** (crash-safe, concurrent reads); `audit_events` is **append-only enforced two ways** — SQLite `BEFORE UPDATE/DELETE` triggers AND the JSONL adapter rejects UPDATE/DELETE. Data-dir auto-created.
+- **Container** (`Dockerfile`): runs as the non-root `node` user (CIS 4.1), has a `HEALTHCHECK` (Node `fetch` — no curl/wget in slim), frozen-lockfile install.
+- **Env fail-fast** (`env.ts`): missing required vars → `process.exit(1)`, no silent misconfig. **Error logging**: `app.onError` + `errorHandler` log server-side, return a generic 500 (operator sees the cause; client gets no leak).
+
+### Issues found & repaired (commit `87307e5`) — the audit trail could silently evaporate
+The C-score *is* "safety & audit" and the activity report is built **only from the audit trail**, yet two paths lost it silently:
+1. **🔴 No data volume.** `docker-compose.yml` mounted no volume for the SQLite store, so `./data/autopilot.db` lived in the container's writable layer → `docker compose down && up` (or any container recreation — exactly what a judge re-running the stack does) **wiped the audit trail + all run state**, breaking the documented "run state survives restart" invariant. **Fix:** added a **named volume** `autopilot-data:/app/backend/data`. Named (not bind) so the non-root `node` user keeps write access; the Dockerfile now **pre-creates `/app/backend/data` owned by `node`** so the volume inherits write permission (a root-owned volume mount would fail SQLite open → silent in-memory fallback).
+2. **🟠 Silent, non-durable fallback.** `getDb()`'s `catch {}` swallowed the real SQLite error and logged a vague "using JSONL fallback" — and that fallback is actually an **in-memory `Map`** (not file-backed despite the name), so anything written after a fallback is lost on restart. **Fix:** the warning now logs the **failure reason** and states the store is **ephemeral** (data lost on restart, fix the native build / mount a writable dir) — a silent degradation becomes a visible, explained one.
+
+### Operational risk register (documented for the team)
+- **Real-VM / live deployment unproven:** no `docker compose up` against a real Docker host + real VM has been run (no Docker here). The volume/permission interplay above is *inspected, not executed* — **this is the #1 thing to smoke-test before freeze** (boot the stack, run one mock incident, restart the container, confirm the prior run + audit trail are still there).
+- **Monitoring/alerting:** the audit log *is* the per-run observability (append-only, redacted, queryable). There is no app-level metrics/log aggregation — acceptable for a single-machine hackathon tool; the HEALTHCHECK covers liveness.
+- **Recovery:** WAL makes an unclean exit crash-safe (recovered on next open). `index.ts` doesn't `db.close()` on shutdown — harmless (WAL recovers; per-statement sync writes are durable), noted not fixed.
+- **Health depth:** `/health` is liveness-only (returns mode), not a readiness probe that pings the DB — fine for the demo; deepen only if a real orchestrator needs readiness gating.
+
+### Verdict
+The deployment story is now durable in the way the product needs: the audit trail persists across container restarts (named volume), and a degraded non-durable store is loud instead of silent. The remaining ops risk is purely **unexecuted verification** — the real `docker compose` + VM smoke — which no code change can substitute for. Full suite **428 pass**, `tsc` clean.
+
+---
+
 ## Cross-phase open items (carry forward)
+- ✅ **Audit-trail durability across container restart** — fixed (`87307e5`, named volume + node-owned data dir + loud fallback). **Still must be *executed*:** `docker compose up`, run an incident, recreate the container, confirm the trail persists.
 - ✅ **CI (tsc + tests) on push/PR** — added & green (`946b3c4`); lockfile fixed so `--frozen-lockfile` passes.
 - **🔴 Reconcile Phase 6 onto current `main` before/at merge** — it branched off `df3b3de` (pre-reconciliation) and will revert the Phase 3/4/5 hardening if merged naively. Rebase first, or merge keeping `main`'s `ai/`+`ssh/`+`safety/`+tests and taking only the new `routes/`/SSE.
 - ~~**Wire the OBSERVING decision step**~~ ✅ **resolved** (`59feb0a`) — `agentDispatch` OBSERVING now decides root-cause vs more-diagnosis from analyzer confidence; observations now include stderr + exit code.
@@ -413,4 +439,4 @@ The **engine is in excellent shape**: safety layer + SSH executor + agent loop a
 
 ---
 
-*Last updated: System-level deep audit — CI added & green (428 tests + tsc on push/PR), stale lockfile fixed. Phase 6 still planning-only. Append a new section per phase as it is audited.*
+*Last updated: System-level ops audit — audit-trail durability fixed (named volume + node-owned data dir + loud fallback); CI green (428 tests). Phase 6 still planning-only; real `docker compose` + VM smoke still owed. Append a new section per phase as it is audited.*
