@@ -27,11 +27,11 @@ Requirements for the hackathon submission (code freeze Sun Jun 7, 14:00). Each m
 
 ### Safety & Audit
 
-- [ ] **SAFE-01**: Deterministic blocklist classifies every dangerous command as `HIGH_RISK_BLOCKED` before execution, including obfuscation variants (extra spaces, quotes, `$()`/backtick wrappers) — *C*
-- [ ] **SAFE-02**: Risk classifier assigns a risk level to every command; the LLM may only raise a level, never lower it — *C*
+- [x] **SAFE-01**: Deterministic blocklist classifies every dangerous command as `HIGH_RISK_BLOCKED` before execution, including obfuscation variants (extra spaces, quotes, `$()`/backtick wrappers) — *C*
+- [x] **SAFE-02**: Risk classifier assigns a risk level to every command; the LLM may only raise a level, never lower it — *C*
 - [ ] **SAFE-03**: Secret redaction strips secrets from every string before it reaches the audit log, UI, or model — *C*
 - [ ] **SAFE-04**: Append-only audit log records every proposed/approved/rejected/executed command and key action; no delete path — *C*
-- [ ] **SAFE-05**: Edited commands are re-validated at approval time; a dangerous edit is blocked (422 + audit BLOCKED) — *C*
+- [x] **SAFE-05**: Edited commands are re-validated at approval time; a dangerous edit is blocked (422 + audit BLOCKED) — *C*
 - [ ] **SAFE-06**: Safety layer is covered by tests — every blocklist pattern, obfuscation variant, edited-command recheck, and redaction — *C/E*
 
 ### Troubleshooting (Agents + Orchestrator)
@@ -123,11 +123,11 @@ Explicitly excluded (PRD §6.3, §11). Documented to prevent scope creep.
 | ERP-04 | Phase 2 | Complete |
 | ERP-05 | Phase 2 | Complete |
 | ERP-06 | Phase 2 | Complete |
-| SAFE-01 | Phase 3 | Pending |
-| SAFE-02 | Phase 3 | Pending |
+| SAFE-01 | Phase 3 | Complete |
+| SAFE-02 | Phase 3 | Complete |
 | SAFE-03 | Phase 3 | Pending |
 | SAFE-04 | Phase 3 | Pending |
-| SAFE-05 | Phase 3 | Pending |
+| SAFE-05 | Phase 3 | Complete |
 | SAFE-06 | Phase 3 | Pending |
 | API-04 | Phase 3 | Pending |
 | DIAG-06 | Phase 4 | Pending |

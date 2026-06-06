@@ -84,7 +84,7 @@ Plans:
 Plans:
 **Wave 1** *(independent — run in parallel)*
 
-- [ ] 03-01-PLAN.md — Blocklist + classifier TDD (command-policy.ts, classifier.ts)
+- [x] 03-01-PLAN.md — Blocklist + classifier TDD (command-policy.ts, classifier.ts)
 - [ ] 03-02-PLAN.md — Redaction TDD (redaction.ts)
 - [ ] 03-03-PLAN.md — Run store (schema.ts, db.ts, runs.ts, audit.ts)
 
@@ -189,7 +189,7 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 |-------|----------------|--------|-----------|
 | 1. Repo Foundation | 3/3 | Complete    | 2026-06-06 |
 | 2. ERP Client + Ticket Routes | 3/3 | Complete    | 2026-06-06 |
-| 3. Safety Layer + Run Store | 0/TBD | Not started | - |
+| 3. Safety Layer + Run Store | 1/4 | In Progress|  |
 | 4. SSH Executor | 0/TBD | Not started | - |
 | 5. Agent Loop + Orchestrator | 0/TBD | Not started | - |
 | 6. Run API + Approvals + SSE | 0/TBD | Not started | - |
