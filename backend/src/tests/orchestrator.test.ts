@@ -499,6 +499,39 @@ describe('reducer transitions', () => {
       expect(result.sideEffects).toHaveLength(0);
     }
   });
+
+  // Regression (audit-gap + phase-desync fix): a blocked FIX command must be
+  // audited and must move the PERSISTED phase back to TRIAGING (via phaseEffect).
+  it('16. PLANNING_FIX + command_blocked → TRIAGING with command.blocked audit', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const state = { ...BASE, phase: 'PLANNING_FIX' as const };
+    const result = reduce(state, { type: 'command_blocked', reason: 'blocklist', command: 'mkfs /dev/sda' });
+    expect(result.nextState.phase).toBe('TRIAGING');
+    expect(
+      result.sideEffects.some(
+        (e) => e.type === 'appendAuditEvent' && (e as { auditType: string }).auditType === 'command.blocked',
+      ),
+    ).toBe(true);
+    expect(
+      result.sideEffects.some(
+        (e) => e.type === 'updateRunPhase' && (e as { phase: string }).phase === 'TRIAGING',
+      ),
+    ).toBe(true);
+  });
+
+  // Regression: a blocked re-gated edit in WAITING_FOR_APPROVAL must be audited
+  // (and not silently dropped) while leaving the run able to retry.
+  it('17. WAITING_FOR_APPROVAL + command_blocked → audited, stays WAITING_FOR_APPROVAL', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const state = { ...BASE, phase: 'WAITING_FOR_APPROVAL' as const };
+    const result = reduce(state, { type: 'command_blocked', reason: 'blocklist', command: 'rm -rf /etc' });
+    expect(result.nextState.phase).toBe('WAITING_FOR_APPROVAL');
+    expect(
+      result.sideEffects.some(
+        (e) => e.type === 'appendAuditEvent' && (e as { auditType: string }).auditType === 'command.blocked',
+      ),
+    ).toBe(true);
+  });
 });
 
 describe('agent mock output', () => {
@@ -797,5 +830,79 @@ describe('orchestrator driver — integration', () => {
     const analyzerSrc = runProblemAnalyzer.toString();
     // The mock function body won't contain forbidden strings — the real check is on the prompts above
     // Also check the agent source file won't contain hardcoded strings (verified via grep in CI)
+  });
+
+  // SAFETY INVARIANT (critical): approving an EDITED command that the policy now
+  // blocks must NEVER execute and MUST be audited. This is the human-edit attack
+  // surface — the gate's "re-check after edit" guarantee.
+  it('Test 8 — re-gate blocks an edited dangerous command: no execution, audited', async () => {
+    const { advance } = await import('../ai/orchestrator.js');
+    const { createRun } = await import('../store/runs.js');
+    const { getDb } = await import('../store/db.js');
+    const { getAuditEvents } = await import('../store/audit.js');
+    type SshExecutor = import('../ssh/types.js').SshExecutor;
+
+    const run = createRun(1, '10.0.0.1:22');
+    await advance(run.id); // → WAITING_FOR_APPROVAL
+    const db = getDb();
+    const pending = db
+      .all<{ id: string; status: string }>('SELECT * FROM command_approvals WHERE run_id = ?', [run.id])
+      .find((a) => a.status === 'PENDING');
+    expect(pending).toBeDefined();
+
+    const execSpy = vi.fn();
+    const spyExecutor = { executeApprovedCommand: execSpy, runPreflight: vi.fn() } as unknown as SshExecutor;
+
+    const state = await advance(
+      run.id,
+      { type: 'command_approved', approvalId: pending!.id, finalCommand: 'rm -rf /etc' },
+      undefined,
+      spyExecutor,
+    );
+
+    expect(execSpy).not.toHaveBeenCalled(); // executor never reached for a blocked command
+    expect(getAuditEvents(run.id).some((e) => e.type === 'command.blocked')).toBe(true);
+    expect(db.all('SELECT * FROM command_results WHERE run_id = ?', [run.id])).toHaveLength(0);
+    expect(state.phase).not.toBe('OBSERVING');
+  });
+
+  // C-SCORE INVARIANT: secrets in command output must be redacted before they are
+  // persisted to command_results OR observations (the redaction-at-sink rule).
+  it('Test 9 — redaction at the sink: secrets in output never persist raw', async () => {
+    const { advance } = await import('../ai/orchestrator.js');
+    const { createRun } = await import('../store/runs.js');
+    const { getDb } = await import('../store/db.js');
+    type SshExecutor = import('../ssh/types.js').SshExecutor;
+
+    const run = createRun(1, '10.0.0.1:22');
+    await advance(run.id);
+    const db = getDb();
+    const pending = db
+      .all<{ id: string; status: string }>('SELECT * FROM command_approvals WHERE run_id = ?', [run.id])
+      .find((a) => a.status === 'PENDING');
+
+    const leakyExecutor = {
+      executeApprovedCommand: vi.fn().mockResolvedValue({
+        stdout: 'db connect: token=SUPERSECRET123', stderr: '', exitCode: 0, durationMs: 5, timedOut: false,
+      }),
+      runPreflight: vi.fn(),
+    } as unknown as SshExecutor;
+
+    await advance(
+      run.id,
+      { type: 'command_approved', approvalId: pending!.id, finalCommand: 'systemctl status status-api --no-pager' },
+      undefined,
+      leakyExecutor,
+    );
+
+    const results = db.all<{ stdout_redacted: string }>('SELECT * FROM command_results WHERE run_id = ?', [run.id]);
+    expect(results).toHaveLength(1);
+    expect(results[0].stdout_redacted).not.toContain('SUPERSECRET123');
+    expect(results[0].stdout_redacted).toContain('«redacted»');
+
+    const sshObs = db
+      .all<{ source: string; content: string }>('SELECT * FROM observations WHERE run_id = ?', [run.id])
+      .find((o) => o.source === 'ssh');
+    expect(sshObs?.content).not.toContain('SUPERSECRET123');
   });
 });

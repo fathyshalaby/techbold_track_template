@@ -170,6 +170,17 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
           ],
         };
       }
+      // Re-gate failure: the technician approved an EDITED command that the safety
+      // policy now blocks. Execution is refused (the driver never calls the
+      // executor) — audit it and stay in WAITING_FOR_APPROVAL so they can retry.
+      if (event.type === 'command_blocked') {
+        return {
+          nextState: state,
+          sideEffects: [
+            auditEffect(state, 'command.blocked', 'system', { reason: event.reason, command: event.command }),
+          ],
+        };
+      }
       break;
     }
 
@@ -224,6 +235,19 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
             { type: 'createPendingApproval', runId: state.runId, proposal: event.proposal },
             { type: 'emitEvent', runId: state.runId, eventType: 'approval.required', payload: { proposal: event.proposal } },
             phaseEffect(state, 'WAITING_FOR_APPROVAL'),
+          ],
+        };
+      }
+      // A blocked fix command must be audited (C-score) AND must move the run back
+      // to TRIAGING in the PERSISTED phase — emitting phaseEffect here is what
+      // calls updateRunPhase; without it the DB stayed on PLANNING_FIX (desync).
+      if (event.type === 'command_blocked') {
+        const nextState = buildState(state, { phase: 'TRIAGING' });
+        return {
+          nextState,
+          sideEffects: [
+            auditEffect(state, 'command.blocked', 'system', { reason: event.reason, command: event.command }),
+            phaseEffect(state, 'TRIAGING'),
           ],
         };
       }
@@ -466,14 +490,15 @@ async function agentDispatch(
         const policyResult = validateCommandAgainstPolicy(proposal.command);
 
         if (!policyResult.allowed) {
+          // reduce() now audits the block AND emits phaseEffect(TRIAGING), so the
+          // persisted phase is updated — just apply its effects and return.
           const { nextState, sideEffects } = reduce(currentState, {
             type: 'command_blocked',
             reason: policyResult.reason ?? policyResult.matchedRule ?? 'blocked',
             command: proposal.command,
           });
           await performSideEffects(sideEffects, db);
-          // PLANNING_FIX has no command_blocked transition — route back to TRIAGING
-          return { ...nextState, phase: 'TRIAGING' };
+          return nextState;
         }
 
         const { nextState, sideEffects } = reduce(currentState, {
