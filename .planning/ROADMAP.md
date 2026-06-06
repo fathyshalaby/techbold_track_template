@@ -104,7 +104,24 @@ Plans:
   3. SSH mock drives the full agent loop offline without a real VM
   4. Preflight step confirms `sudo -n true`, `LANG=C`, and PATH via `bash -lc` before any command runs
 
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+**Wave 1** *(independent)*
+
+- [ ] 04-01-PLAN.md — SSH layer type contracts (types.ts)
+
+**Wave 2** *(blocked on Wave 1 completion — 04-02 and 04-04 run in parallel)*
+
+- [ ] 04-02-PLAN.md — Executor logic TDD: result shape, output cap, timeout, bash-lc wrap, A1 guard (test file only)
+- [ ] 04-04-PLAN.md — Mock SSH TDD + mock.ts: fixture map, fallback, preflight, SshExecutor conformance
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-03-PLAN.md — Real ssh2 client + executor implementation (client.ts + executor.ts)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 04-05-PLAN.md — ssh-tools.ts proposeSshCommand + createSshExecutor factory wiring
 
 ### Phase 5: Agent Loop + Orchestrator
 
