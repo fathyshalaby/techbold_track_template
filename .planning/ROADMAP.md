@@ -16,7 +16,7 @@ Nine phases derived directly from the locked build-order critical path in docs/T
 - [ ] **Phase 3: Safety Layer + Run Store** - Deterministic blocklist/classifier/redaction + tests; append-only SQLite audit log
 - [ ] **Phase 4: SSH Executor** - ssh2 single-command executor with timeout/redaction/output-cap + mock + preflight hardening
 - [ ] **Phase 5: Agent Loop + Orchestrator** - problem_analyzer, problem_solver, validator agents + deterministic state machine
-- [ ] **Phase 6: Run API + Approvals + SSE** - Run CRUD routes, approval/reject/edit with safety re-check, SSE event stream
+- [x] **Phase 6: Run API + Approvals + SSE** - Run CRUD routes, approval/reject/edit with safety re-check, SSE event stream (completed 2026-06-06)
 - [ ] **Phase 7: Activity Generation** - activity_log_generator from audit trail only; draft + submit to Phoenix
 - [ ] **Phase 8: Frontend** - Ticket list, run page, approval card, audit timeline, activity editor
 - [ ] **Phase 9: Tests + Submission Polish** - phoenix-client + orchestrator tests; README; MIT license; REPORT.md; demo video; secret scan
@@ -177,7 +177,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 06-04-PLAN.md — Mount runs + approvals + events routers in app.ts
+- [x] 06-04-PLAN.md — Mount runs + approvals + events routers in app.ts
 
 ### Phase 7: Activity Generation
 
@@ -236,7 +236,7 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 | 3. Safety Layer + Run Store | 4/4 | Complete    | 2026-06-06 |
 | 4. SSH Executor | 5/5 | Complete    | 2026-06-06 |
 | 5. Agent Loop + Orchestrator | 4/5 | In Progress|  |
-| 6. Run API + Approvals + SSE | 3/4 | In Progress|  |
+| 6. Run API + Approvals + SSE | 4/4 | Complete   | 2026-06-06 |
 | 7. Activity Generation | 0/TBD | Not started | - |
 | 8. Frontend | 0/TBD | Not started | - |
 | 9. Tests + Submission Polish | 0/TBD | Not started | - |
