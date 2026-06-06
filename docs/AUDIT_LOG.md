@@ -189,6 +189,33 @@ The branch shipped the executor **test spec** (`ssh-executor.test.ts`, 244 lines
 - **Carry-forward now partly addressed:** the 30 s channel-kill timeout resolves the earlier "follow/stream commands hang" risk (`tail -f`, `journalctl -f`, `ping` without `-c`) at the executor level — they now time out cleanly rather than hanging the run.
 - **Still open for Phase 5/6:** the executor returns RAW output **by design** — the orchestrator MUST call `redactSecrets()` before audit/SSE/UI/model (the redaction-at-sink invariant); add an integration test for that when the call site lands. Bounded *tail* reads should be steered by the agent prompt (a `cat` of a huge log returns a truncated head).
 
+### Phase 4 — Deep Audit (test strategy & regression-prevention pass, commit `1e6b804`)
+Second pass with the *test-strategy / regression-prevention* lens (the "Repository Deep Audit" prompt), now that the executor is implemented and on `main`. Code treated as source of truth.
+
+**Executive summary.** The executor is small (~125 LOC), pure-logic except the ssh2 boundary, and on the **B-score critical path** (it is what acts on a real VM). No production defect found this pass — the implementation matches the spec and the architecture (raw output, caller redacts; never a model tool; fail-safe timeout). The real gap was in the **regression net**: the contract was under-pinned by tests, so future edits could silently break remote execution.
+
+**Invariants asserted (must never break):**
+1. `wrapCommand` produces a single, correctly single-quoted `bash -lc '<cmd>'` argument for ALL inputs (incl. embedded `'`), and never expands/strips metacharacters at wrap time — a broken wrap silently corrupts *every* remote command.
+2. The command's true exit code (incl. nonzero, e.g. `systemctl status` → 3) reaches the result; `timedOut` distinguishes a kill from a real exit.
+3. Output is capped to `REDACTION_CAP_BYTES` per stream while **preserving the leading bytes** (not emptying/garbling), and passes through unchanged when under the cap.
+4. The executor never hangs (30 s channel-kill → `timedOut:true`) and never crashes on a post-ready connection error (the connect error listener stays attached and absorbs it).
+5. **Mock ≡ Real contract:** both `SshExecutor` impls return identical key sets for `executeApprovedCommand` and `runPreflight`, so `resolveClientMode` can swap them with zero other change.
+
+**Repairs (tests added, commit `1e6b804`).** +10 tests: `wrapCommand` quoting (plain / embedded-quote / metachar / shape), nonzero exit-code + stderr propagation, output-cap **content** (head preserved) + under-cap passthrough, and **mock/real parity** for both methods. SSH suite **33 → 43**; full backend suite unaffected (test-only change). No source edits → zero regression risk.
+
+**Test gaps remaining (deferred, scoped to later phases):**
+- *Connect-timeout (10 s) path* not directly tested (only the 30 s command timeout). Low value — same timer mechanism; deferred.
+- *Mid-command connection drop resolves only after the 30 s backstop* rather than promptly. Minor UX, safe; could add a client `error`/`close` listener in `executeApprovedCommand` to finalize early — **deferred** (not worth the added edge surface pre-freeze).
+- *Redaction-at-sink* and *gate-recheck-on-edit* are orchestrator-level (Phase 5/6) — already logged as carry-forwards; no call site exists yet.
+- *Real ssh2 against a live VM* — the ultimate integration test; covered by the planned `docker compose` + real-VM smoke, not unit tests.
+
+**Declined (avoid over-engineering / cargo-cult):**
+- *`fast-check` property tests for `wrapCommand`* — ideal in theory (round-trip through a shell), but needs a shell to verify and `fast-check` is already a logged carry-forward; the targeted example cases cover the real failure modes. Declined for now.
+- *Re-running the safety gate inside the executor* (belt-and-suspenders) — the gate already runs at proposal and post-edit; a third check is the wrong layer and could mask an upstream bug. Flagged for the orchestrator phase as a *consideration*, not implemented.
+- *Snapshot/golden-master of command output* — output is environment-dependent; per-field asserts are more meaningful.
+
+**Verdict.** Executor is correct, minimal, and now well-pinned by tests in both directions (happy path + failure/cap/parity). No bloat, no premature optimization. Remaining items are integration-level and correctly deferred to the phases that introduce their call sites.
+
 ---
 
 ## Cross-phase open items (carry forward)
@@ -205,4 +232,4 @@ The branch shipped the executor **test spec** (`ssh-executor.test.ts`, 244 lines
 
 ---
 
-*Last updated: Phase 4 (SSH executor implemented + landed on main; full suite 346 pass). Append a new section per phase as it is audited.*
+*Last updated: Phase 4 (deep-audit pass — executor regression net hardened; SSH suite 43, full suite 346 pass). Append a new section per phase as it is audited.*
