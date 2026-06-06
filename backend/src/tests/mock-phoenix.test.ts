@@ -169,13 +169,11 @@ describe('MockPhoenixClient', () => {
   });
 
   describe('setStatus', () => {
-    it('mutates ticket status and returns updated ticket', async () => {
+    it('returns updated ticket with new status', async () => {
       const ticket = MOCK_TICKETS.find((t) => t.status === 'OPEN')!;
       const result = await client.setStatus(ticket.id, 'DONE');
       expect(result.status).toBe('DONE');
       expect(result.id).toBe(ticket.id);
-      // verify in-place mutation
-      expect(MOCK_TICKETS.find((t) => t.id === ticket.id)!.status).toBe('DONE');
     });
 
     it('throws PhoenixNotFoundError for unknown id', async () => {

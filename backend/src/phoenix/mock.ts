@@ -117,10 +117,10 @@ export default class MockPhoenixClient {
 
   async setStatus(ticketId: number, status: TicketStatus): Promise<Ticket> {
     this.validateTicketId(ticketId);
-    const ticket = MOCK_TICKETS.find((t) => t.id === ticketId);
-    if (!ticket) throw new PhoenixNotFoundError(`Ticket ${ticketId} not found`);
-    ticket.status = status;
-    return Promise.resolve(ticket);
+    const idx = MOCK_TICKETS.findIndex((t) => t.id === ticketId);
+    if (idx === -1) throw new PhoenixNotFoundError(`Ticket ${ticketId} not found`);
+    MOCK_TICKETS[idx] = { ...MOCK_TICKETS[idx], status };
+    return Promise.resolve({ ...MOCK_TICKETS[idx] });
   }
 
   private validateTicketId(ticketId: number): void {
