@@ -97,7 +97,7 @@ const CREATE_TABLES = `
   END;
 `;
 
-function makeJsonlAdapter(): DbAdapter {
+export function makeJsonlAdapter(): DbAdapter {
   const tables = new Map<string, Record<string, unknown>[]>();
 
   function getTable(name: string): Record<string, unknown>[] {
@@ -149,17 +149,24 @@ function makeJsonlAdapter(): DbAdapter {
         const idx = rows.findIndex((r) => r['id'] === id);
         if (idx === -1) return;
 
-        // Parse SET clause: col = ?, col2 = ?, ...
+        // Parse SET clause by matching each `col = <expr with one ?>` assignment.
+        // Naive comma-splitting breaks on COALESCE(?, col) — its internal comma
+        // produces phantom fragments and misaligns params. Match assignments
+        // directly instead: each consumes exactly one positional param, in order.
         const setMatch = sql.match(/SET\s+(.+?)\s+WHERE/is);
         if (!setMatch) return;
-        const setParts = setMatch[1].split(',').map((p) => p.trim());
-        // params for SET come before the WHERE param
-        const setParams = params.slice(0, setParts.length);
+        const assignRe = /(\w+)\s*=\s*(COALESCE\s*\(\s*\?\s*,\s*\w+\s*\)|\?)/gi;
         const updated = { ...rows[idx] };
-        setParts.forEach((part, i) => {
-          const colMatch2 = part.match(/^(\w+)\s*=/i);
-          if (colMatch2) updated[colMatch2[1]] = setParams[i] ?? null;
-        });
+        let paramIdx = 0;
+        let am: RegExpExecArray | null;
+        while ((am = assignRe.exec(setMatch[1])) !== null) {
+          const col = am[1];
+          const value = params[paramIdx++];
+          const isCoalesce = /^COALESCE/i.test(am[2]);
+          // COALESCE(?, col): a null/undefined param keeps the existing value.
+          if (isCoalesce && (value === null || value === undefined)) continue;
+          updated[col] = value ?? null;
+        }
         rows[idx] = updated;
       }
     },
