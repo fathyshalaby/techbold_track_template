@@ -4,13 +4,14 @@ import { z } from 'zod';
 
 export const TicketStatusSchema = z.enum(['OPEN', 'PENDING', 'DONE']);
 
+// .strict() rejects unknown keys at the Phoenix → backend trust boundary (T-02-01)
 export const SystemInfoSchema = z.object({
   ip: z.string(),
   port: z.number(),
   username: z.string(),
   os: z.string(),
   notes: z.string().optional(),
-});
+}).strict();
 
 // .strict() rejects unknown keys at the Phoenix → backend trust boundary (T-02-01)
 export const TicketSchema = z.object({

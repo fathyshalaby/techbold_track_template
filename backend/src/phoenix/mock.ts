@@ -73,7 +73,7 @@ export default class MockPhoenixClient {
     } else if (query?.sort === 'status') {
       result.sort((a, b) => a.status.localeCompare(b.status));
     } else if (query?.sort === 'date') {
-      result.sort((a, b) => a.id - b.id);
+      result.sort((a, b) => (a.created_at ?? '').localeCompare(b.created_at ?? ''));
     }
 
     return Promise.resolve(result);

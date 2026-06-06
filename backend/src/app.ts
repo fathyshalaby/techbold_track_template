@@ -12,5 +12,6 @@ app.route('/health', healthRouter);
 app.route('/api/tickets', ticketsRouter);
 
 app.onError((err, c) => {
-  return c.json({ error: err.message }, 500);
+  console.error(err);
+  return c.json({ error: 'internal server error' }, 500);
 });
