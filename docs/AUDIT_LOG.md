@@ -216,6 +216,27 @@ Second pass with the *test-strategy / regression-prevention* lens (the "Reposito
 
 **Verdict.** Executor is correct, minimal, and now well-pinned by tests in both directions (happy path + failure/cap/parity). No bloat, no premature optimization. Remaining items are integration-level and correctly deferred to the phases that introduce their call sites.
 
+### Phase 4 — Ops Audit (veteran Linux sysadmin / SSH-execution reality lens, commit `94caa7c`)
+Third pass with the *"how does SSH command execution actually behave on a broken VM"* lens. The first two passes checked completeness and the test net; this one checked the executor against real-world `ssh2`/remote-shell gotchas that cause "works-in-mock, breaks-on-real" failures during graded runs.
+
+**Manual-process baseline.** A technician SSHing into a broken box runs one non-interactive command at a time, reads stdout/stderr + exit code, and — critically — *never blocks on input*: if a command sits waiting (forgot a filename, a tool that reads stdin), they hit Ctrl-D/Ctrl-C and move on. Automation must reproduce that "no input, EOF immediately" behaviour.
+
+**Issue found & repaired — stdin left open (commit `94caa7c`).** The executor wired the read side (stdout/stderr/exit/close) but never closed the **write (stdin) half** of the channel. Real-world consequence: any command that reads stdin — `grep pattern` with no file, bare `cat`, `sort`, `wc`, `sed 'expr'` — blocks waiting for input and only resolves at the **30 s kill**, reporting `timedOut` for what is really a "forgot the filename" slip. On a timed grading run that burns 30 s per slip and produces a misleading result. **Fix:** call `channel.end()` immediately after attaching listeners (we never send stdin) so the remote command gets EOF and exits at once; the read half stays open. +1 regression test; the mock channel gained `end()` to mirror the real `ClientChannel`.
+
+**Real-world behaviours reviewed and judged OK (no change):**
+- **No PTY** — correct: prevents interactive hangs, and makes a stray `sudo` (without `-n`) fail fast with "no tty present" instead of hanging. Combined with the new stdin-EOF, the executor cannot hang on input.
+- **`bash -lc` (login shell)** — chosen for stable PATH; accepted. *Minor risk noted:* a misbehaving `/etc/profile.d/*` that echoes to stdout could prepend noise to command output. Real servers rarely do this for non-interactive shells; not worth switching to `bash -c` (which would lose PATH). Documented, not changed.
+- **No `pipefail`** — `a | b` reports `b`'s exit, so a failed `grep | head` can look successful. Standard shell behaviour; the agent proposes mostly single commands. Left as-is (adding `set -o pipefail` could surprise). Noted.
+- **Host-key verification disabled** (ssh2 default) — acceptable and *desirable* for ephemeral graded VMs (avoids "host key changed" failures); the SSH key + token stay server-side. Accept for the hackathon threat model.
+- **Passphrase-protected keys / keepalive** — not supported / not set; fine for the provided `.pem` and ≤30 s commands. Noted.
+
+**Operational risk register (what an operator would watch in production):**
+- *Run throughput:* before the fix, a single stdin-reading mistake cost 30 s; now near-instant. The 30 s timeout remains the backstop for genuinely long commands.
+- *Profile noise / pipefail* (above) — low likelihood; surfaced for awareness.
+- *Agent must use batch flags* (`--no-pager`, `ps`/`top -b`) since there's no PTY — steer in the Phase-5 agent prompt (carry-forward).
+
+**Verdict.** The executor now matches how a careful technician runs commands non-interactively over SSH: deterministic shell, no input hang, hard timeout, capped output, faithful exit code. One real operational defect fixed; remaining items are deliberate, documented trade-offs. Full suite **357 pass / 0 fail**, `tsc` clean.
+
 ---
 
 ## Cross-phase open items (carry forward)
@@ -226,10 +247,11 @@ Second pass with the *test-strategy / regression-prevention* lens (the "Reposito
 - **Property-based fuzz tests for the safety blocklist** (`fast-check`) — secret-path×verb/flag permutations + whitespace/quote insertion always blocked. Highest-value test upgrade; do in a hardening pass if time allows before freeze.
 - **Phase-6 integration test: gate re-runs on the edited command** — assert an approval-time edit is re-validated and a blocked edit cannot execute (the "re-check after human edit" invariant; no call site exists until the orchestrator lands).
 - **Prefer bounded tail reads in agent prompt** (Phase 5) — `cat <huge log>` returns a truncated *head*; real errors are at the tail. Steer the model to `tail -n` / `journalctl -n`.
+- **Steer agent to non-interactive/batch flags** (Phase 5) — no PTY, so the model must use `--no-pager` (systemctl/journalctl), `top -b -n1`, `ps` (not `top`), and always pass a file to `grep`/`cat` (stdin is now EOF'd, so a missing file fails fast rather than hanging — but a batch flag is still cleaner output).
 - ~~**Per-command timeout for follow/stream commands**~~ ✅ **resolved in Phase 4** (`1d811fd`) — the 30 s channel-kill timeout makes `tail -f`/`journalctl -f`/`ping` time out cleanly instead of hanging the run.
 - **Redaction-at-sink integration test** (Phase 5/6) — the SSH executor returns RAW output by design; assert the orchestrator runs `redactSecrets()` before audit/SSE/UI/model (no call site exists until the orchestrator lands).
 - **Document safe disk-full-via-logs playbook** for demo/operators — `logrotate -f` / `gzip` / `mv`, never `truncate`/`rm` on `/var/log` (hard-fail).
 
 ---
 
-*Last updated: Phase 4 (deep-audit pass — executor regression net hardened; SSH suite 43, full suite 346 pass). Append a new section per phase as it is audited.*
+*Last updated: Phase 4 (ops-audit pass — stdin-hang fix; SSH suite 45, full suite 357 pass). Append a new section per phase as it is audited.*
