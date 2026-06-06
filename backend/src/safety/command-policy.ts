@@ -338,12 +338,15 @@ export function validateCommandAgainstPolicy(command: string): PolicyResult {
     };
   }
 
-  // Split into segments and check each against the blocklist
-  const segments = splitSegments(normalized);
+  // Check the full command AND each split segment against the blocklist.
+  // Full-command check catches pipe-to-shell exfiltration (curl … | sh), where
+  // the danger is the pipe itself; per-segment check catches a dangerous link in
+  // a chain (echo hi; rm -rf /etc) that would otherwise hide behind a safe prefix.
+  const candidates = [normalized, ...splitSegments(normalized)];
 
-  for (const segment of segments) {
+  for (const candidate of candidates) {
     for (const rule of BLOCKLIST) {
-      if (rule.pattern.test(segment)) {
+      if (rule.pattern.test(candidate)) {
         return {
           allowed: false,
           riskLevel: RiskLevel.HIGH_RISK_BLOCKED,
