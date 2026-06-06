@@ -12,7 +12,7 @@ Nine phases derived directly from the locked build-order critical path in docs/T
 - Decimal phases: Inserted only under /gsd-phase --insert if urgent work appears mid-stream
 
 - [x] **Phase 1: Repo Foundation** - Migrate to Node 22 + Hono + TS; validated env; mock mode toggle (completed 2026-06-06)
-- [ ] **Phase 2: ERP Client + Ticket Routes** - Phoenix client with auth/retry/mock; ticket list + detail endpoints
+- [x] **Phase 2: ERP Client + Ticket Routes** - Phoenix client with auth/retry/mock; ticket list + detail endpoints (completed 2026-06-06)
 - [ ] **Phase 3: Safety Layer + Run Store** - Deterministic blocklist/classifier/redaction + tests; append-only SQLite audit log
 - [ ] **Phase 4: SSH Executor** - ssh2 single-command executor with timeout/redaction/output-cap + mock + preflight hardening
 - [ ] **Phase 5: Agent Loop + Orchestrator** - problem_analyzer, problem_solver, validator agents + deterministic state machine
