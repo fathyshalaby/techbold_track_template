@@ -60,8 +60,11 @@ function makeSshChannel(opts: ChannelOpts) {
   const { EventEmitter } = require('node:events') as typeof import('node:events');
   const channel = new EventEmitter() as InstanceType<typeof EventEmitter> & {
     stderr: InstanceType<typeof EventEmitter>;
+    end: ReturnType<typeof vi.fn>;
   };
   channel.stderr = new EventEmitter();
+  // Real ssh2 ClientChannel exposes end() to close the stdin (write) half.
+  channel.end = vi.fn();
 
   process.nextTick(() => {
     if (opts.stdout !== null) channel.emit('data', opts.stdout);
@@ -123,6 +126,20 @@ const TARGET: SshTarget = {
 // ---------------------------------------------------------------------------
 
 describe('ssh-executor', () => {
+
+  // Ops regression: a non-interactive command that reads stdin (grep/cat/sort
+  // with no file) must NOT block on input — the executor closes the write half.
+  describe('stdin is closed (no hang on stdin-reading commands)', () => {
+    it('calls channel.end() to EOF stdin after wiring output listeners', async () => {
+      let created: ReturnType<typeof makeSshChannel> | undefined;
+      channelFactory = () => {
+        created = makeSshChannel({ stdout: Buffer.from('x'), stderr: null, exitCode: 0 });
+        return created;
+      };
+      await executeApprovedCommand('appr-stdin', 'grep pattern', TARGET);
+      expect(created!.end).toHaveBeenCalled();
+    });
+  });
 
   describe('result shape', () => {
     beforeEach(() => {

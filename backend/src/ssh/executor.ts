@@ -94,6 +94,13 @@ export async function executeApprovedCommand(
         if (typeof code === 'number') exitCode = code;
       });
       channel.on('close', () => finalize());
+
+      // Close our (write) half immediately: we never send stdin. Without this, a
+      // command that reads stdin (e.g. `grep pattern` with no file, `cat`, `sort`,
+      // `wc`) blocks forever waiting for input and only resolves at the 30s kill —
+      // a "forgot the filename" slip would burn 30s of a graded run. EOF makes it
+      // exit at once. The read half (stdout/stderr) stays open.
+      channel.end();
     });
   });
 }
