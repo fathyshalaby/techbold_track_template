@@ -121,7 +121,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 04-05-PLAN.md — ssh-tools.ts proposeSshCommand + createSshExecutor factory wiring
+- [x] 04-05-PLAN.md — ssh-tools.ts proposeSshCommand + createSshExecutor factory wiring
 
 ### Phase 5: Agent Loop + Orchestrator
 
@@ -207,7 +207,7 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 | 1. Repo Foundation | 3/3 | Complete    | 2026-06-06 |
 | 2. ERP Client + Ticket Routes | 3/3 | Complete    | 2026-06-06 |
 | 3. Safety Layer + Run Store | 4/4 | Complete    | 2026-06-06 |
-| 4. SSH Executor | 4/5 | In Progress|  |
+| 4. SSH Executor | 5/5 | Complete    | 2026-06-06 |
 | 5. Agent Loop + Orchestrator | 0/TBD | Not started | - |
 | 6. Run API + Approvals + SSE | 0/TBD | Not started | - |
 | 7. Activity Generation | 0/TBD | Not started | - |
