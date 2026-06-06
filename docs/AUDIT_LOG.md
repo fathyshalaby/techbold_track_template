@@ -369,7 +369,31 @@ Phase 6 branched from **`df3b3de`** (Julian's phase-05 tip) — **before** the P
 
 ---
 
+# System-Level Deep Audit (whole-repo, freeze-readiness pass — commits `2d68603` + `946b3c4`)
+Phase 6 has no code, so the deep-audit/test-strategy/regression-prevention prompt was applied **holistically to the assembled system on `main`** (Phases 1–5, 428 tests) to find cross-cutting gaps the per-phase passes couldn't see.
+
+### Issues found & repaired
+1. **🔴 No CI at all → added (verified green).** `.github/workflows/` did not exist — the 428-test suite + `tsc` never ran automatically, so any push could silently regress the B/C-score-critical code. This is the *exact* gap the running "regression-prevention" theme assumed was covered and wasn't. **Fix:** added `.github/workflows/ci.yml` — workspace `pnpm install` + `tsc --noEmit` + `vitest run` on every push to `main` and every PR (Node 22, ubuntu; better-sqlite3 resolves a prebuilt binary). First run failed (`pnpm/action-setup` needs an explicit `version` — no root `package.json#packageManager`); pinned `version: 11`; **second run green in 36s**. The regression gate is now live and proven.
+2. **🟠 Stale lockfile (would have broken CI + any clean install) → fixed.** `package.json` declared `ulid@^3.0.2` (Phase-5 approval IDs) but it was missing from `pnpm-lock.yaml`, so `pnpm install --frozen-lockfile` (CI default) failed. This is also why a `pnpm-lock.yaml` diff kept reappearing across phases. Regenerated the lock (`--lockfile-only`); frozen install now passes.
+
+### System-level findings (documented — not code-repairable here)
+- **🔴 No HTTP surface yet (Phase 6).** The full engine exists (orchestrator + safety + executor + agents, all tested) but `routes/{runs,approvals,events}.ts` are 2-line stubs and `app.ts` mounts only `/health` + `/api/tickets`. **You cannot drive an incident end-to-end via the API today** — Phase 6 is the missing keystone. Highest-value *next build* (with the reconciliation caveat above).
+- **Test pyramid shape:** strong L1 (unit: safety, redaction, classifier) + L2 (component: phoenix client, ssh executor, orchestrator integration via mocks). **Missing L3/L4:** no HTTP-level system test (needs the routes) and **no real-VM / `docker compose` E2E** — the recurring "works-in-mock, breaks-on-real" risk. The one thing no current test proves is behaviour against a live sshd + a real Phoenix.
+- **Activity generation (Phase 7) absent:** `activity-log-generator` agent + `routes/activity.ts` are stubs — the "draft ERP activity from the audit trail" step (part of the scored deliverable) isn't built.
+- **Frontend:** technician workspace is a skeleton — out of scope for the backend score but needed for the live demo.
+
+### Regression-prevention plan (now partially in place)
+- ✅ **CI gate** (tsc + 428 tests) on push/PR — the core regression net, now automated.
+- **Recommended next (cheap, deferred):** add `fast-check` property tests for the safety blocklist (already logged); a route-level integration test once Phase 6 lands; a smoke job that boots the backend in `MOCK_MODE` and hits `/health`.
+- **Not adopted (justified):** lint/format gate (Biome/ESLint) — nice-to-have, not pre-freeze critical; coverage thresholds — the suite is already comprehensive, a % gate adds noise now.
+
+### Freeze-readiness verdict
+The **engine is in excellent shape**: safety layer + SSH executor + agent loop are complete, hardened across multiple audit lenses, and now guarded by green CI (428 tests). The **gap to a demoable product** is the HTTP/SSE surface (Phase 6) + activity draft (Phase 7) + the real-VM smoke. Those are build-forward items, not defects in what exists. Top pre-freeze priorities, in order: (1) implement Phase 6 **rebased on `main`**; (2) `docker compose up` + one real-VM incident smoke; (3) Phase 7 activity draft.
+
+---
+
 ## Cross-phase open items (carry forward)
+- ✅ **CI (tsc + tests) on push/PR** — added & green (`946b3c4`); lockfile fixed so `--frozen-lockfile` passes.
 - **🔴 Reconcile Phase 6 onto current `main` before/at merge** — it branched off `df3b3de` (pre-reconciliation) and will revert the Phase 3/4/5 hardening if merged naively. Rebase first, or merge keeping `main`'s `ai/`+`ssh/`+`safety/`+tests and taking only the new `routes/`/SSE.
 - ~~**Wire the OBSERVING decision step**~~ ✅ **resolved** (`59feb0a`) — `agentDispatch` OBSERVING now decides root-cause vs more-diagnosis from analyzer confidence; observations now include stderr + exit code.
 - ~~**AI SDK v4 vs v5/v6**~~ ✅ **resolved in Phase 5** — stayed on v4 (`ai@^4.3.16`, `LanguageModelV1`), clean mock-model; no upgrade churn.
@@ -389,4 +413,4 @@ Phase 6 branched from **`df3b3de`** (Julian's phase-05 tip) — **before** the P
 
 ---
 
-*Last updated: Phase 6 check — planning-only (not yet implemented); flagged the reconciliation-onto-main requirement. Phase 5 prior: 428 tests pass. Append a new section per phase as it is audited.*
+*Last updated: System-level deep audit — CI added & green (428 tests + tsc on push/PR), stale lockfile fixed. Phase 6 still planning-only. Append a new section per phase as it is audited.*
