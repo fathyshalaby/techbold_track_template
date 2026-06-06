@@ -80,7 +80,17 @@ Plans:
   4. Run store creates a `runs` row and `run.started` audit entry on run creation; no delete path exists
   5. SQLite store persists approvals, results, observations, and activity drafts; JSONL fallback activates when SQLite is unavailable
 
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+**Wave 1** *(independent — run in parallel)*
+
+- [ ] 03-01-PLAN.md — Blocklist + classifier TDD (command-policy.ts, classifier.ts)
+- [ ] 03-02-PLAN.md — Redaction TDD (redaction.ts)
+- [ ] 03-03-PLAN.md — Run store (schema.ts, db.ts, runs.ts, audit.ts)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-04-PLAN.md — Safety §9 consolidated test gate (safety.test.ts)
 
 ### Phase 4: SSH Executor
 
