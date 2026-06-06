@@ -194,6 +194,19 @@ describe('phoenix-client', () => {
       await expect(client.getTicket(1)).rejects.toBeInstanceOf(PhoenixNotFoundError);
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
+
+    it('does NOT retry POST createActivity on network error — fetch called once (no duplicate ERP records)', async () => {
+      const fetchMock = vi.fn().mockRejectedValue(new Error('network failure'));
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(
+        client.createActivity({
+          ticket_id: 1,
+          start_datetime: '2026-01-01T00:00:00Z',
+          end_datetime: '2026-01-01T01:00:00Z',
+        }),
+      ).rejects.toBeInstanceOf(PhoenixNetworkError);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Authorization header', () => {
