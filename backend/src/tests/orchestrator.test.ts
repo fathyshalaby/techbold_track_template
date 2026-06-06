@@ -1,5 +1,6 @@
 // Orchestrator tests: mocked SSH + model — full happy path + reject path
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import type { LanguageModelV1 } from 'ai';
 import { z } from 'zod';
 
 describe('RunPhase enum migration', () => {
@@ -262,5 +263,143 @@ describe('Prompt generalization (DIAG-02 / SC2)', () => {
   it('VALIDATOR_SYSTEM_PROMPT does not instruct using is-active as sole proof', async () => {
     const { VALIDATOR_SYSTEM_PROMPT } = await import('../ai/prompts.js');
     expect(VALIDATOR_SYSTEM_PROMPT).not.toMatch(/\bis-active\b/);
+  });
+});
+
+describe('agent schemas', () => {
+  it('CustomerSystemContextSchema parses valid summary', async () => {
+    const { CustomerSystemContextSchema } = await import(
+      '../ai/agents/customer-system-analyzer.js'
+    );
+    expect(() =>
+      CustomerSystemContextSchema.parse({ summary: 'Ubuntu 22.04, nginx running on :80' }),
+    ).not.toThrow();
+  });
+
+  it('CustomerSystemContextSchema rejects empty summary', async () => {
+    const { CustomerSystemContextSchema } = await import(
+      '../ai/agents/customer-system-analyzer.js'
+    );
+    expect(() => CustomerSystemContextSchema.parse({ summary: '' })).toThrow();
+  });
+
+  it('CustomerSystemContextSchema rejects missing summary', async () => {
+    const { CustomerSystemContextSchema } = await import(
+      '../ai/agents/customer-system-analyzer.js'
+    );
+    expect(() => CustomerSystemContextSchema.parse({})).toThrow();
+  });
+});
+
+describe('agent degradation', () => {
+  it('runProblemAnalyzer rejects with AgentUnavailableError when model throws', async () => {
+    const { runProblemAnalyzer, AgentUnavailableError } = await import(
+      '../ai/agents/problem-analyzer.js'
+    );
+    const throwingModel: LanguageModelV1 = {
+      specificationVersion: 'v1',
+      provider: 'mock',
+      modelId: 'mock-throw',
+      defaultObjectGenerationMode: 'json',
+      supportsStructuredOutputs: true,
+      doGenerate: async () => {
+        throw new Error('model unavailable');
+      },
+      doStream: async () => {
+        throw new Error('mock model does not support streaming');
+      },
+    };
+    await expect(
+      runProblemAnalyzer(
+        { ticketDescription: 'nginx not responding', observations: [] },
+        throwingModel,
+      ),
+    ).rejects.toBeInstanceOf(AgentUnavailableError);
+  });
+
+  it('AgentUnavailableError message contains "agent unavailable" (case-insensitive)', async () => {
+    const { runProblemAnalyzer, AgentUnavailableError } = await import(
+      '../ai/agents/problem-analyzer.js'
+    );
+    const throwingModel: LanguageModelV1 = {
+      specificationVersion: 'v1',
+      provider: 'mock',
+      modelId: 'mock-throw',
+      defaultObjectGenerationMode: 'json',
+      supportsStructuredOutputs: true,
+      doGenerate: async () => {
+        throw new Error('model unavailable');
+      },
+      doStream: async () => {
+        throw new Error('mock model does not support streaming');
+      },
+    };
+    await expect(
+      runProblemAnalyzer(
+        { ticketDescription: 'nginx not responding', observations: [] },
+        throwingModel,
+      ),
+    ).rejects.toMatchObject({ message: expect.stringMatching(/agent unavailable/i) });
+  });
+});
+
+describe('agent mock output', () => {
+  it('runProblemAnalyzer with scripted mock returns valid DiagnosticProposal', async () => {
+    const { runProblemAnalyzer, MOCK_DIAGNOSTIC_PROPOSAL } = await import(
+      '../ai/agents/problem-analyzer.js'
+    );
+    const scriptedModel: LanguageModelV1 = {
+      specificationVersion: 'v1',
+      provider: 'mock',
+      modelId: 'mock-scripted',
+      defaultObjectGenerationMode: 'json',
+      supportsStructuredOutputs: true,
+      doGenerate: async () => ({
+        rawCall: { rawPrompt: null, rawSettings: {} },
+        finishReason: 'stop' as const,
+        usage: { promptTokens: 0, completionTokens: 0 },
+        text: JSON.stringify(MOCK_DIAGNOSTIC_PROPOSAL),
+      }),
+      doStream: async () => {
+        throw new Error('mock model does not support streaming');
+      },
+    };
+    const result = await runProblemAnalyzer(
+      { ticketDescription: 'nginx not responding', observations: [] },
+      scriptedModel,
+    );
+    expect(result.hypotheses.length).toBeGreaterThanOrEqual(1);
+    expect(result.isReadOnly).toBe(true);
+  });
+
+  it('runValidator with scripted mock returns LIKELY_FIXED', async () => {
+    const { runValidator, MOCK_VALIDATION_RESULT_LIKELY } = await import(
+      '../ai/agents/validator.js'
+    );
+    const scriptedModel: LanguageModelV1 = {
+      specificationVersion: 'v1',
+      provider: 'mock',
+      modelId: 'mock-scripted',
+      defaultObjectGenerationMode: 'json',
+      supportsStructuredOutputs: true,
+      doGenerate: async () => ({
+        rawCall: { rawPrompt: null, rawSettings: {} },
+        finishReason: 'stop' as const,
+        usage: { promptTokens: 0, completionTokens: 0 },
+        text: JSON.stringify(MOCK_VALIDATION_RESULT_LIKELY),
+      }),
+      doStream: async () => {
+        throw new Error('mock model does not support streaming');
+      },
+    };
+    const result = await runValidator(
+      {
+        ticketDescription: 'nginx not responding',
+        observations: ['systemctl restart nginx succeeded'],
+        fixApplied: 'systemctl restart nginx',
+      },
+      scriptedModel,
+    );
+    expect(result.status).toBe('LIKELY_FIXED');
   });
 });
