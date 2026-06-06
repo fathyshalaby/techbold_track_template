@@ -18,7 +18,7 @@ function getClient() {
     return new MockPhoenixClient();
   }
   const env = getEnv();
-  return new PhoenixClient(env.PHOENIX_API_URL, env.PHOENIX_API_TOKEN);
+  return new PhoenixClient(env.PHOENIX_API_BASE_URL, env.PHOENIX_API_TOKEN);
 }
 
 ticketsRouter.get('/', async (c) => {

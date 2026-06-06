@@ -236,23 +236,30 @@ describe('PhoenixValidationErrorSchema', () => {
   });
 });
 
-// T-02-01: security boundaries reject unknown fields
-describe('TicketSchema strict boundary', () => {
-  it('rejects unknown top-level fields', () => {
+// Tolerance boundary: consuming an external API we don't control, we accept
+// (and strip) unknown fields rather than reject — a benign extra field from the
+// live ERP must NOT break ticket/customer-system loading. We still reject
+// MISSING required fields and wrong types (covered above).
+describe('TicketSchema tolerates unknown fields (strips, does not reject)', () => {
+  it('accepts an extra field and strips it from the parsed result', () => {
     const base = {
       id: 1, title: 't', description: 'd', priority: 'high',
       status: 'OPEN', customer_id: 1, customer_name: 'Acme',
     };
-    expect(TicketSchema.safeParse({ ...base, injected: 'x' }).success).toBe(false);
+    const parsed = TicketSchema.parse({ ...base, injected: 'x' });
+    expect(parsed).not.toHaveProperty('injected');
+    expect(parsed.id).toBe(1);
   });
 });
 
-describe('CustomerSystemSchema strict boundary', () => {
-  it('rejects unknown top-level fields', () => {
+describe('CustomerSystemSchema tolerates unknown fields (strips, does not reject)', () => {
+  it('accepts an extra field and strips it from the parsed result', () => {
     const base = {
       ticket_id: 1, customer_id: 1,
       system: { ip: '10.0.0.1', port: 22, username: 'azureuser', os: 'Ubuntu 22.04' },
     };
-    expect(CustomerSystemSchema.safeParse({ ...base, injected: 'x' }).success).toBe(false);
+    const parsed = CustomerSystemSchema.parse({ ...base, injected: 'x' });
+    expect(parsed).not.toHaveProperty('injected');
+    expect(parsed.ticket_id).toBe(1);
   });
 });
