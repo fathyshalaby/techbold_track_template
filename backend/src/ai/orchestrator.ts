@@ -24,6 +24,20 @@ export { type DiagnosticProposal, type FixProposal, type ValidationResult };
 
 export const MAX_STEPS = 12;
 
+// A technician stops diagnosing and moves to a fix once confident enough in the
+// cause. We use the problem-analyzer's top-hypothesis confidence as that signal.
+export const ROOT_CAUSE_CONFIDENCE_THRESHOLD = 0.8;
+
+// Build the observation text an agent reads from a command result. A diagnosing
+// technician needs the EXIT CODE and STDERR, not just stdout — many failures
+// (nginx -t, OOM=137, "No such file") show only there. Empty streams omitted.
+function formatObservation(r: import('../store/schema.js').CommandResult): string {
+  const parts = [`$ ${r.command}`, `exit_code: ${r.exit_code}${r.timed_out ? ' (timed out)' : ''}`];
+  if (r.stdout_redacted && r.stdout_redacted.trim()) parts.push(`stdout:\n${r.stdout_redacted}`);
+  if (r.stderr_redacted && r.stderr_redacted.trim()) parts.push(`stderr:\n${r.stderr_redacted}`);
+  return parts.join('\n');
+}
+
 export interface OrchestratorState {
   runId: string;
   phase: RunPhaseValue;
@@ -190,7 +204,7 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
         return {
           nextState,
           sideEffects: [
-            { type: 'appendObservation', runId: state.runId, source: 'ssh', content: event.result.stdout_redacted },
+            { type: 'appendObservation', runId: state.runId, source: 'ssh', content: formatObservation(event.result) },
             auditEffect(state, 'command.completed', 'ssh', { approvalId: event.approvalId, exitCode: event.result.exit_code }),
             phaseEffect(state, 'OBSERVING'),
           ],
@@ -534,6 +548,44 @@ async function agentDispatch(
         });
         await performSideEffects(sideEffects, db);
         return nextState;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        appendAuditEvent(currentState.runId, 'agent.unavailable', 'system', { message });
+        return currentState;
+      }
+    }
+
+    case 'OBSERVING': {
+      // Decide whether the accumulated evidence pins the root cause or more
+      // diagnosis is needed. Reuses the problem-analyzer (no separate decision
+      // agent): if its top hypothesis confidence ≥ threshold → root cause found
+      // → PLANNING_FIX; otherwise → TRIAGING to propose the next probe. Mirrors
+      // a technician deciding "I'm sure enough — fix it" vs "keep looking".
+      try {
+        const observations = db
+          .all<{ content: string; source: string }>('SELECT * FROM observations WHERE run_id = ?', [currentState.runId])
+          .filter((o) => o.source !== STEP_COUNT_SOURCE)
+          .map((o) => o.content);
+
+        const proposal = await runProblemAnalyzer({
+          ticketDescription: `Ticket #${currentState.ticketId} — system: ${currentState.customerSystemId}`,
+          observations,
+        });
+
+        const top = proposal.hypotheses.reduce((a, b) => (b.confidence > a.confidence ? b : a));
+
+        if (top.confidence >= ROOT_CAUSE_CONFIDENCE_THRESHOLD) {
+          const { nextState, sideEffects } = reduce(currentState, {
+            type: 'root_cause_found',
+            hypothesis: top.cause,
+          });
+          await performSideEffects(sideEffects, db);
+          return nextState; // → PLANNING_FIX
+        }
+
+        const { nextState, sideEffects } = reduce(currentState, { type: 'more_diagnosis_needed' });
+        await performSideEffects(sideEffects, db);
+        return nextState; // → TRIAGING (re-propose next diagnostic command)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         appendAuditEvent(currentState.runId, 'agent.unavailable', 'system', { message });

@@ -905,4 +905,89 @@ describe('orchestrator driver — integration', () => {
       .find((o) => o.source === 'ssh');
     expect(sshObs?.content).not.toContain('SUPERSECRET123');
   });
+
+  // LOOP-PROGRESSION (was the #1 gap — OBSERVING used to stall): after a command
+  // runs, advancing must auto-decide root-cause vs more-diagnosis.
+  async function driveToObserving() {
+    const { advance } = await import('../ai/orchestrator.js');
+    const { createRun } = await import('../store/runs.js');
+    const { getDb } = await import('../store/db.js');
+    type SshExecutor = import('../ssh/types.js').SshExecutor;
+    const run = createRun(1, '10.0.0.1:22');
+    await advance(run.id); // → WAITING_FOR_APPROVAL
+    const db = getDb();
+    const pending = db
+      .all<{ id: string; status: string }>('SELECT * FROM command_approvals WHERE run_id = ?', [run.id])
+      .find((a) => a.status === 'PENDING');
+    const exec = {
+      executeApprovedCommand: vi.fn().mockResolvedValue({
+        stdout: 'Active: failed', stderr: '', exitCode: 3, durationMs: 5, timedOut: false,
+      }),
+      runPreflight: vi.fn(),
+    } as unknown as SshExecutor;
+    await advance(
+      run.id,
+      { type: 'command_approved', approvalId: pending!.id, finalCommand: 'systemctl status status-api --no-pager' },
+      undefined,
+      exec,
+    ); // → OBSERVING
+    return { run, advance };
+  }
+
+  it('Test 10 — OBSERVING + high-confidence hypothesis → PLANNING_FIX', async () => {
+    const { run, advance } = await driveToObserving();
+    const { runProblemAnalyzer } = await import('../ai/agents/problem-analyzer.js');
+    (runProblemAnalyzer as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ...MOCK_DIAGNOSTIC,
+      hypotheses: [{ cause: 'port 8080 already in use', evidence: 'EADDRINUSE', confidence: 0.95 }],
+    });
+    const state = await advance(run.id);
+    expect(state.phase).toBe('PLANNING_FIX');
+    const { getAuditEvents } = await import('../store/audit.js');
+    expect(getAuditEvents(run.id).some((e) => e.type === 'diagnosis.root_cause_found')).toBe(true);
+  });
+
+  it('Test 11 — OBSERVING + low-confidence hypothesis → TRIAGING (keep diagnosing)', async () => {
+    const { run, advance } = await driveToObserving();
+    const { runProblemAnalyzer } = await import('../ai/agents/problem-analyzer.js');
+    (runProblemAnalyzer as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ...MOCK_DIAGNOSTIC,
+      hypotheses: [{ cause: 'maybe disk?', evidence: 'inconclusive', confidence: 0.3 }],
+    });
+    const state = await advance(run.id);
+    expect(state.phase).toBe('TRIAGING');
+    const { getAuditEvents } = await import('../store/audit.js');
+    expect(getAuditEvents(run.id).some((e) => e.type === 'diagnosis.more_needed')).toBe(true);
+  });
+
+  // OBSERVATION FIDELITY: the agent must see exit code + stderr, not just stdout.
+  it('Test 12 — observation records exit code and stderr, not only stdout', async () => {
+    const { advance } = await import('../ai/orchestrator.js');
+    const { createRun } = await import('../store/runs.js');
+    const { getDb } = await import('../store/db.js');
+    type SshExecutor = import('../ssh/types.js').SshExecutor;
+    const run = createRun(1, '10.0.0.1:22');
+    await advance(run.id);
+    const db = getDb();
+    const pending = db
+      .all<{ id: string; status: string }>('SELECT * FROM command_approvals WHERE run_id = ?', [run.id])
+      .find((a) => a.status === 'PENDING');
+    const exec = {
+      executeApprovedCommand: vi.fn().mockResolvedValue({
+        stdout: '', stderr: 'nginx: configuration file test failed', exitCode: 1, durationMs: 5, timedOut: false,
+      }),
+      runPreflight: vi.fn(),
+    } as unknown as SshExecutor;
+    await advance(
+      run.id,
+      { type: 'command_approved', approvalId: pending!.id, finalCommand: 'nginx -t' },
+      undefined,
+      exec,
+    );
+    const sshObs = db
+      .all<{ source: string; content: string }>('SELECT * FROM observations WHERE run_id = ?', [run.id])
+      .find((o) => o.source === 'ssh');
+    expect(sshObs?.content).toContain('exit_code: 1');
+    expect(sshObs?.content).toContain('nginx: configuration file test failed');
+  });
 });
