@@ -4,7 +4,8 @@ import type { Dirent } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { REDACTION_CAP_BYTES } from '../safety/redaction.js';
-import { executeApprovedCommand, runPreflight } from '../ssh/executor.js';
+import { executeApprovedCommand, runPreflight, wrapCommand, RealSshExecutor } from '../ssh/executor.js';
+import { MockSshExecutor } from '../ssh/mock.js';
 import { SshConnectionError, type SshTarget } from '../ssh/types.js';
 
 // Cross-platform recursive scan for a substring in non-comment lines of a dir.
@@ -315,6 +316,100 @@ describe('ssh-executor', () => {
       );
 
       connectSpy.mockRestore();
+    });
+  });
+
+  // ─── Regression: wrapCommand quoting (pure fn, high-impact) ───────────────
+  // A broken wrap silently corrupts EVERY remote command. Real ssh2 runs the
+  // wrapped string via the remote shell, so the inner command must survive as a
+  // single bash -lc argument — including embedded single quotes (awk/sed/grep).
+  describe('wrapCommand quoting', () => {
+    it('wraps a plain command verbatim inside single quotes', () => {
+      expect(wrapCommand('uname -a')).toBe("bash -lc 'uname -a'");
+    });
+
+    it('escapes embedded single quotes with the POSIX \'\\\'\' idiom', () => {
+      // awk '{print $1}'  →  bash -lc 'awk '\''{print $1}'\'''
+      expect(wrapCommand("awk '{print $1}'")).toBe("bash -lc 'awk '\\''{print $1}'\\'''");
+    });
+
+    it('always starts with "bash -lc \'" and ends with "\'"', () => {
+      for (const cmd of ['df -h', "echo 'hi'", 'systemctl status x', "a'b'c"]) {
+        const w = wrapCommand(cmd);
+        expect(w.startsWith("bash -lc '")).toBe(true);
+        expect(w.endsWith("'")).toBe(true);
+      }
+    });
+
+    it('does not expand or drop shell metacharacters at wrap time', () => {
+      // $(...) / backticks / | must be carried literally into the inner shell,
+      // not interpreted by the wrapper.
+      const w = wrapCommand('echo $(whoami) | grep x');
+      expect(w).toContain('$(whoami)');
+      expect(w).toContain('| grep x');
+    });
+  });
+
+  // ─── Regression: nonzero exit code propagates ─────────────────────────────
+  describe('exit code propagation', () => {
+    it('surfaces a nonzero exit code (e.g. 3 from systemctl status)', async () => {
+      channelFactory = () =>
+        makeSshChannel({ stdout: Buffer.from('inactive'), stderr: null, exitCode: 3 });
+      const result = await executeApprovedCommand('appr-x', 'systemctl status x', TARGET);
+      expect(result.exitCode).toBe(3);
+      expect(result.timedOut).toBe(false);
+    });
+
+    it('captures stderr alongside a nonzero exit', async () => {
+      channelFactory = () =>
+        makeSshChannel({ stdout: null, stderr: Buffer.from('boom'), exitCode: 1 });
+      const result = await executeApprovedCommand('appr-y', 'bad-cmd', TARGET);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('boom');
+    });
+  });
+
+  // ─── Regression: output cap preserves CONTENT (head), not just length ──────
+  describe('output cap content', () => {
+    it('keeps the first REDACTION_CAP_BYTES bytes intact (not garbage/empty)', async () => {
+      const big = Buffer.alloc(REDACTION_CAP_BYTES + 500, 0x41); // 'A' * (cap+500)
+      channelFactory = () => makeSshChannel({ stdout: big, stderr: null, exitCode: 0 });
+      const result = await executeApprovedCommand('appr-cap', 'cat big', TARGET);
+      expect(result.stdout.length).toBe(REDACTION_CAP_BYTES);
+      expect(result.stdout).toBe('A'.repeat(REDACTION_CAP_BYTES));
+    });
+
+    it('returns output unchanged when under the cap', async () => {
+      channelFactory = () =>
+        makeSshChannel({ stdout: Buffer.from('short output\n'), stderr: null, exitCode: 0 });
+      const result = await executeApprovedCommand('appr-small', 'echo', TARGET);
+      expect(result.stdout).toBe('short output\n');
+    });
+  });
+
+  // ─── Contract: mock and real executors must stay shape-compatible ──────────
+  // CONTEXT invariant: "the mock mirrors the real executor exactly" so the
+  // orchestrator can swap them via resolveClientMode with no other change.
+  // This guards against the two implementations drifting apart.
+  describe('mock/real contract parity', () => {
+    beforeEach(() => {
+      channelFactory = () =>
+        makeSshChannel({ stdout: Buffer.from('ok'), stderr: null, exitCode: 0 });
+    });
+
+    it('executeApprovedCommand returns the same key set from both implementations', async () => {
+      const real = await new RealSshExecutor().executeApprovedCommand('a', 'uname -a', TARGET);
+      const mock = await new MockSshExecutor().executeApprovedCommand('a', 'uname -a', TARGET);
+      expect(Object.keys(real).sort()).toEqual(Object.keys(mock).sort());
+    });
+
+    it('runPreflight returns the same key set from both implementations', async () => {
+      // real preflight runs two commands (sudo, path); both succeed here.
+      const real = await new RealSshExecutor().runPreflight(TARGET);
+      const mock = await new MockSshExecutor().runPreflight(TARGET);
+      expect(Object.keys(real).sort()).toEqual(Object.keys(mock).sort());
+      expect(real.lang).toBe('C');
+      expect(mock.lang).toBe('C');
     });
   });
 
