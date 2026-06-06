@@ -149,7 +149,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion — 05-03 and 05-04 run in parallel)*
 
 - [x] 05-03-PLAN.md — Agent implementations TDD (problem-analyzer, customer-system-analyzer, problem-solver, validator)
-- [ ] 05-04-PLAN.md — Orchestrator reducer TDD (pure state, event → nextState, sideEffects reducer + max-steps cap)
+- [x] 05-04-PLAN.md — Orchestrator reducer TDD (pure state, event → nextState, sideEffects reducer + max-steps cap)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -225,7 +225,7 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 | 2. ERP Client + Ticket Routes | 3/3 | Complete    | 2026-06-06 |
 | 3. Safety Layer + Run Store | 4/4 | Complete    | 2026-06-06 |
 | 4. SSH Executor | 5/5 | Complete    | 2026-06-06 |
-| 5. Agent Loop + Orchestrator | 3/5 | In Progress|  |
+| 5. Agent Loop + Orchestrator | 4/5 | In Progress|  |
 | 6. Run API + Approvals + SSE | 0/TBD | Not started | - |
 | 7. Activity Generation | 0/TBD | Not started | - |
 | 8. Frontend | 0/TBD | Not started | - |
