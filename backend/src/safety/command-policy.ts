@@ -93,7 +93,8 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
   },
   {
     ruleName: 'broad-chmod-chown',
-    pattern: /\bchown\s+-[a-zA-Z]*R[a-zA-Z]*\s+(\/|\/etc|\/var|\/home|\/srv|\/usr|\/boot)/i,
+    // Allow an optional owner:group argument between the flag and the path
+    pattern: /\bchown\s+-[a-zA-Z]*R[a-zA-Z]*\s+(\S+\s+)?(\/|\/etc|\/var|\/home|\/srv|\/usr|\/boot)/i,
     reason: 'Broad recursive chown on system root or directories is forbidden',
   },
 
