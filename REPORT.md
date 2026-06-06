@@ -25,17 +25,22 @@ precise activity that is written back to the ERP.
    is genuinely provider/stack-agnostic.
 
 2. **Step-wise human-in-the-loop, not autonomous tool loops.** The agent is asked for exactly one
-   action per turn (`run_command` or `conclude`). The backend creates a pending step and pauses;
-   approval/rejection spans separate HTTP requests. This makes the per-command approval gate
+   action per turn (`run_command` or `conclude`). The backend creates a step and pauses for any
+   state-changing command; approval/rejection spans separate HTTP requests. This makes the per-command approval gate
    server-authoritative and the audit trail exact. In Node we deliberately define AI SDK tools
    **without** `execute` and manage the messages/HITL ourselves to keep editing + safety in our code.
 
-3. **Safety is deterministic, not model-trust.** A regex deny-list (hard-block) + read-only
-   allow-list (low-risk) classifies every command before it can run, independent of the model.
-   Blocked commands never execute, even if approved. Rules live in one JSON validated in both
-   Python `re` and JS `RegExp` (25/25 tests) so both backends behave identically. Secrets are
-   redacted from logs, from tool results sent to the LLM, and from the activity. The SSH key never
-   leaves the backend.
+3. **Safety is deterministic, and the human gate is risk-tiered.** A regex deny-list (hard-block) +
+   read-only allow-list classifies every command before it can run, independent of the model;
+   blocked commands never execute, even if approved. Rules live in one JSON validated in both
+   Python `re` and JS `RegExp` (25/25 tests) so both backends behave identically. Read-only
+   diagnostics run automatically while **every write** (`needs_review`) requires approve/edit/reject
+   — concentrating the technician's attention where it matters instead of training rubber-stamping
+   (15 harmless reads erode the gate for the dangerous 16th; toggle `AUTO_RUN_READONLY=false` for
+   approve-everything). An **LLM input guard** then scrubs secrets and PII — passwords, tokens,
+   JWT/AWS/GitHub keys, `scheme://user:pass@` connection strings, emails, private keys — from
+   **every** message sent to the model (not just tool results), and from the audit log and the
+   activity. The SSH key never leaves the backend.
 
 4. **Persistence-aware fixing.** The agent is instructed to fix the root cause and ensure the fix
    survives a reboot/restart (`systemctl enable --now`, persisted config) — matching the grader's
@@ -57,8 +62,8 @@ ssh2 · Azure OpenAI `gpt-5.4-nano` (+ local Qwen fallback) · Docker Compose.
   filters; system load; complete activity create; clean 401/404/empty handling.
 - **B (troubleshooting):** diagnosis-first agent, minimal/persistent fixes, validation; built for
   generalisation (no hardcoded incidents).
-- **C (safety/audit):** deny-list, per-command human gate, full audit trail, secret redaction,
-  minimal-change prompting. No secrets in repo/logs/activity.
+- **C (safety/audit):** deny-list, risk-tiered human gate (writes), full audit trail, LLM input
+  guard + PII redaction, minimal-change prompting. No secrets in repo/logs/activity.
 - **D (technician UX):** ticket overview + detail with system info, visible agent progress,
   followable audit log, approve/edit/reject/abort.
 - **E (engineering):** modular separation, two-build structure, real README, runnable tests
