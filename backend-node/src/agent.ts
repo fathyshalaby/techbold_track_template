@@ -5,6 +5,7 @@
 import { generateText, type ModelMessage, tool } from "ai";
 import { z } from "zod";
 import { getModel } from "./llm";
+import * as safety from "./safety";
 
 export const SYSTEM_PROMPT = `You are an expert Linux service-desk technician's copilot. You troubleshoot ONE customer incident on a remote Ubuntu server over SSH, under the technician's control.
 
@@ -68,11 +69,31 @@ export interface NextAction {
   deferred: Array<{ toolCallId: string; toolName: string }>;
 }
 
+// LLM input guard — scrub secrets/PII from EVERY outbound message before it reaches the model.
+function guardMessages(messages: ModelMessage[]): ModelMessage[] {
+  return messages.map((m) => {
+    const content = (m as any).content;
+    if (typeof content === "string") return { ...m, content: safety.redact(content) } as ModelMessage;
+    if (Array.isArray(content)) {
+      return {
+        ...m,
+        content: content.map((p: any) => {
+          if (p && p.type === "text" && typeof p.text === "string") return { ...p, text: safety.redact(p.text) };
+          if (p && p.type === "tool-result" && p.output?.type === "text" && typeof p.output.value === "string")
+            return { ...p, output: { ...p.output, value: safety.redact(p.output.value) } };
+          return p;
+        }),
+      } as ModelMessage;
+    }
+    return m;
+  });
+}
+
 export async function nextAction(messages: ModelMessage[]): Promise<NextAction> {
   const result = await generateText({
     model: getModel(),
     system: SYSTEM_PROMPT,
-    messages,
+    messages: guardMessages(messages),
     tools,
     toolChoice: "auto",
   });

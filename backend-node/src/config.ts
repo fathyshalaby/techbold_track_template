@@ -21,6 +21,9 @@ export const config = {
   sshConnectTimeout: Number(e.SSH_CONNECT_TIMEOUT || 10),
   sshCommandTimeout: Number(e.SSH_COMMAND_TIMEOUT || 30),
 
+  // auto-execute read-only diagnostics; require approval ONLY for writes (set "false" for strict mode)
+  autoRunReadonly: e.AUTO_RUN_READONLY !== "false",
+
   llmProvider: (e.LLM_PROVIDER || "azure").toLowerCase(),
   azureEndpoint: e.AZURE_OPENAI_ENDPOINT || "",
   azureApiKey: e.AZURE_OPENAI_API_KEY || "",

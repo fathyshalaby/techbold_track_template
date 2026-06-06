@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import type { ModelMessage } from "ai";
 import * as activityMod from "./activity";
 import * as agent from "./agent";
+import { config } from "./config";
 import { erp } from "./erp";
 import * as safety from "./safety";
 import { SSHRunner } from "./ssh";
@@ -103,6 +104,39 @@ function findStep(run: Run, stepId: string): Step | undefined {
   return run.steps.find((s) => s.id === stepId);
 }
 
+// Run an approved (or auto-approved read-only) command over SSH; feed the redacted result back.
+async function execute(run: Run, step: Step, command: string, auto: boolean): Promise<void> {
+  step.status = "running";
+  step.decided_at = now();
+  run.status = "running";
+  run.pending_step_id = null;
+  run.log(auto ? "agent" : "technician", auto ? "auto_executed" : "approved", {
+    step_id: step.id,
+    command: safety.redact(command),
+  });
+  try {
+    const result = await run.ssh!.run(command);
+    step.ran_at = now();
+    const redacted = {
+      exit_code: result.exit_code,
+      stdout: safety.redact(result.stdout),
+      stderr: safety.redact(result.stderr),
+      duration_ms: result.duration_ms,
+      truncated: result.truncated,
+    };
+    step.result = redacted;
+    step.status = result.exit_code === 0 ? "succeeded" : "failed";
+    run.log("system", "executed", { step_id: step.id, command: safety.redact(command), exit_code: result.exit_code });
+    const toolContent = `exit_code=${result.exit_code}\nstdout:\n${redacted.stdout}\nstderr:\n${redacted.stderr}`;
+    run.messages.push(agent.toolResultMessage(step.tool_call_id, step.tool_name, toolContent.slice(0, 8000)));
+  } catch (e) {
+    step.status = "failed";
+    step.result = { exit_code: 255, stdout: "", stderr: String((e as Error).message || e), duration_ms: 0, truncated: false };
+    run.log("system", "error", { step_id: step.id, note: `ssh error: ${(e as Error).message}` });
+    run.messages.push(agent.toolResultMessage(step.tool_call_id, step.tool_name, `SSH ERROR: ${(e as Error).message}`));
+  }
+}
+
 async function advance(run: Run): Promise<void> {
   run.auto = 0;
   while (true) {
@@ -177,10 +211,17 @@ async function advance(run: Run): Promise<void> {
         continue;
       }
 
+      run.log("agent", "proposed", { step_id: step.id, command: safety.redact(command), note: step.rationale });
+
+      // Selective human-in-the-loop: auto-run READ-ONLY diagnostics; gate every write.
+      if (verdict.classification === "low_risk" && config.autoRunReadonly && run.auto < MAX_AUTO_ADVANCE) {
+        await execute(run, step, command, true);
+        continue;
+      }
+
       step.status = "pending_approval";
       run.pending_step_id = step.id;
       run.status = "awaiting_approval";
-      run.log("agent", "proposed", { step_id: step.id, command: safety.redact(command), note: step.rationale });
       return;
     }
 
@@ -234,34 +275,7 @@ export async function approveStep(runId: string, stepId: string, editedCommand?:
     return run.toDict();
   }
 
-  step.status = "running";
-  step.decided_at = now();
-  run.status = "running";
-  run.pending_step_id = null;
-  run.log("technician", "approved", { step_id: step.id, command: safety.redact(command) });
-
-  try {
-    const result = await run.ssh!.run(command);
-    step.ran_at = now();
-    const redacted = {
-      exit_code: result.exit_code,
-      stdout: safety.redact(result.stdout),
-      stderr: safety.redact(result.stderr),
-      duration_ms: result.duration_ms,
-      truncated: result.truncated,
-    };
-    step.result = redacted;
-    step.status = result.exit_code === 0 ? "succeeded" : "failed";
-    run.log("system", "executed", { step_id: step.id, command: safety.redact(command), exit_code: result.exit_code });
-    const toolContent = `exit_code=${result.exit_code}\nstdout:\n${redacted.stdout}\nstderr:\n${redacted.stderr}`;
-    run.messages.push(agent.toolResultMessage(step.tool_call_id, step.tool_name, toolContent.slice(0, 8000)));
-  } catch (e) {
-    step.status = "failed";
-    step.result = { exit_code: 255, stdout: "", stderr: String((e as Error).message || e), duration_ms: 0, truncated: false };
-    run.log("system", "error", { step_id: step.id, note: `ssh error: ${(e as Error).message}` });
-    run.messages.push(agent.toolResultMessage(step.tool_call_id, step.tool_name, `SSH ERROR: ${(e as Error).message}`));
-  }
-
+  await execute(run, step, command, false);
   await advance(run);
   return run.toDict();
 }

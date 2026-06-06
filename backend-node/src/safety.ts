@@ -51,7 +51,11 @@ export function isBlocked(command: string): boolean {
 const SECRET_PATTERNS: RegExp[] = [
   /-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g,
   /(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key)\s*[:=]\s*\S+/gi,
-  /Authorization:\s*Bearer\s+\S+/gi,
+  /\bBearer\s+[A-Za-z0-9._\-]{8,}/gi,
+  /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/g, // emails (PII)
+  /\bAKIA[0-9A-Z]{16}\b/g, // AWS access key id
+  /\beyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/g, // JWT
+  /\bgh[posru]_[A-Za-z0-9]{20,}\b/g, // GitHub tokens
 ];
 
 export function redact(text?: string | null): string {
@@ -60,6 +64,8 @@ export function redact(text?: string | null): string {
   for (const v of [config.phoenixToken, config.azureApiKey, config.openrouterApiKey]) {
     if (v && v.length >= 6) s = s.split(v).join("***REDACTED***");
   }
+  // connection strings: scheme://user:password@host -> scheme://user:***@host
+  s = s.replace(/([A-Za-z][A-Za-z0-9+.\-]*:\/\/[^\s:@/]+):[^\s:@/]+@/g, "$1:***@");
   for (const rx of SECRET_PATTERNS) s = s.replace(rx, "***REDACTED***");
   return s;
 }

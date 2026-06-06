@@ -66,11 +66,15 @@ human approval for that specific command.
 - **Deterministic deny-list** (model-independent) hard-blocks `rm -rf /…`, `chmod -R 777` on
   system dirs, firewall/audit disabling, DB drops, `curl … | sh`, log/history wiping, etc.
   Blocked commands **never run**, even if approved.
-- **Read-only allow-list** marks diagnostics (`systemctl status`, `journalctl`, `ss`, `cat /var/log`…)
-  as low-risk — but they **still** require a human click.
-- **Everything else** → `needs_review` → mandatory human approval.
-- **Secret redaction** scrubs keys/passwords/tokens from audit logs, tool results sent to the
-  LLM, and the activity before it reaches the ERP. The SSH key never leaves the backend.
+- **Risk-tiered human gate.** Read-only diagnostics (`systemctl status`, `journalctl`, `ss`,
+  `cat /var/log`…) run **automatically**; every command that **changes** the system (`needs_review`)
+  requires an explicit **approve / edit / reject**. This focuses the technician's attention on writes
+  and avoids approval fatigue (rubber-stamping 15 harmless reads erodes the gate that matters). Set
+  `AUTO_RUN_READONLY=false` for strict "approve-everything" mode.
+- **LLM input guard + redaction.** Secrets and PII (passwords, tokens, JWT/AWS/GitHub keys,
+  connection-string credentials, emails, private keys) are scrubbed from **every** message sent to
+  the LLM — not just tool results — and from the audit log and the ERP activity. The SSH key never
+  leaves the backend.
 
 Rules live once in `shared/safety-rules.json` and are validated in **both** Python `re` and JS
 `RegExp` (`shared/tests/`, 25/25).
