@@ -203,6 +203,14 @@ export function makeJsonlAdapter(): DbAdapter {
 
 let adapter: DbAdapter | undefined;
 
+export function setDb(db: DbAdapter): void {
+  adapter = db;
+}
+
+export function resetDb(): void {
+  adapter = undefined;
+}
+
 export function getDb(dbPath?: string): DbAdapter {
   if (adapter) return adapter;
 

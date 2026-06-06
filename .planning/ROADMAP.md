@@ -117,11 +117,11 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 04-03-PLAN.md — Real ssh2 client + executor implementation (client.ts + executor.ts)
+- [x] 04-03-PLAN.md — Real ssh2 client + executor implementation (client.ts + executor.ts)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 04-05-PLAN.md — ssh-tools.ts proposeSshCommand + createSshExecutor factory wiring
+- [x] 04-05-PLAN.md — ssh-tools.ts proposeSshCommand + createSshExecutor factory wiring
 
 ### Phase 5: Agent Loop + Orchestrator
 
@@ -136,7 +136,24 @@ Plans:
   4. `problem_solver` returns a `FixProposal` that is minimal, reversible, and includes a captured rollback command
   5. `validator` proves the customer benefit is restored (not just `is-active`) and checks reboot/restart persistence; single success → `LIKELY_FIXED`, repeated → `VERIFIED_FIXED`
 
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+**Wave 1** *(independent)*
+
+- [x] 05-01-PLAN.md — RunPhase enum migration + agent Zod schemas (DiagnosticProposal, FixProposal, ValidationResult)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 05-02-PLAN.md — model.ts provider + prompts.ts system prompts for all four agent roles
+
+**Wave 3** *(blocked on Wave 2 completion — 05-03 and 05-04 run in parallel)*
+
+- [x] 05-03-PLAN.md — Agent implementations TDD (problem-analyzer, customer-system-analyzer, problem-solver, validator)
+- [x] 05-04-PLAN.md — Orchestrator reducer TDD (pure state, event → nextState, sideEffects reducer + max-steps cap)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 05-05-PLAN.md — Orchestrator async driver + full in-process integration test
 
 ### Phase 6: Run API + Approvals + SSE
 
@@ -207,8 +224,8 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 | 1. Repo Foundation | 3/3 | Complete    | 2026-06-06 |
 | 2. ERP Client + Ticket Routes | 3/3 | Complete    | 2026-06-06 |
 | 3. Safety Layer + Run Store | 4/4 | Complete    | 2026-06-06 |
-| 4. SSH Executor | 3/5 | In progress | - |
-| 5. Agent Loop + Orchestrator | 0/TBD | Not started | - |
+| 4. SSH Executor | 5/5 | Complete    | 2026-06-06 |
+| 5. Agent Loop + Orchestrator | 4/5 | In Progress|  |
 | 6. Run API + Approvals + SSE | 0/TBD | Not started | - |
 | 7. Activity Generation | 0/TBD | Not started | - |
 | 8. Frontend | 0/TBD | Not started | - |
