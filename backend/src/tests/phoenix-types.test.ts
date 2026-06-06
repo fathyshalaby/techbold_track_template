@@ -227,3 +227,24 @@ describe('PhoenixValidationErrorSchema', () => {
     expect(PhoenixValidationErrorSchema.safeParse({ detail: 'bad' }).success).toBe(false);
   });
 });
+
+// T-02-01: security boundaries reject unknown fields
+describe('TicketSchema strict boundary', () => {
+  it('rejects unknown top-level fields', () => {
+    const base = {
+      id: 1, title: 't', description: 'd', priority: 'high',
+      status: 'OPEN', customer_id: 1, customer_name: 'Acme',
+    };
+    expect(TicketSchema.safeParse({ ...base, injected: 'x' }).success).toBe(false);
+  });
+});
+
+describe('CustomerSystemSchema strict boundary', () => {
+  it('rejects unknown top-level fields', () => {
+    const base = {
+      ticket_id: 1, customer_id: 1,
+      system: { ip: '10.0.0.1', port: 22, username: 'azureuser', os: 'Ubuntu 22.04' },
+    };
+    expect(CustomerSystemSchema.safeParse({ ...base, injected: 'x' }).success).toBe(false);
+  });
+});
