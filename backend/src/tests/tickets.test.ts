@@ -128,3 +128,18 @@ describe('Error mapping — PhoenixAuthError → 502', () => {
     spy.mockRestore();
   });
 });
+
+describe('Error mapping — PhoenixValidationError → 502', () => {
+  it('returns 502 with opaque message when listTickets throws PhoenixValidationError', async () => {
+    const { PhoenixValidationError } = await import('../phoenix/client.js');
+    const mockModule = await import('../phoenix/mock.js');
+    const spy = vi.spyOn(mockModule.default.prototype, 'listTickets').mockRejectedValueOnce(
+      new PhoenixValidationError('Response shape mismatch: unexpected field'),
+    );
+    const res = await app.request('/api/tickets');
+    expect(res.status).toBe(502);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe('ERP returned an unexpected response');
+    spy.mockRestore();
+  });
+});

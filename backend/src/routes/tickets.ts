@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { getEnv, resolveClientMode } from '../env.js';
-import { PhoenixClient, PhoenixAuthError, PhoenixNotFoundError, PhoenixNetworkError } from '../phoenix/client.js';
+import { PhoenixClient, PhoenixAuthError, PhoenixNotFoundError, PhoenixNetworkError, PhoenixValidationError } from '../phoenix/client.js';
 import MockPhoenixClient from '../phoenix/mock.js';
 import { TicketStatusSchema } from '../phoenix/types.js';
 
@@ -38,6 +38,9 @@ ticketsRouter.get('/', async (c) => {
     if (err instanceof PhoenixNetworkError) {
       return c.json({ error: 'ERP unavailable' }, 502);
     }
+    if (err instanceof PhoenixValidationError) {
+      return c.json({ error: 'ERP returned an unexpected response' }, 502);
+    }
     throw err;
   }
 });
@@ -61,6 +64,9 @@ ticketsRouter.get('/:id/customer-system', async (c) => {
     if (err instanceof PhoenixNetworkError) {
       return c.json({ error: 'ERP unavailable' }, 502);
     }
+    if (err instanceof PhoenixValidationError) {
+      return c.json({ error: 'ERP returned an unexpected response' }, 502);
+    }
     throw err;
   }
 });
@@ -83,6 +89,9 @@ ticketsRouter.get('/:id', async (c) => {
     }
     if (err instanceof PhoenixNetworkError) {
       return c.json({ error: 'ERP unavailable' }, 502);
+    }
+    if (err instanceof PhoenixValidationError) {
+      return c.json({ error: 'ERP returned an unexpected response' }, 502);
     }
     throw err;
   }
