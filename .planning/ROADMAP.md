@@ -59,7 +59,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — Phoenix HTTP client with auth/retry/timeout + rubric-E tests (TDD)
+- [x] 02-02-PLAN.md — Phoenix HTTP client with auth/retry/timeout + rubric-E tests (TDD)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -178,7 +178,7 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Repo Foundation | 3/3 | Complete    | 2026-06-06 |
-| 2. ERP Client + Ticket Routes | 1/3 | In progress | - |
+| 2. ERP Client + Ticket Routes | 2/3 | In progress | - |
 | 3. Safety Layer + Run Store | 0/TBD | Not started | - |
 | 4. SSH Executor | 0/TBD | Not started | - |
 | 5. Agent Loop + Orchestrator | 0/TBD | Not started | - |
