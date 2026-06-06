@@ -343,6 +343,164 @@ describe('agent degradation', () => {
   });
 });
 
+describe('reducer transitions', () => {
+  const BASE = {
+    runId: 'run_test',
+    phase: 'TRIAGING' as const,
+    status: 'RUNNING' as const,
+    stepCount: 0,
+    ticketId: 1,
+    customerSystemId: '10.0.0.1:22',
+  };
+
+  const DIAGNOSTIC_PROPOSAL = {
+    hypotheses: [{ cause: 'nginx crashed', evidence: 'port 80 closed', confidence: 0.9 }],
+    command: 'systemctl status nginx',
+    purpose: 'check nginx state',
+    expectedSignal: 'service status',
+    riskNotes: 'read-only',
+    isReadOnly: true,
+  };
+
+  const FIX_PROPOSAL = {
+    rootCause: 'nginx config error',
+    command: 'systemctl restart nginx',
+    rationale: 'restart to apply config',
+    rollbackCommand: 'systemctl stop nginx',
+    isReversible: true,
+    persistenceNote: 'enabled',
+  };
+
+  const COMMAND_RESULT = {
+    id: 'res_1',
+    run_id: 'run_test',
+    approval_id: 'appr_1',
+    command: 'systemctl status nginx',
+    exit_code: 0,
+    stdout_redacted: 'active (running)',
+    stderr_redacted: '',
+    duration_ms: 100,
+    timed_out: 0,
+    created_at: new Date().toISOString(),
+  };
+
+  it('1. TRIAGING + diagnostic_proposal_ready → WAITING_FOR_APPROVAL with createPendingApproval + emitEvent', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const result = reduce(BASE, { type: 'diagnostic_proposal_ready', proposal: DIAGNOSTIC_PROPOSAL });
+    expect(result.nextState.phase).toBe('WAITING_FOR_APPROVAL');
+    expect(result.sideEffects.some((e) => e.type === 'createPendingApproval')).toBe(true);
+    expect(result.sideEffects.some((e) => e.type === 'emitEvent' && (e as { type: 'emitEvent'; runId: string; eventType: string; payload: unknown }).eventType === 'approval.required')).toBe(true);
+  });
+
+  it('2. TRIAGING + command_blocked → TRIAGING with auditCommandBlocked', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const result = reduce(BASE, { type: 'command_blocked', reason: 'blocklist', command: 'rm -rf /' });
+    expect(result.nextState.phase).toBe('TRIAGING');
+    expect(result.sideEffects.some((e) => e.type === 'appendAuditEvent' && (e as { type: 'appendAuditEvent'; auditType: string }).auditType === 'command.blocked')).toBe(true);
+  });
+
+  it('3. WAITING_FOR_APPROVAL + command_rejected → TRIAGING with auditRejected', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const state = { ...BASE, phase: 'WAITING_FOR_APPROVAL' as const };
+    const result = reduce(state, { type: 'command_rejected', reason: 'too risky' });
+    expect(result.nextState.phase).toBe('TRIAGING');
+    expect(result.sideEffects.some((e) => e.type === 'appendAuditEvent' && (e as { type: 'appendAuditEvent'; auditType: string }).auditType === 'command.rejected')).toBe(true);
+  });
+
+  it('4. EXECUTING_COMMAND + command_result → OBSERVING with appendObservation + command.completed audit', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const state = { ...BASE, phase: 'EXECUTING_COMMAND' as const };
+    const result = reduce(state, { type: 'command_result', approvalId: 'appr_1', result: COMMAND_RESULT });
+    expect(result.nextState.phase).toBe('OBSERVING');
+    expect(result.sideEffects.some((e) => e.type === 'appendObservation')).toBe(true);
+    expect(result.sideEffects.some((e) => e.type === 'appendAuditEvent' && (e as { type: 'appendAuditEvent'; auditType: string }).auditType === 'command.completed')).toBe(true);
+  });
+
+  it('5. OBSERVING + root_cause_found → PLANNING_FIX', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const state = { ...BASE, phase: 'OBSERVING' as const };
+    const result = reduce(state, { type: 'root_cause_found', hypothesis: 'nginx crashed due to OOM' });
+    expect(result.nextState.phase).toBe('PLANNING_FIX');
+  });
+
+  it('6. OBSERVING + more_diagnosis_needed → TRIAGING', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const state = { ...BASE, phase: 'OBSERVING' as const };
+    const result = reduce(state, { type: 'more_diagnosis_needed' });
+    expect(result.nextState.phase).toBe('TRIAGING');
+  });
+
+  it('7. PLANNING_FIX + fix_proposal_ready → WAITING_FOR_APPROVAL with createPendingApproval', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const state = { ...BASE, phase: 'PLANNING_FIX' as const };
+    const result = reduce(state, { type: 'fix_proposal_ready', proposal: FIX_PROPOSAL });
+    expect(result.nextState.phase).toBe('WAITING_FOR_APPROVAL');
+    expect(result.sideEffects.some((e) => e.type === 'createPendingApproval')).toBe(true);
+  });
+
+  it('8. VALIDATING + validation_complete VERIFIED_FIXED → DRAFTING_ACTIVITY', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const state = { ...BASE, phase: 'VALIDATING' as const };
+    const result = reduce(state, { type: 'validation_complete', result: { status: 'VERIFIED_FIXED', benefitCheck: 'ok', persistenceCheck: 'enabled', evidence: [] } });
+    expect(result.nextState.phase).toBe('DRAFTING_ACTIVITY');
+  });
+
+  it('9. VALIDATING + validation_complete LIKELY_FIXED → DRAFTING_ACTIVITY', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const state = { ...BASE, phase: 'VALIDATING' as const };
+    const result = reduce(state, { type: 'validation_complete', result: { status: 'LIKELY_FIXED', benefitCheck: 'ok', persistenceCheck: null, evidence: [] } });
+    expect(result.nextState.phase).toBe('DRAFTING_ACTIVITY');
+  });
+
+  it('10. VALIDATING + validation_complete NOT_FIXED → TRIAGING', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const state = { ...BASE, phase: 'VALIDATING' as const };
+    const result = reduce(state, { type: 'validation_complete', result: { status: 'NOT_FIXED', benefitCheck: 'still broken', persistenceCheck: null, evidence: [] } });
+    expect(result.nextState.phase).toBe('TRIAGING');
+  });
+
+  it('11. Max-steps cap at stepCount=12 → WAITING_FOR_ACTIVITY_REVIEW with run.steps_capped audit', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const state = { ...BASE, phase: 'TRIAGING' as const, stepCount: 12 };
+    const result = reduce(state, { type: 'diagnostic_proposal_ready', proposal: DIAGNOSTIC_PROPOSAL });
+    expect(result.nextState.phase).toBe('WAITING_FOR_ACTIVITY_REVIEW');
+    expect(result.sideEffects.some((e) => e.type === 'appendAuditEvent' && (e as { type: 'appendAuditEvent'; auditType: string }).auditType === 'run.steps_capped')).toBe(true);
+  });
+
+  it('12. Abort from CREATED/TRIAGING/WAITING_FOR_APPROVAL → ABORTED', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    for (const phase of ['CREATED', 'TRIAGING', 'WAITING_FOR_APPROVAL'] as const) {
+      const result = reduce({ ...BASE, phase }, { type: 'abort' });
+      expect(result.nextState.phase).toBe('ABORTED');
+      expect(result.nextState.status).toBe('ABORTED');
+    }
+  });
+
+  it('13. unrecoverable_error → FAILED with errorMessage', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const result = reduce(BASE, { type: 'unrecoverable_error', message: 'SSH connection lost' });
+    expect(result.nextState.phase).toBe('FAILED');
+    expect(result.nextState.status).toBe('FAILED');
+    expect(result.nextState.errorMessage).toContain('SSH connection lost');
+  });
+
+  it('14. stepCount increments on diagnostic_proposal_ready', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    const result = reduce(BASE, { type: 'diagnostic_proposal_ready', proposal: DIAGNOSTIC_PROPOSAL });
+    expect(result.nextState.stepCount).toBe(1);
+  });
+
+  it('15. Terminal phases (COMPLETED/FAILED/ABORTED) ignore all events', async () => {
+    const { reduce } = await import('../ai/orchestrator.js');
+    for (const phase of ['COMPLETED', 'FAILED', 'ABORTED'] as const) {
+      const state = { ...BASE, phase };
+      const result = reduce(state, { type: 'abort' });
+      expect(result.nextState.phase).toBe(phase);
+      expect(result.sideEffects).toHaveLength(0);
+    }
+  });
+});
+
 describe('agent mock output', () => {
   it('runProblemAnalyzer with scripted mock returns valid DiagnosticProposal', async () => {
     const { runProblemAnalyzer, MOCK_DIAGNOSTIC_PROPOSAL } = await import(
