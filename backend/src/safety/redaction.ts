@@ -61,7 +61,9 @@ const REDACTION_PATTERNS: RedactionPattern[] = [
   // JSON-encoded variants: "key":"value" or "key": "value"
   {
     name: 'json-token-field',
-    pattern: /("(?:(?:access_|refresh_|id_)?token|secret|password|passwd|api[_-]?key|authorization|credential)"\s*:\s*)"[^"]*"/gi,
+    // Any JSON key containing a secret-indicator word (token, secret, password,
+    // key, credential, auth) — catches compound names like phoenix_token, ssh_key.
+    pattern: /("[A-Za-z0-9_-]*(?:token|secret|passwd|password|api[_-]?key|key|authorization|auth|credential)[A-Za-z0-9_-]*"\s*:\s*)"[^"]*"/gi,
     replacement: '$1"«redacted»"',
   },
   {
