@@ -223,6 +223,14 @@ describe('PhoenixValidationErrorSchema', () => {
     ).not.toThrow();
   });
 
+  it('parses a validation error with integer loc index', () => {
+    expect(() =>
+      PhoenixValidationErrorSchema.parse({
+        detail: [{ loc: ['body', 0, 'ticket_id'], msg: 'field required', type: 'missing' }],
+      }),
+    ).not.toThrow();
+  });
+
   it('rejects detail as a plain string', () => {
     expect(PhoenixValidationErrorSchema.safeParse({ detail: 'bad' }).success).toBe(false);
   });

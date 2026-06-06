@@ -89,7 +89,7 @@ export const PhoenixErrorSchema = z.object({
 export const PhoenixValidationErrorSchema = z.object({
   detail: z.array(
     z.object({
-      loc: z.array(z.string()),
+      loc: z.array(z.union([z.string(), z.number()])),
       msg: z.string(),
       type: z.string(),
     }),
