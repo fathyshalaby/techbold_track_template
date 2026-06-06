@@ -144,7 +144,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 05-02-PLAN.md — model.ts provider + prompts.ts system prompts for all four agent roles
+- [x] 05-02-PLAN.md — model.ts provider + prompts.ts system prompts for all four agent roles
 
 **Wave 3** *(blocked on Wave 2 completion — 05-03 and 05-04 run in parallel)*
 
