@@ -297,4 +297,49 @@ describe('safety — policy and classifier', () => {
     });
   });
 
+  // ─── Ops-audit regression: recursive chmod/chown on APP paths is a legit ───
+  // repair, not a hard-fail. Only 777, root, bare system dirs, and critical
+  // system trees are blocked. Previously ALL recursive chmod/chown under
+  // /var|/home|/srv|/usr was hard-blocked, which broke permission-fix incidents.
+  describe('ops regression — legit recursive permission repairs are allowed', () => {
+    it.each([
+      'chown -R www-data:www-data /var/www/html',
+      'chown -R nginx:nginx /var/lib/myapp',
+      'chown -R appuser:appuser /srv/app',
+      'chown -R user:user /home/user/app',
+      'chmod -R 755 /var/www/html',
+      'chmod -R 750 /srv/app/releases',
+      'chmod -R 644 /usr/local/app/config',
+      'chown azureuser:www-data /srv/app/uploads', // non-recursive specific path
+      'chmod 644 /etc/nginx/nginx.conf',           // non-recursive specific file
+    ])('does not hard-block "%s"', (cmd) => {
+      const result = validateCommandAgainstPolicy(cmd);
+      expect(result.riskLevel).not.toBe(RiskLevel.HIGH_RISK_BLOCKED);
+      expect(result.allowed).toBe(true);
+    });
+  });
+
+  describe('ops regression — dangerous chmod/chown still blocked', () => {
+    it.each([
+      'chmod 777 /tmp/x',                  // 777 anywhere (world-writable)
+      'chmod -R 777 /var/www/html',
+      'chmod -R 777 /',
+      'chown -R root:root /',              // filesystem root
+      'chmod -R 755 /',
+      'chown -R x /etc',                   // bare system dirs
+      'chown -R x /var',
+      'chown -R x /home',
+      'chown -R x /usr',
+      'chown -R x /srv',
+      'chown -R nobody /etc/nginx',        // under a critical system tree
+      'chmod -R g+w /boot/grub',
+      'chown -R x /usr/lib/python3',       // under /usr (not /usr/local)
+    ])('blocks "%s"', (cmd) => {
+      const result = validateCommandAgainstPolicy(cmd);
+      expect(result.allowed).toBe(false);
+      expect(result.riskLevel).toBe(RiskLevel.HIGH_RISK_BLOCKED);
+      expect(result.matchedRule).toBeTruthy();
+    });
+  });
+
 });

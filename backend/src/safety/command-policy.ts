@@ -85,29 +85,41 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
     reason: 'Fork bomb pattern detected',
   },
 
-  // ── Broad chmod / chown ───────────────────────────────────────────────────
+  // ── Broad / dangerous chmod / chown ───────────────────────────────────────
+  // Design note (ops lens): the ONLY chmod/chown hard-fail is world-writable
+  // (777). Recursive chown / non-777 recursive chmod on an APPLICATION path
+  // (/var/www/html, /srv/app, /home/<u>/app, /opt/app, /usr/local/app) is a
+  // routine, legitimate permission repair — blocking it would cripple
+  // troubleshooting. Those pass through to human approval (MEDIUM); only the
+  // filesystem root, bare top-level dirs, and critical system trees are blocked.
   {
     ruleName: 'broad-chmod-chown',
-    // chmod -R 777 / or chmod 777 -R /etc etc.
-    pattern: /\bchmod\b.*\b777\b.*\s(-R\s+|(-[a-zA-Z]*R[a-zA-Z]*)\s+)?(\/|\/etc|\/var|\/home|\/srv|\/usr|\/boot)/i,
-    reason: 'Broad recursive 777 chmod on system paths is forbidden',
+    // 777 (world-writable) is never a correct fix — recursive or not.
+    pattern: /\bchmod\b[^;&|]*\b777\b/i,
+    reason: 'chmod 777 (world-writable) is forbidden — use a least-privilege mode',
   },
   {
     ruleName: 'broad-chmod-chown',
-    pattern: /\bchmod\b.*-[a-zA-Z]*R[a-zA-Z]*\b.*\b777\b/i,
-    reason: 'Broad recursive 777 chmod is forbidden',
+    // chmod/chown on the filesystem root `/` or a BARE top-level directory
+    // (no deeper app subpath). Consumes leading flags / numeric mode / owner
+    // tokens, then requires the target to be root or a bare system dir.
+    pattern: /\bch(?:own|mod)\s+(?:-[a-zA-Z]+\s+|[0-7]{3,4}\s+|[^\s\/]+\s+)*\/(?:etc|usr|var|home|srv|opt|boot|bin|sbin|lib|lib64|root|dev|proc|sys|mnt|media)?\/?(?:\s|$)/i,
+    reason: 'chmod/chown on the filesystem root or a bare system directory is forbidden',
   },
   {
     ruleName: 'broad-chmod-chown',
-    // chmod 777 -R /path or chmod -R 777 /path (any system path)
-    pattern: /\bchmod\b\s+(\d+\s+-[a-zA-Z]*R[a-zA-Z]*|-[a-zA-Z]*R[a-zA-Z]*\s+\d+)\s+(\/|\/etc|\/var|\/home|\/srv|\/usr|\/boot)/i,
-    reason: 'Recursive chmod on system paths is forbidden',
+    // Recursive chmod/chown anywhere under a never-touch system tree. The `\s`
+    // before the slash anchors the match to a TOP-LEVEL component, so that an
+    // app path that merely contains a system name mid-path (e.g. /var/lib/myapp
+    // contains "/lib/") is NOT caught.
+    pattern: /\bch(?:own|mod)\b[^;&|]*-[a-zA-Z]*R[a-zA-Z]*[^;&|]*\s\/(?:etc|boot|bin|sbin|lib|lib64|root|dev|proc|sys)(?:\/|\s|$)/i,
+    reason: 'Recursive chmod/chown under a critical system directory is forbidden',
   },
   {
     ruleName: 'broad-chmod-chown',
-    // Allow an optional owner:group argument between the flag and the path
-    pattern: /\bchown\s+-[a-zA-Z]*R[a-zA-Z]*\s+(\S+\s+)?(\/|\/etc|\/var|\/home|\/srv|\/usr|\/boot)/i,
-    reason: 'Broad recursive chown on system root or directories is forbidden',
+    // Recursive chmod/chown under /usr — except the /usr/local app prefix.
+    pattern: /\bch(?:own|mod)\b[^;&|]*-[a-zA-Z]*R[a-zA-Z]*[^;&|]*\s\/usr\/(?!local(?:\/|\s|$))/i,
+    reason: 'Recursive chmod/chown under /usr (except /usr/local) is forbidden',
   },
 
   // ── Disable security controls ─────────────────────────────────────────────
