@@ -960,6 +960,19 @@ describe('orchestrator driver — integration', () => {
     expect(getAuditEvents(run.id).some((e) => e.type === 'diagnosis.more_needed')).toBe(true);
   });
 
+  // Research/reuse (LLM confidence is miscalibrated): a HIGH confidence with NO
+  // evidence must NOT be treated as root cause — require corroborating evidence.
+  it('Test 11b — OBSERVING + high confidence but EMPTY evidence → keep diagnosing', async () => {
+    const { run, advance } = await driveToObserving();
+    const { runProblemAnalyzer } = await import('../ai/agents/problem-analyzer.js');
+    (runProblemAnalyzer as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ...MOCK_DIAGNOSTIC,
+      hypotheses: [{ cause: 'definitely the database', evidence: '   ', confidence: 0.99 }],
+    });
+    const state = await advance(run.id);
+    expect(state.phase).toBe('TRIAGING'); // not PLANNING_FIX — unsupported high confidence is rejected
+  });
+
   // OBSERVATION FIDELITY: the agent must see exit code + stderr, not just stdout.
   it('Test 12 — observation records exit code and stderr, not only stdout', async () => {
     const { advance } = await import('../ai/orchestrator.js');

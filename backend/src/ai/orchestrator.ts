@@ -610,7 +610,15 @@ async function agentDispatch(
 
         const top = proposal.hypotheses.reduce((a, b) => (b.confidence > a.confidence ? b : a));
 
-        if (top.confidence >= ROOT_CAUSE_CONFIDENCE_THRESHOLD) {
+        // Verbalized LLM confidence is systematically miscalibrated/overconfident
+        // (well-documented; RLHF/reasoning models worse), so we DON'T trust the
+        // number alone: a root-cause decision that drives to a fix must also cite
+        // concrete evidence. A high-confidence hypothesis with empty evidence is a
+        // hallucination red flag → keep diagnosing. The human still approves the
+        // fix command, which remains the real backstop.
+        const hasEvidence = typeof top.evidence === 'string' && top.evidence.trim().length > 0;
+
+        if (top.confidence >= ROOT_CAUSE_CONFIDENCE_THRESHOLD && hasEvidence) {
           const { nextState, sideEffects } = reduce(currentState, {
             type: 'root_cause_found',
             hypothesis: top.cause,
