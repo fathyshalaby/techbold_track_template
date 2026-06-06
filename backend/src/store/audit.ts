@@ -1,5 +1,6 @@
 import { ulid } from 'ulid';
 import { getDb } from './db.js';
+import { redactSecrets } from '../safety/redaction.js';
 import {
   AuditEventSchema,
   CommandApprovalSchema,
@@ -119,7 +120,7 @@ export function appendCommandResult(
       id,
       runId,
       approvalId,
-      result.command,
+      redactSecrets(result.command),
       result.exitCode,
       result.stdoutRedacted,
       result.stderrRedacted,

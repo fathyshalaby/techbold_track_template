@@ -9,7 +9,8 @@ export type RedactionPattern = {
 const REDACTION_PATTERNS: RedactionPattern[] = [
   {
     name: 'private-key-block',
-    pattern: /-----BEGIN[\s\S]*?PRIVATE KEY-----[\s\S]*?-----END[^-]*PRIVATE KEY-----/g,
+    // Match from BEGIN to END (when present) or to end-of-string — handles truncated keys at 16 KB cap
+    pattern: /-----BEGIN[\s\S]*?PRIVATE KEY-----[\s\S]*?(?:-----END[^-]*PRIVATE KEY-----|$)/g,
     replacement: '«redacted»',
   },
   {
@@ -39,35 +40,41 @@ const REDACTION_PATTERNS: RedactionPattern[] = [
   },
   {
     name: 'password-field',
-    pattern: /(passw(?:or)?d\s*=\s*)\S+/gi,
+    pattern: /(passw(?:or)?d\s*[=:]\s*)\S+/gi,
     replacement: '$1«redacted»',
   },
   {
     name: 'token-field',
-    pattern: /(token\s*=\s*)\S+/gi,
+    pattern: /(token\s*[=:]\s*)\S+/gi,
     replacement: '$1«redacted»',
   },
   {
     name: 'secret-field',
-    pattern: /(secret\s*=\s*)\S+/gi,
+    pattern: /(secret\s*[=:]\s*)\S+/gi,
     replacement: '$1«redacted»',
   },
   {
     name: 'api-key-field',
-    pattern: /(api[_-]?key\s*=\s*)\S+/gi,
+    pattern: /(api[_-]?key\s*[=:]\s*)\S+/gi,
     replacement: '$1«redacted»',
   },
   // JSON-encoded variants: "key":"value" or "key": "value"
   {
     name: 'json-token-field',
-    pattern: /("(?:token|secret|password|passwd|api[_-]?key|authorization|credential)"\s*:\s*)"[^"]*"/gi,
+    pattern: /("(?:(?:access_|refresh_|id_)?token|secret|password|passwd|api[_-]?key|authorization|credential)"\s*:\s*)"[^"]*"/gi,
     replacement: '$1"«redacted»"',
   },
   {
     name: 'env-secret-var',
-    // Matches ENV_VAR_NAMES that contain secret-indicator words, not already handled above.
-    // Negative lookahead prevents matching «redacted» values from prior passes.
-    pattern: /\b([A-Z_]*(?:SECRET|TOKEN|KEY|PASS|PASSWORD|CREDENTIAL)[A-Z_0-9]*\s*=\s*)(?!«redacted»)\S+/g,
+    // Matches env var names (upper or lower case) containing secret-indicator words.
+    // Negative lookahead prevents double-redacting already-redacted values.
+    pattern: /\b([A-Za-z_]*(?:SECRET|TOKEN|KEY|PASS|PASSWORD|CREDENTIAL|secret|token|key|pass|password|credential)[A-Za-z_0-9]*\s*=\s*)(?!«redacted»)\S+/g,
+    replacement: '$1«redacted»',
+  },
+  {
+    name: 'secret-header',
+    // Custom HTTP headers carrying tokens/keys/secrets (e.g. X-Phoenix-Token: abc123)
+    pattern: /([Xx]-[A-Za-z0-9-]*(?:token|key|secret|auth)[A-Za-z0-9-]*\s*:\s*)\S+/gi,
     replacement: '$1«redacted»',
   },
 ];

@@ -1,12 +1,15 @@
 import { z } from 'zod';
 import { RiskLevel } from '../safety/risk-levels.js';
 
+export const RunStatus = z.enum(['CREATED', 'RUNNING', 'COMPLETED', 'FAILED', 'ABORTED']);
+export const RunPhase = z.enum(['CREATED', 'ANALYSIS', 'DIAGNOSIS', 'FIX', 'VALIDATION', 'REPORT', 'COMPLETED']);
+
 export const RunSchema = z.object({
   id: z.string(),
   ticket_id: z.number(),
   customer_system_id: z.string(),
-  status: z.string(),
-  current_phase: z.string(),
+  status: RunStatus,
+  current_phase: RunPhase,
   started_at: z.string(),
   updated_at: z.string(),
   completed_at: z.string().nullable(),
@@ -74,6 +77,8 @@ export const ActivityDraftSchema = z.object({
 }).strict();
 
 export type Run = z.infer<typeof RunSchema>;
+export type RunStatusValue = z.infer<typeof RunStatus>;
+export type RunPhaseValue = z.infer<typeof RunPhase>;
 export type AuditEvent = z.infer<typeof AuditEventSchema>;
 export type CommandApproval = z.infer<typeof CommandApprovalSchema>;
 export type CommandResult = z.infer<typeof CommandResultSchema>;

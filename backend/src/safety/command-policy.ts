@@ -18,14 +18,26 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
   // ── rm -rf on system/data paths ──────────────────────────────────────────
   {
     ruleName: 'rm-rf-system-paths',
-    pattern: /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r|--recursive)\s+(-[a-zA-Z]+\s+)*([\/~]|\/etc|\/var|\/home|\/srv|\/usr|\/boot|\/var\/lib)/i,
+    pattern: /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r|--recursive)\s+(-[a-zA-Z]+\s+)*([\/~\.]|\.\.|\.|\/etc|\/var|\/home|\/srv|\/usr|\/boot|\/var\/lib)/i,
     reason: 'Recursive force-delete on system or data paths is forbidden',
   },
   // Catch rm with flags in any order: rm -fr, rm -rf
   {
     ruleName: 'rm-rf-system-paths',
-    pattern: /\brm\b.*\s(-[a-zA-Z]*r[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*)\s+.*(-[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*r[a-zA-Z]*)\s+([\/~]|\/etc|\/var|\/home|\/srv|\/usr|\/boot)/i,
+    pattern: /\brm\b.*\s(-[a-zA-Z]*r[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*)\s+.*(-[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*r[a-zA-Z]*)\s+([\/~\.]|\.\.|\.|\/etc|\/var|\/home|\/srv|\/usr|\/boot)/i,
     reason: 'Recursive force-delete on system or data paths is forbidden',
+  },
+  // Long-form flags: --recursive --force (both orders) on system/data paths
+  {
+    ruleName: 'rm-rf-system-paths',
+    pattern: /\brm\b.*--(recursive|force).*--(recursive|force)\s+(-[a-zA-Z]+\s+)*([\/~\.]|\.\.|\.|\/etc|\/var|\/home|\/srv|\/usr|\/boot)/i,
+    reason: 'Recursive force-delete (long flags) on system or data paths is forbidden',
+  },
+  // --recursive alone is sufficient to delete non-empty dirs
+  {
+    ruleName: 'rm-rf-system-paths',
+    pattern: /\brm\b.*--recursive\s+(-[a-zA-Z]+\s+)*([\/~\.]|\.\.|\.|\/etc|\/var|\/home|\/srv|\/usr|\/boot)/i,
+    reason: 'Recursive delete (long flags) on system or data paths is forbidden',
   },
 
   // ── Recursive find -delete over system paths ─────────────────────────────
@@ -120,6 +132,47 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
     reason: 'Stopping or masking security services is forbidden',
   },
 
+  // ── Privilege escalation ──────────────────────────────────────────────────
+  {
+    ruleName: 'privilege-escalation',
+    pattern: /\bsudo\s+(su|bash|sh|zsh|fish|ksh|csh|tcsh|dash|-i|-s)\b/i,
+    reason: 'Gaining an interactive root shell via sudo is forbidden',
+  },
+  {
+    ruleName: 'privilege-escalation',
+    pattern: /\bsu\s+-\s*$/,
+    reason: 'Switching to root user is forbidden',
+  },
+
+  // ── Reverse shells ────────────────────────────────────────────────────────
+  {
+    ruleName: 'reverse-shell',
+    pattern: /\/dev\/tcp\//i,
+    reason: 'Bash /dev/tcp reverse shell is forbidden',
+  },
+  {
+    ruleName: 'reverse-shell',
+    pattern: /\bbash\s+.*>&\s*\/dev\//i,
+    reason: 'Bash I/O redirect to /dev/ is a reverse shell indicator',
+  },
+  {
+    ruleName: 'inline-interpreter',
+    pattern: /\b(python3?|perl|ruby)\s+-[ce]\b/i,
+    reason: 'Inline interpreter one-liners can execute arbitrary code and are forbidden',
+  },
+
+  // ── Setuid / setgid bit ───────────────────────────────────────────────────
+  {
+    ruleName: 'setuid-setgid',
+    pattern: /\bchmod\b.*[+][sS]/i,
+    reason: 'Setting setuid or setgid bit is forbidden',
+  },
+  {
+    ruleName: 'setuid-setgid',
+    pattern: /\bchmod\b\s+[2467][0-9]{3}/i,
+    reason: 'chmod with setuid/setgid numeric mode (2xxx, 4xxx, 6xxx, 7xxx) is forbidden',
+  },
+
   // ── Secret exposure ───────────────────────────────────────────────────────
   {
     ruleName: 'secret-exposure',
@@ -133,9 +186,24 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
   },
   {
     ruleName: 'secret-exposure',
-    // printenv/env piped externally
-    pattern: /\b(printenv|env)\b.*\|/i,
-    reason: 'Piping environment variables to external commands risks secret exposure',
+    pattern: /\bcat\s+.*\/proc\/self\/environ\b/i,
+    reason: 'Reading process environment exposes all secrets including tokens',
+  },
+  {
+    ruleName: 'secret-exposure',
+    pattern: /\bcat\s+(~\/\.env|\.\/\.env|\/etc\/environment)\b/i,
+    reason: 'Reading .env or system environment files exposes secrets',
+  },
+  {
+    ruleName: 'secret-exposure',
+    pattern: /\bcat\s+\/etc\/passwd\b/i,
+    reason: 'Reading /etc/passwd is forbidden',
+  },
+  {
+    ruleName: 'secret-exposure',
+    // Block printenv and bare env outright — they can dump all env vars including secrets
+    pattern: /\b(printenv|env)\b/i,
+    reason: 'printenv/env may expose secrets; use specific non-secret reads instead',
   },
 
   // ── Hide tracks ───────────────────────────────────────────────────────────
@@ -173,9 +241,9 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
   },
   {
     ruleName: 'exfiltration',
-    // nc/netcat with -e (reverse shell)
-    pattern: /\b(nc|netcat)\b.*-e\b/i,
-    reason: 'Netcat reverse shell is forbidden',
+    // Block all nc/netcat/ncat usage — redirect, pipe, listener, and -e forms
+    pattern: /\b(nc|netcat|ncat)\b/i,
+    reason: 'Netcat is forbidden — use curl for probes',
   },
 
   // ── DB destruction ────────────────────────────────────────────────────────
@@ -217,9 +285,9 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
 // This is deliberately simple — no full shell parse, just enough to catch
 // chained dangerous segments like `echo hi; rm -rf /etc`.
 function splitSegments(cmd: string): string[] {
-  // Split on ||, &&, and ; — order matters: check two-char ops first
+  // Split on ||, &&, ;, and | — order matters: check two-char ops first
   return cmd
-    .split(/\|\||&&|;/)
+    .split(/\|\||&&|;|\|/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }

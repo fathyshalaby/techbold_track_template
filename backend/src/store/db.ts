@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Database } from 'better-sqlite3';
 
 export type StoreMode = 'sqlite' | 'jsonl';
@@ -81,6 +83,18 @@ const CREATE_TABLES = `
     created_at TEXT,
     submitted_at TEXT
   );
+
+  CREATE TRIGGER IF NOT EXISTS audit_events_no_update
+  BEFORE UPDATE ON audit_events
+  BEGIN
+    SELECT RAISE(ABORT, 'audit_events is append-only');
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS audit_events_no_delete
+  BEFORE DELETE ON audit_events
+  BEGIN
+    SELECT RAISE(ABORT, 'audit_events is append-only');
+  END;
 `;
 
 function makeJsonlAdapter(): DbAdapter {
@@ -110,14 +124,19 @@ function makeJsonlAdapter(): DbAdapter {
     mode: 'jsonl',
 
     run(sql: string, params: unknown[] = []): void {
+      // Enforce audit_events append-only at the adapter level
+      if (/^\s*UPDATE\s+audit_events\b/i.test(sql) || /^\s*DELETE\s+FROM\s+audit_events\b/i.test(sql)) {
+        throw new Error('audit_events is append-only');
+      }
+
       const table = extractTableName(sql);
-      if (!table) return;
+      if (!table) throw new Error(`JSONL adapter: cannot parse table from SQL: ${sql}`);
       const rows = getTable(table);
 
       if (/^\s*INSERT/i.test(sql)) {
         // Build a record from positional params
         const colMatch = sql.match(/\(([^)]+)\)\s+VALUES/i);
-        if (!colMatch) return;
+        if (!colMatch) throw new Error(`JSONL adapter: cannot parse columns from SQL: ${sql}`);
         const cols = colMatch[1].split(',').map((c) => c.trim());
         const record: Record<string, unknown> = {};
         cols.forEach((col, i) => { record[col] = params[i] ?? null; });
@@ -182,7 +201,11 @@ export function getDb(dbPath?: string): DbAdapter {
     // Dynamic import so the module loads even when native bindings are absent
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const BetterSqlite3 = require('better-sqlite3') as typeof import('better-sqlite3');
-    const db: Database = new BetterSqlite3(dbPath ?? ':memory:');
+    const resolvedPath = dbPath ?? process.env['DB_PATH'] ?? './data/autopilot.db';
+    if (resolvedPath !== ':memory:') {
+      fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
+    }
+    const db: Database = new BetterSqlite3(resolvedPath);
     db.pragma('journal_mode = WAL');
     db.exec(CREATE_TABLES);
 
