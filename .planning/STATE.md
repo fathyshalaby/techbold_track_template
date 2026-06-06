@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: 06-01 complete — run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)
-last_updated: "2026-06-07T00:48:00.000Z"
-last_activity: 2026-06-07 -- Phase 06 Plan 01 complete
+stopped_at: "06-01 complete — run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)"
+last_updated: "2026-06-06T22:53:45.251Z"
+last_activity: 2026-06-07 -- Phase 06 Plan 01 complete (run lifecycle routes)
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 24
-  completed_plans: 20
+  completed_plans: 22
   percent: 56
 ---
 
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-06-06)
 ## Current Position
 
 Phase: 06 (run-api-approvals-sse) — EXECUTING
-Plan: 2 of 4
-Status: Executing Phase 06
+Plan: 3 of 4
+Status: Ready to execute
 Last activity: 2026-06-07 -- Phase 06 Plan 01 complete (run lifecycle routes)
 
 Progress: [██░░░░░░░░] 25%
@@ -52,6 +52,7 @@ Progress: [██░░░░░░░░] 25%
 | Phase 04 P01 | 1 | 1 tasks | 2 files |
 | Phase 04-ssh-executor P03 | 25min | 2 tasks | 2 files |
 | Phase 05 P03 | 2min | 2 tasks | 4 files |
+| Phase 06 P02 | 65 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 05-05]: vi.spyOn used for integration test mocking rather than vi.mock — vi.mock is file-scoped and hoisted, breaking pre-existing agent tests that inject real model instances; spyOn is describe-scoped and restoreable
 - [Phase 06-01]: POST /api/runs uses updateRunPhase directly (not advance()) to transition CREATED→LOADED_CONTEXT — advance() auto-recurses through LOADED_CONTEXT→TRIAGING→LLM, violating the PRD §9 201-response contract
 - [Phase 06-01]: vi.clearAllMocks() used in afterEach instead of vi.restoreAllMocks() — restoreAllMocks resets vi.fn() instances created inside vi.mock() back to originals, breaking mocks for subsequent tests in the same file
+- [Phase ?]: approvalsRouter mounts at /api/runs prefix alongside runsRouter — Hono matches specific paths first so no collisions
+- [Phase ?]: Blocked-command 422 detection uses state.phase === WAITING_FOR_APPROVAL after advance() — no extra audit query; reduce() leaves phase unchanged on command_blocked
 
 ### Pending Todos
 
@@ -92,6 +95,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-07T00:48:00.000Z
+Last session: 2026-06-06T22:53:40.470Z
 Stopped at: 06-01 complete — run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)
 Resume file: .planning/phases/06-run-api-approvals-sse/06-01-SUMMARY.md
