@@ -46,7 +46,7 @@ Requirements for the hackathon submission (code freeze Sun Jun 7, 14:00). Each m
 ### Run API & Events
 
 - [ ] **API-01**: Run routes work per PRD §9: `POST /api/runs`, `GET /api/runs/:id`, `POST /api/runs/:id/next`, `POST /api/runs/:id/abort` — *B/D*
-- [ ] **API-02**: Approval routes approve (optionally edited) → safety re-check → execute, and reject-with-reason → agent proposes an alternative — *C*
+- [x] **API-02**: Approval routes approve (optionally edited) → safety re-check → execute, and reject-with-reason → agent proposes an alternative — *C*
 - [ ] **API-03**: SSE stream emits run events live (`run.started`, `approval.required`, `command.completed`, etc.); every meaningful side-effect emits and audits the same event — *D*
 - [ ] **API-04**: Run store persists runs, approvals, results, observations, and activity drafts (SQLite, JSONL fallback) — *C/E*
 
@@ -137,7 +137,7 @@ Explicitly excluded (PRD §6.3, §11). Documented to prevent scope creep.
 | DIAG-04 | Phase 5 | Complete |
 | DIAG-05 | Phase 5 | Complete |
 | API-01 | Phase 6 | Pending |
-| API-02 | Phase 6 | Pending |
+| API-02 | Phase 6 | Complete |
 | API-03 | Phase 6 | Pending |
 | ACT-01 | Phase 7 | Pending |
 | ACT-02 | Phase 7 | Pending |
