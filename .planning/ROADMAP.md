@@ -52,10 +52,17 @@ Nine phases derived directly from the locked build-order critical path in docs/T
   5. The in-memory mock returns valid fixtures for every client method used in the agent loop
 
 **Plans**: 3 plans
-
 Plans:
+**Wave 1**
+
 - [ ] 02-01-PLAN.md — Phoenix Zod type schemas (TDD: schema parsing contracts)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 02-02-PLAN.md — Phoenix HTTP client with auth/retry/timeout + rubric-E tests (TDD)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 02-03-PLAN.md — In-memory mock + ticket route wiring
 
 **UI hint**: yes
