@@ -136,7 +136,24 @@ Plans:
   4. `problem_solver` returns a `FixProposal` that is minimal, reversible, and includes a captured rollback command
   5. `validator` proves the customer benefit is restored (not just `is-active`) and checks reboot/restart persistence; single success → `LIKELY_FIXED`, repeated → `VERIFIED_FIXED`
 
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+**Wave 1** *(independent)*
+
+- [ ] 05-01-PLAN.md — RunPhase enum migration + agent Zod schemas (DiagnosticProposal, FixProposal, ValidationResult)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 05-02-PLAN.md — model.ts provider + prompts.ts system prompts for all four agent roles
+
+**Wave 3** *(blocked on Wave 2 completion — 05-03 and 05-04 run in parallel)*
+
+- [ ] 05-03-PLAN.md — Agent implementations TDD (problem-analyzer, customer-system-analyzer, problem-solver, validator)
+- [ ] 05-04-PLAN.md — Orchestrator reducer TDD (pure state, event → nextState, sideEffects reducer + max-steps cap)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 05-05-PLAN.md — Orchestrator async driver + full in-process integration test
 
 ### Phase 6: Run API + Approvals + SSE
 
