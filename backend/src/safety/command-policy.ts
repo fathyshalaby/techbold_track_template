@@ -140,7 +140,7 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
   },
   {
     ruleName: 'privilege-escalation',
-    pattern: /\bsu\s+-\s*$/,
+    pattern: /\bsu\b(\s+-)?(\s+(root|-l|--login))*\s*$/,
     reason: 'Switching to root user is forbidden',
   },
 
@@ -317,8 +317,8 @@ function normalizeCommand(cmd: string): string {
     return `__UNRESOLVABLE__ ${result}`;
   }
 
-  // 6. Variables like ${HOME} that remain unresolved → block conservatively
-  if (/\$\{[^}]+\}|\$[A-Z_][A-Z0-9_]*/.test(result)) {
+  // 6. Variables like ${HOME} or $dir that remain unresolved → block conservatively
+  if (/\$\{[^}]+\}|\$[A-Za-z_][A-Za-z0-9_]*/.test(result)) {
     return `__UNRESOLVABLE__ ${result}`;
   }
 
