@@ -1,4 +1,8 @@
-// Health check route — implemented in Plan 03
 import { Hono } from 'hono';
+import { isMockMode } from '../env.js';
+
 export const healthRouter = new Hono();
-healthRouter.get('/', (c) => c.json({ status: 'ok' }));
+
+healthRouter.get('/', (c) => {
+  return c.json({ status: 'ok', mode: isMockMode() ? 'mock' : 'real' });
+});

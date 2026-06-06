@@ -1,3 +1,14 @@
-// Hono app: middleware, routes, onError — implemented in Plan 03
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { healthRouter } from './routes/health.js';
+
 export const app = new Hono();
+
+// Open CORS — intentional for this single-machine local tool (ARCHITECTURE.md §10)
+app.use('*', cors());
+
+app.route('/health', healthRouter);
+
+app.onError((err, c) => {
+  return c.json({ error: err.message }, 500);
+});
