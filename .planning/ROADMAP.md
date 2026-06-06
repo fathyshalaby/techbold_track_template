@@ -189,7 +189,19 @@ Plans:
   1. `POST /api/runs/:id/activity/draft` returns all 5 graded fields (`summary`, `root_cause`, `actions_taken`, `commands_summary`, `validation_result`) populated from the audit trail — no invented facts, no secrets
   2. `POST /api/runs/:id/activity/submit` creates a real Phoenix activity via `createActivity` and returns the created record
 
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1** *(independent)*
+
+- [ ] 07-01-PLAN.md — Activity log generator agent TDD (ActivityDraftFieldsSchema, runActivityLogGenerator, MOCK_ACTIVITY_DRAFT)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 07-02-PLAN.md — Activity routes TDD (POST /activity/draft, POST /activity/submit)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 07-03-PLAN.md — Mount activityRouter in app.ts
 
 ### Phase 8: Frontend
 
@@ -237,6 +249,6 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 | 4. SSH Executor | 5/5 | Complete    | 2026-06-06 |
 | 5. Agent Loop + Orchestrator | 4/5 | In Progress|  |
 | 6. Run API + Approvals + SSE | 4/4 | Complete   | 2026-06-06 |
-| 7. Activity Generation | 0/TBD | Not started | - |
+| 7. Activity Generation | 0/3 | Not started | - |
 | 8. Frontend | 0/TBD | Not started | - |
 | 9. Tests + Submission Polish | 0/TBD | Not started | - |
