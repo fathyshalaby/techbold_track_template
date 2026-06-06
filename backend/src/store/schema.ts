@@ -2,7 +2,22 @@ import { z } from 'zod';
 import { RiskLevel } from '../safety/risk-levels.js';
 
 export const RunStatus = z.enum(['CREATED', 'RUNNING', 'COMPLETED', 'FAILED', 'ABORTED']);
-export const RunPhase = z.enum(['CREATED', 'ANALYSIS', 'DIAGNOSIS', 'FIX', 'VALIDATION', 'REPORT', 'COMPLETED']);
+export const RunPhase = z.enum([
+  'CREATED',
+  'LOADED_CONTEXT',
+  'TRIAGING',
+  'WAITING_FOR_APPROVAL',
+  'EXECUTING_COMMAND',
+  'OBSERVING',
+  'PLANNING_FIX',
+  'VALIDATING',
+  'DRAFTING_ACTIVITY',
+  'WAITING_FOR_ACTIVITY_REVIEW',
+  'SUBMITTING_ACTIVITY',
+  'COMPLETED',
+  'FAILED',
+  'ABORTED',
+]);
 
 export const RunSchema = z.object({
   id: z.string(),
