@@ -347,7 +347,30 @@ Fourth and final Phase-5 pass: is the custom agent-orchestration the right build
 
 ---
 
+# Phase 6 — Run API + Approvals + SSE (`gsd/phase-06-run-api-approvals-sse`)
+
+**Checked:** `gsd/phase-06-run-api-approvals-sse` @ branch tip, against `main` + all branches. **Status: PLANNING-ONLY — not yet implemented.** The branch adds five `.planning/phases/06-*` docs (`06-CONTEXT` + `06-01..04 PLAN`, **no SUMMARY files**) and **zero `backend/src` changes** (confirmed: `git diff df3b3de..phase-06 -- backend/` is empty). The routes it will build — `runs.ts`, `approvals.ts`, `events.ts` — are still 2-line stubs on `main`; `app.ts` mounts only `/health` + `/api/tickets`. Nothing to land or repair this pass.
+
+### Plan assessment (06-CONTEXT + 06-01..04) — sound
+The design is a thin HTTP/SSE surface over the existing `advance()` driver — **no new business logic**, which is the right call:
+- `POST /api/runs` (create), `GET /api/runs/:id` (aggregate: run + latest pending approval + audit timeline), `POST .../approve|reject|next|abort` — all thin wrappers delegating to `advance()`.
+- Approve sends `command_approved`; the safety re-check **inside `advance()` already blocks a dangerous edit** (the gate-recheck I verified in Phase 5) → route returns **422 {error, riskLevel}**, run stays `WAITING_FOR_APPROVAL`. Relies on the `WAITING_FOR_APPROVAL + command_blocked` audit handler I added (`739cf89`).
+- Stale/duplicate approval → 409/422 (good — guards double-approve).
+- SSE via Hono `streamSSE` over `runEventBus`, with **audit backfill on connect + ~15s keepalive** (good demo resilience). Output is already redacted at the store layer.
+- A1 anti-pattern respected: routes only call `advance()`; `executeApprovedCommand` stays unreachable except inside the approved-command path.
+
+### 🔴 Reconciliation risk (flag for when Phase 6 is implemented)
+Phase 6 branched from **`df3b3de`** (Julian's phase-05 tip) — **before** the Phase-5 reconciliation landed on `main`. Its source tree is Julian's divergent phase-05: it **lacks** the reconciled-main hardening (OBSERVING wiring, VALIDATING reachability, evidence-gated root cause, the hardened SSH executor, and ~880 lines of regression tests — the `git diff phase-06..main` shows `ssh-executor.test.ts −234`, `safety-policy.test.ts −129`, etc.). **If Phase 6 is implemented on this lineage and merged naively it will revert all of that** — the same divergence we reconciled for Phase 5. **Required at merge time:** rebase phase-06 onto current `main` (or merge keeping `main`'s `ai/`, `ssh/`, `safety/`, and tests; take only the new `routes/`+`events/sse.ts`). Notably, the plan's own 422-on-blocked-edit behavior *depends on* my Phase-5 fixes, so it must land on top of them, not under them.
+
+### Plan-level note for the implementer
+`advance()` returns the new `OrchestratorState`, not a "was the command blocked?" flag. The approve route must distinguish *executed* (→ 200) from *re-gate blocked* (→ 422) — derive it (e.g. phase still `WAITING_FOR_APPROVAL` **and** a fresh `command.blocked` audit row), or have `advance()` surface a result discriminator. Worth deciding before coding the route.
+
+**Verdict.** Phase 6 is well-planned and correctly scoped (HTTP/SSE only, all logic reused from `advance()`); nothing to audit in code yet. The one thing that matters now is **not losing the reconciled `main`** when it's implemented — rebase phase-06 onto `main` first.
+
+---
+
 ## Cross-phase open items (carry forward)
+- **🔴 Reconcile Phase 6 onto current `main` before/at merge** — it branched off `df3b3de` (pre-reconciliation) and will revert the Phase 3/4/5 hardening if merged naively. Rebase first, or merge keeping `main`'s `ai/`+`ssh/`+`safety/`+tests and taking only the new `routes/`/SSE.
 - ~~**Wire the OBSERVING decision step**~~ ✅ **resolved** (`59feb0a`) — `agentDispatch` OBSERVING now decides root-cause vs more-diagnosis from analyzer confidence; observations now include stderr + exit code.
 - ~~**AI SDK v4 vs v5/v6**~~ ✅ **resolved in Phase 5** — stayed on v4 (`ai@^4.3.16`, `LanguageModelV1`), clean mock-model; no upgrade churn.
 - **`docker compose up` smoke on a real Docker host** — confirm the non-root image + graceful shutdown + (now) the live `createActivity` 422 shape. Mocks ≠ reality.
@@ -366,4 +389,4 @@ Fourth and final Phase-5 pass: is the custom agent-orchestration the right build
 
 ---
 
-*Last updated: Phase 5 (research/reuse pass — 4 lenses complete; evidence-gated root cause; full suite 428 pass). Append a new section per phase as it is audited.*
+*Last updated: Phase 6 check — planning-only (not yet implemented); flagged the reconciliation-onto-main requirement. Phase 5 prior: 428 tests pass. Append a new section per phase as it is audited.*
