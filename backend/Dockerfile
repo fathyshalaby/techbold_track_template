@@ -8,6 +8,11 @@ COPY backend/package.json backend/
 COPY frontend/package.json frontend/
 RUN pnpm install --frozen-lockfile --config.minimum-release-age=0
 COPY backend/src ./backend/src
+# Pre-create the SQLite data dir owned by `node` so the named volume mounted there
+# (docker-compose) inherits node ownership — otherwise Docker creates the volume
+# mountpoint as root, the non-root user can't write, and the store silently falls
+# back to the in-memory adapter (losing the audit trail).
+RUN mkdir -p /app/backend/data
 # Run as the unprivileged built-in `node` user, not root (CIS Docker Benchmark 4.1).
 # Install/build steps above ran as root; hand the tree to `node` for runtime.
 RUN chown -R node:node /app

@@ -238,8 +238,16 @@ export function getDb(dbPath?: string): DbAdapter {
         return db.prepare(sql).all(params) as T[];
       },
     };
-  } catch {
-    console.warn('[store] SQLite unavailable — using JSONL fallback');
+  } catch (err) {
+    // Surface WHY SQLite failed AND that the fallback is EPHEMERAL — a silent
+    // degradation to a non-durable store would lose the audit trail (the C-score
+    // source of truth) without the operator noticing.
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[store] SQLite unavailable (${reason}) — falling back to an IN-MEMORY store. ` +
+        'Run state and the audit trail will NOT survive a restart; fix the native ' +
+        'better-sqlite3 build (or mount a writable data dir) for durable storage.',
+    );
     adapter = makeJsonlAdapter();
   }
 
