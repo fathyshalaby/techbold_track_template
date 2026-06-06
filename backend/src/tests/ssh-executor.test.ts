@@ -1,10 +1,38 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { execSync } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
+import type { Dirent } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { REDACTION_CAP_BYTES } from '../safety/redaction.js';
-import { executeApprovedCommand } from '../ssh/executor.js';
-import type { SshTarget } from '../ssh/types.js';
+import { executeApprovedCommand, runPreflight } from '../ssh/executor.js';
+import { SshConnectionError, type SshTarget } from '../ssh/types.js';
+
+// Cross-platform recursive scan for a substring in non-comment lines of a dir.
+// Replaces a bash-only `execSync('grep … 2>/dev/null || true')` that threw under
+// the Windows cmd.exe shell. Returns matching "file:line" entries (empty = none).
+function grepDir(dir: string, needle: string): string[] {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return []; // dir absent → nothing to match (same as grep on a missing path)
+  }
+  const hits: string[] = [];
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      hits.push(...grepDir(full, needle));
+    } else if (entry.isFile()) {
+      readFileSync(full, 'utf8')
+        .split('\n')
+        .forEach((line, i) => {
+          if (line.trim().startsWith('//')) return; // skip comment-only lines
+          if (line.includes(needle)) hits.push(`${full}:${i + 1}`);
+        });
+    }
+  }
+  return hits;
+}
 
 // ---------------------------------------------------------------------------
 // ssh2 mock
@@ -64,7 +92,12 @@ vi.mock('ssh2', () => {
       // channelFactory is a module-level let; it is fully initialized by the time
       // exec() is actually called (after all imports have settled).
       const channel = channelFactory();
-      process.nextTick(() => cb(undefined, channel));
+      // Deliver the channel SYNCHRONOUSLY so the caller attaches its data/exit/
+      // close listeners before the channel's queued (nextTick) emits fire. This
+      // mirrors real ssh2 — the exec callback runs first, then stream events
+      // arrive. (The previous nextTick wrapper raced the channel's own emit tick
+      // and dropped every event, so the executor never saw 'close'.)
+      cb(undefined, channel);
     }
 
     end(): void {}
@@ -229,15 +262,59 @@ describe('ssh-executor', () => {
     it('is not imported or referenced in any ai/tools/ file', () => {
       const thisFile = fileURLToPath(import.meta.url);
       const aiToolsDir = path.resolve(path.dirname(thisFile), '..', 'ai', 'tools');
+      // Comment-only lines are excluded by grepDir (the §A1 note in ssh-tools.ts
+      // is an architect's warning, not an import or call).
+      expect(grepDir(aiToolsDir, 'executeApprovedCommand')).toEqual([]);
+    });
+  });
 
-      // Exclude comment-only lines (// ...) — the anti-pattern note in ssh-tools.ts
-      // is an architect's warning comment, not an actual import or call.
-      const output = execSync(
-        `grep -r "executeApprovedCommand" "${aiToolsDir}" 2>/dev/null | grep -v '^[^:]*:[[:space:]]*//' || true`,
-        { encoding: 'utf8' },
+  describe('preflight', () => {
+    it('reports sudoAvailable=true, lang=C, and captured PATH when sudo -n succeeds', async () => {
+      // Lazy factories — each channel must be created (and its emits scheduled)
+      // only when exec() calls channelFactory(), so listeners attach in time.
+      const responses = [
+        () => makeSshChannel({ stdout: null, stderr: null, exitCode: 0 }), // sudo -n true
+        () => makeSshChannel({ stdout: Buffer.from('/usr/bin:/bin'), stderr: null, exitCode: 0 }), // echo $PATH
+      ];
+      let call = 0;
+      channelFactory = () => responses[call++]();
+
+      const result = await runPreflight(TARGET);
+      expect(result.sudoAvailable).toBe(true);
+      expect(result.lang).toBe('C');
+      expect(result.path).toBe('/usr/bin:/bin');
+    });
+
+    it('reports sudoAvailable=false (non-fatal) when sudo -n exits non-zero', async () => {
+      const responses = [
+        () => makeSshChannel({ stdout: null, stderr: Buffer.from('a password is required'), exitCode: 1 }),
+        () => makeSshChannel({ stdout: Buffer.from('/usr/bin:/bin'), stderr: null, exitCode: 0 }),
+      ];
+      let call = 0;
+      channelFactory = () => responses[call++]();
+
+      const result = await runPreflight(TARGET);
+      expect(result.sudoAvailable).toBe(false);
+      expect(result.path).toBe('/usr/bin:/bin');
+    });
+  });
+
+  describe('connection failure', () => {
+    it('rejects with SshConnectionError when the connection errors', async () => {
+      // Make the mocked Client emit 'error' instead of 'ready'.
+      const ssh2 = await import('ssh2');
+      const connectSpy = vi
+        .spyOn(ssh2.Client.prototype, 'connect')
+        .mockImplementation(function (this: import('node:events').EventEmitter) {
+          process.nextTick(() => this.emit('error', new Error('ECONNREFUSED')));
+          return this as unknown as ReturnType<typeof ssh2.Client.prototype.connect>;
+        });
+
+      await expect(executeApprovedCommand('appr-err', 'uname -a', TARGET)).rejects.toBeInstanceOf(
+        SshConnectionError,
       );
 
-      expect(output.trim()).toBe('');
+      connectSpy.mockRestore();
     });
   });
 

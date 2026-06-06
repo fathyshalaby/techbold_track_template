@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { execSync } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
+import type { Dirent } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import {
@@ -9,6 +10,32 @@ import {
   DEFAULT_FALLBACK_RESULT,
 } from '../ssh/mock.js';
 import type { SshTarget } from '../ssh/types.js';
+
+// Cross-platform recursive substring scan (non-comment lines). Replaces a
+// bash-only `execSync('grep … || true')` that threw under Windows cmd.exe.
+function grepDir(dir: string, needle: string): string[] {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const hits: string[] = [];
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      hits.push(...grepDir(full, needle));
+    } else if (entry.isFile()) {
+      readFileSync(full, 'utf8')
+        .split('\n')
+        .forEach((line, i) => {
+          if (line.trim().startsWith('//')) return;
+          if (line.includes(needle)) hits.push(`${full}:${i + 1}`);
+        });
+    }
+  }
+  return hits;
+}
 
 const TARGET: SshTarget = {
   host: '10.0.0.1',
@@ -146,12 +173,7 @@ describe('ssh-mock', () => {
       const thisFile = fileURLToPath(import.meta.url);
       const aiToolsDir = path.resolve(path.dirname(thisFile), '..', 'ai', 'tools');
 
-      const output = execSync(
-        `grep -r "ssh/mock" "${aiToolsDir}" 2>/dev/null | grep -v '^[^:]*:[[:space:]]*//' || true`,
-        { encoding: 'utf8' },
-      );
-
-      expect(output.trim()).toBe('');
+      expect(grepDir(aiToolsDir, 'ssh/mock')).toEqual([]);
     });
   });
 
