@@ -23,7 +23,7 @@ export function appendAuditEvent(
   const db = getDb();
   const id = `ev_${ulid()}`;
   const ts = new Date().toISOString();
-  const payloadJson = JSON.stringify(payload);
+  const payloadJson = redactSecrets(JSON.stringify(payload));
   db.run(
     'INSERT INTO audit_events (id, run_id, type, actor, ts, payload_json) VALUES (?, ?, ?, ?, ?, ?)',
     [id, runId, type, actor, ts, payloadJson],

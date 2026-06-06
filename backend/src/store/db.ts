@@ -142,8 +142,10 @@ function makeJsonlAdapter(): DbAdapter {
         cols.forEach((col, i) => { record[col] = params[i] ?? null; });
         rows.push(record);
       } else if (/^\s*UPDATE/i.test(sql)) {
-        const id = extractWhere(sql, params);
-        if (!id) return;
+        // In UPDATE statements the WHERE id is the LAST param (SET params come first).
+        const m = sql.match(/WHERE\s+(\w+)\s*=\s*\?/i);
+        if (!m || m[1].toLowerCase() !== 'id') return;
+        const id = params[params.length - 1] as string;
         const idx = rows.findIndex((r) => r['id'] === id);
         if (idx === -1) return;
 
