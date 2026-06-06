@@ -69,6 +69,13 @@ describe('GET /api/tickets', () => {
     const body = await res.json() as unknown[];
     expect(Array.isArray(body)).toBe(true);
   });
+
+  it('returns 400 for invalid status query parameter', async () => {
+    const res = await app.request('/api/tickets?status=INVALID');
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe('invalid query parameters');
+  });
 });
 
 describe('GET /api/tickets/:id', () => {

@@ -23,7 +23,10 @@ function getClient() {
 
 ticketsRouter.get('/', async (c) => {
   const parsed = ListQuerySchema.safeParse(c.req.query());
-  const query = parsed.success ? parsed.data : {};
+  if (!parsed.success) {
+    return c.json({ error: 'invalid query parameters' }, 400);
+  }
+  const query = parsed.data;
 
   try {
     const tickets = await getClient().listTickets(query);
