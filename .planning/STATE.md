@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: 05-05 complete — async orchestrator driver (advance/createInitialState/setStepCountForTest)
-last_updated: "2026-06-07T00:04:30.000Z"
-last_activity: 2026-06-07 -- Phase 05 Plan 05 complete
+stopped_at: "06-03 complete — SSE events route (createSseStream, eventsRouter, audit↔bus symmetry test)"
+last_updated: "2026-06-07T00:56:35Z"
+last_activity: 2026-06-07 -- Phase 06 Plan 03 complete (SSE events route)
 progress:
   total_phases: 9
-  completed_phases: 4
-  total_plans: 20
-  completed_plans: 18
-  percent: 44
+  completed_phases: 5
+  total_plans: 24
+  completed_plans: 22
+  percent: 56
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-06)
 
 **Core value:** Win B+C (55 pts) — solve hidden Linux-service incidents on fresh VMs, safely and auditably
-**Current focus:** Phase 05 — agent-loop-orchestrator
+**Current focus:** Phase 06 — run-api-approvals-sse
 
 ## Current Position
 
-Phase: 05 (agent-loop-orchestrator) — COMPLETE
-Plan: 5 of 5
-Status: Phase complete — all 5 plans executed
-Last activity: 2026-06-07 -- Phase 05 Plan 05 complete
+Phase: 06 (run-api-approvals-sse) — EXECUTING
+Plan: 4 of 4
+Status: Ready to execute
+Last activity: 2026-06-07 -- Phase 06 Plan 01 complete (run lifecycle routes)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 25%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P01 | 1 | 1 tasks | 2 files |
 | Phase 04-ssh-executor P03 | 25min | 2 tasks | 2 files |
 | Phase 05 P03 | 2min | 2 tasks | 4 files |
+| Phase 06 P02 | 65 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,10 @@ Recent decisions affecting current work:
 - [Phase 05-05]: setDb/resetDb exported from store/db.ts for test isolation — module-level singleton pattern requires explicit injection for JSONL adapter in integration tests; no architectural change to production path
 - [Phase 05-05]: emitEvent side effect also writes to audit log — event bus fans out to SSE, but audit log is the queryable source of truth; tests verify approval.required via getAuditEvents rather than the bus
 - [Phase 05-05]: vi.spyOn used for integration test mocking rather than vi.mock — vi.mock is file-scoped and hoisted, breaking pre-existing agent tests that inject real model instances; spyOn is describe-scoped and restoreable
+- [Phase 06-01]: POST /api/runs uses updateRunPhase directly (not advance()) to transition CREATED→LOADED_CONTEXT — advance() auto-recurses through LOADED_CONTEXT→TRIAGING→LLM, violating the PRD §9 201-response contract
+- [Phase 06-01]: vi.clearAllMocks() used in afterEach instead of vi.restoreAllMocks() — restoreAllMocks resets vi.fn() instances created inside vi.mock() back to originals, breaking mocks for subsequent tests in the same file
+- [Phase ?]: approvalsRouter mounts at /api/runs prefix alongside runsRouter — Hono matches specific paths first so no collisions
+- [Phase ?]: Blocked-command 422 detection uses state.phase === WAITING_FOR_APPROVAL after advance() — no extra audit query; reduce() leaves phase unchanged on command_blocked
 
 ### Pending Todos
 
@@ -90,6 +95,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-06T23:55:00.000Z
-Stopped at: 05-04 complete — pure orchestrator reducer (reduce/OrchestratorState/OrchestratorEvent/SideEffect/MAX_STEPS)
-Resume file: .planning/phases/05-agent-loop-orchestrator/05-04-SUMMARY.md
+Last session: 2026-06-06T22:53:40.470Z
+Stopped at: 06-01 complete — run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)
+Resume file: .planning/phases/06-run-api-approvals-sse/06-01-SUMMARY.md
