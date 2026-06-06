@@ -324,6 +324,27 @@ Third pass: does the automated diagnose→fix→validate loop match how a senior
 
 **Verdict.** The loop now faithfully mirrors expert incident workflow in both directions — it iterates to a root cause AND validates the fix before drafting. The remaining gaps are deliberate HITL boundaries (rollback approval) and prompt-quality items, both logged.
 
+### Phase 5 — Research / Reuse Audit (OSINT & adjacent-knowledge lens, commit `0c9548c`)
+Fourth and final Phase-5 pass: is the custom agent-orchestration the right build, and what known pitfalls can we borrow? Researched the LLM-agent-loop / HITL-orchestration space.
+
+**Is the custom state machine + agent loop justified?** *Yes — and strongly validated by prior art.* The closest existing system is **LangGraph**: its `interrupt_before` (gate *before* the action) + checkpoint persistence + approve/edit/reject is *exactly* our `WAITING_FOR_APPROVAL` + SQLite-persisted run state. LangChain's own guidance — "LangGraph is worth it when you need persistence across sessions, human approval gates, or parallel fan-out" — describes our first two needs precisely, confirming the *shape* is right. We did **not** adopt it (LangChain ecosystem weight, JS port less mature, and a working/tested/dependency-free machine already exists). The **Vercel AI SDK's** own loop control (`stepCountIs`, default 20) validates our `MAX_STEPS=12` runaway-loop cap. Critically, the SDK's *auto* tool loop (v4 `maxSteps`) executes tools **without** human approval — the wrong fit for our hard-fail safety model — which is exactly why a custom step-by-step state machine with an approval break is correct on v4.
+
+**Issue found & repaired — unreliable confidence gate (commit `0c9548c`).** Research is unanimous: **verbalized LLM confidence is systematically miscalibrated and overconfident** (across models/domains; RLHF & reasoning models *worse* — "high confidence on low-accuracy answers"). The OBSERVING root-cause gate keyed *solely* on the analyzer's self-reported top-hypothesis `confidence ≥ 0.8` — precisely that unreliable signal. **Fix:** also require the hypothesis to cite **non-empty evidence** (a confident-but-unsupported hypothesis is a hallucination red flag → keep diagnosing). Grounded in the "confidence–faithfulness gap" literature; the human's approval of the resulting fix command remains the real backstop. +1 test (high conf + empty evidence → keep diagnosing).
+
+**Reuse opportunities evaluated & declined (with reason):**
+- **LangGraph / LangChain** — closest fit, but a framework rewrite of working code + heavier deps; borrowed the *validation* (HITL-interrupt + checkpointing pattern), not the framework.
+- **XState** (formal statechart lib, visualization, guards) — nice-to-have, but ~10 phases in a small pure `reduce()` don't justify a dependency + DSL; the reducer is fully unit-tested. Declined.
+- **AI SDK v6 `needsApproval`** — natively implements our approval gate ("HITL with a single flag, no custom code"). **Real future simplification** *if* the team upgrades v4→v6, but out of scope pre-freeze (the v4-vs-v5/6 decision was deliberately "stay on v4"). Logged.
+- **Calibration tooling** (Brier/log-scoring, self-consistency sampling) to fix LLM overconfidence — research-grade, overkill here; the evidence-requirement + HITL backstop is the pragmatic mitigation.
+
+**Adjacent-knowledge borrowed (Nebenwissenschaft):** *Decision science* — confidence calibration / the overconfidence bias drove the evidence-gate fix; the diagnose→fix→validate loop is a **OODA / hypothesis-test** cycle. *Reliability eng.* — `MAX_STEPS` cap = a circuit breaker; agent-failure → `agent.unavailable` + unchanged state = fail-safe degradation. *Control systems* — the loop is feedback control with a human gate in the actuation path. *Root-cause analysis* — hypotheses-with-evidence mirrors formal RCA (evidence before conclusion).
+
+**Strategic recommendations (ranked):** (1) *Done:* evidence-gated root cause. (2) *Prompt hardening:* validator must do a before/after symptom comparison; analyzer must steer to batch/non-interactive flags + bounded reads (logged). (3) *Strategic, if v6 upgrade ever happens:* replace the custom approval plumbing with `needsApproval`. (4) *Real-VM smoke* remains the one thing no unit test can prove.
+
+**Verdict.** Custom orchestration is the correct, defensible build — validated against LangGraph and the AI SDK's own loop control, and now hardened against the best-documented LLM-agent failure mode (overconfidence) with a research-grounded evidence requirement. Four lenses (reconcile/land, test-strategy, ops, research/reuse) have now exercised Phase 5; full suite **428 pass / 0 fail**.
+
+*Sources: [LangGraph human-in-the-loop](https://docs.langchain.com/oss/python/langchain/human-in-the-loop) · [Vercel AI SDK loop control](https://ai-sdk.dev/docs/agents/loop-control) + [AI SDK 6 needsApproval](https://vercel.com/blog/ai-sdk-6) · LLM verbalized-confidence calibration research ([overview](https://www.emergentmind.com/topics/verbalized-confidence-scores), arXiv "confidence–faithfulness gap").*
+
 ---
 
 ## Cross-phase open items (carry forward)
@@ -341,7 +362,8 @@ Third pass: does the automated diagnose→fix→validate loop match how a senior
 - **Document safe disk-full-via-logs playbook** for demo/operators — `logrotate -f` / `gzip` / `mv`, never `truncate`/`rm` on `/var/log` (hard-fail).
 - **Surface `rollbackCommand` on `NOT_FIXED`** (UI/Phase 6) — when validation fails the failed fix is left applied; offer the recorded `rollbackCommand` as a one-click proposal (still human-approved). Don't auto-rollback (HITL).
 - **Harden the validator prompt for before/after symptom comparison** (Phase 5/7) — validation must re-probe the ticket's *original* failing signal, not just confirm the fix command exited 0.
+- **AI SDK v6 `needsApproval`** (future) — if the team ever upgrades v4→v6, the native `needsApproval` HITL flag can replace the custom approval-gate plumbing in the orchestrator. Not pre-freeze.
 
 ---
 
-*Last updated: Phase 5 (ops-audit pass — OBSERVING loop + VALIDATING reachability fixed; the full diagnose→fix→validate→draft loop now runs; full suite 427 pass). Append a new section per phase as it is audited.*
+*Last updated: Phase 5 (research/reuse pass — 4 lenses complete; evidence-gated root cause; full suite 428 pass). Append a new section per phase as it is audited.*
