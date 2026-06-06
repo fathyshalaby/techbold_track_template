@@ -3,20 +3,22 @@ status: all_fixed
 phase: 03-safety-layer-run-store
 source: 03-REVIEW.md
 fix_scope: critical_warning
-findings_in_scope: 9
-fixed: 9
+findings_in_scope: 14
+fixed: 14
 skipped: 0
-iteration: 1
+iteration: 3
 created: 2026-06-06
 ---
 
 # Code Review Fix Report — Phase 03
 
-All 9 review blockers were fixed and merged into the phase branch. The fixer
-agent crashed before committing (truncated return, uncommitted edits left in an
-isolated worktree); the orchestrator salvaged the complete edit set by committing
-it inside the worktree branch (`b524434`) and fast-forward-merging it back, then
-fixed one regression the merged change introduced.
+All review findings across three review cycles were fixed and committed to the
+phase branch. The first fixer agent crashed before committing (truncated return,
+uncommitted edits left in an isolated worktree); the orchestrator salvaged the
+complete edit set by committing it inside the worktree branch (`b524434`) and
+fast-forward-merging it back. Two subsequent confirmation re-reviews caught
+regressions the fixes themselves introduced — each was fixed in turn, and a
+regression test was added for the JSONL fallback path that had no coverage.
 
 ## Findings Fixed
 
@@ -43,8 +45,40 @@ Fix (`2659cb6`): `validateCommandAgainstPolicy` now checks the blocklist against
 segment (catches chained dangerous commands like `echo hi; rm -rf /etc`). Both
 detection needs are satisfied without conflict.
 
+## Second Review Cycle — New Blockers from the Fixes
+
+The confirmation re-review found two new blockers introduced by the CR-01..CR-09 fixes:
+
+| ID | Category | Fix |
+|----|----------|-----|
+| CR-02b | Audit payload unredacted | `appendAuditEvent` wrote `JSON.stringify(payload)` straight to `audit_events.payload_json`. Now redacts via `redactSecrets` before write (`3636f74`) — closes the rubric-C hard-fail risk of secrets in the audit log. |
+| CR-01b | JSONL UPDATE wrong id binding | `extractWhere` returned `params[0]` but UPDATEs put the WHERE id last. Fixed to `params[params.length - 1]` (`3636f74`). |
+
+Two safety warnings also closed (`b5604c5`): `su - root` / `su root` now blocked
+(rule was anchored to `su -$`), and lowercase shell variables (`$dir`, `$cmd`) now
+trip the `__UNRESOLVABLE__` conservative-block gate (pattern was `$[A-Z_]` only).
+
+## Third Review Cycle — Incomplete COALESCE Fix
+
+The CR-01b id-binding fix was correct, but the JSONL SET-clause parser still split
+on every comma — and `updateApprovalStatus` uses `COALESCE(?, col)` expressions whose
+internal commas produced 11 fragments for 6 placeholders, misaligning every param.
+Approval decisions silently vanished in the JSONL fallback path (which had zero test
+coverage).
+
+Fix (`d692988`): the SET parser now matches each `col = <expr-with-one-?>` assignment
+directly via regex, handling both plain `?` and `COALESCE(?, col)` forms (null param →
+keep existing value, matching SQL semantics). Added `store-jsonl.test.ts` with 3
+regression tests exercising the COALESCE UPDATE path, the audit append-only guard, and
+INSERT/GET round-trips.
+
+A final Info item was also closed (`970f700`): the `json-token-field` redaction pattern
+now matches any JSON key containing a secret-indicator word (`phoenix_token`, `auth_token`,
+`ssh_key`), not just an exact key set.
+
 ## Verification
 
 - `tsc --noEmit`: clean
-- Full suite: 250 passed, 1 skipped (Phase 5 orchestrator stub), 0 failed
+- Full suite: 253 passed, 1 skipped (Phase 5 orchestrator stub), 0 failed
 - §9 consolidated safety gate (`safety.test.ts`) green, including all new blocklist categories
+- New `store-jsonl.test.ts` covers the previously-untested JSONL fallback UPDATE path
