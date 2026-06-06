@@ -111,17 +111,53 @@ Explicitly excluded (PRD §6.3, §11). Documented to prevent scope creep.
 
 ## Traceability
 
-Which phases cover which requirements. Populated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (pending roadmap) | — | Pending |
+| PLAT-01 | Phase 1 | Pending |
+| PLAT-02 | Phase 1 | Pending |
+| PLAT-03 | Phase 1 | Pending |
+| PLAT-04 | Phase 1 | Pending |
+| ERP-01 | Phase 2 | Pending |
+| ERP-02 | Phase 2 | Pending |
+| ERP-03 | Phase 2 | Pending |
+| ERP-04 | Phase 2 | Pending |
+| ERP-05 | Phase 2 | Pending |
+| ERP-06 | Phase 2 | Pending |
+| SAFE-01 | Phase 3 | Pending |
+| SAFE-02 | Phase 3 | Pending |
+| SAFE-03 | Phase 3 | Pending |
+| SAFE-04 | Phase 3 | Pending |
+| SAFE-05 | Phase 3 | Pending |
+| SAFE-06 | Phase 3 | Pending |
+| API-04 | Phase 3 | Pending |
+| DIAG-06 | Phase 4 | Pending |
+| DIAG-01 | Phase 5 | Pending |
+| DIAG-02 | Phase 5 | Pending |
+| DIAG-03 | Phase 5 | Pending |
+| DIAG-04 | Phase 5 | Pending |
+| DIAG-05 | Phase 5 | Pending |
+| API-01 | Phase 6 | Pending |
+| API-02 | Phase 6 | Pending |
+| API-03 | Phase 6 | Pending |
+| ACT-01 | Phase 7 | Pending |
+| ACT-02 | Phase 7 | Pending |
+| UX-01 | Phase 8 | Pending |
+| UX-02 | Phase 8 | Pending |
+| UX-03 | Phase 8 | Pending |
+| UX-04 | Phase 8 | Pending |
+| UX-05 | Phase 8 | Pending |
+| UX-06 | Phase 8 | Pending |
+| UX-07 | Phase 8 | Pending |
+| ENG-01 | Phase 9 | Pending |
+| ENG-02 | Phase 9 | Pending |
+| ENG-03 | Phase 9 | Pending |
+| ENG-04 | Phase 9 | Pending |
 
 **Coverage:**
-- v1 requirements: 36 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 36 ⚠️
+- v1 requirements: 39 total (REQUIREMENTS.md header said 36 — that count was stale; actual count is 39 after PLAT/ERP/SAFE/DIAG/API/ACT/UX/ENG IDs enumerated)
+- Mapped to phases: 39/39
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-06*
-*Last updated: 2026-06-06 after initial definition*
+*Last updated: 2026-06-06 after roadmap creation*

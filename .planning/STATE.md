@@ -1,0 +1,78 @@
+---
+gsd_state_version: '1.0'
+status: planning
+progress:
+  total_phases: 9
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+---
+
+# Project State
+
+## Project Reference
+
+See: .planning/PROJECT.md (updated 2026-06-06)
+
+**Core value:** Win B+C (55 pts) — solve hidden Linux-service incidents on fresh VMs, safely and auditably
+**Current focus:** Phase 1 — Repo Foundation
+
+## Current Position
+
+Phase: 1 of 9 (Repo Foundation)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-06-06 — Roadmap created from locked TASKS.md build order
+
+Progress: [░░░░░░░░░░] 0%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0
+- Average duration: —
+- Total execution time: 0 hours
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
+
+*Updated after each plan completion*
+
+## Accumulated Context
+
+### Decisions
+
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
+
+- Init: Node 22 + Hono replaces FastAPI skeleton — architecture doc mandates TS/Hono
+- Init: Roadmap derived from locked TASKS.md build order, not re-derived from first principles
+- Init: Mock mode is first-class — demo must survive flaky Wi-Fi and VM reboots
+- Init: Phases 2 and 3 can run in parallel (ERP client is independent of safety+store)
+
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
+
+- SSH `.pem` key not yet placed in `keys/` — hard blocker for real VM work (Phase 4+)
+- Passwordless sudo for `azureuser` unconfirmed — preflight `sudo -n true` in Phase 4
+- Code freeze: Sun Jun 7 14:00 (~24h from roadmap creation)
+
+## Deferred Items
+
+| Category | Item | Status | Deferred At |
+|----------|------|--------|-------------|
+| v2 | HCR-01..06 human-control extensions | Deferred | Init |
+| v2 | BOOST-01..06 UX + safety boosters | Deferred | Init |
+
+## Session Continuity
+
+Last session: 2026-06-06
+Stopped at: Roadmap written — ready to plan Phase 1
+Resume file: None
