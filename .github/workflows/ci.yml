@@ -26,6 +26,8 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 11 # no root package.json#packageManager, so pin explicitly
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
