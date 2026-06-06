@@ -173,7 +173,7 @@ Plans:
 
 - [x] 06-01-PLAN.md — Run routes TDD (POST /api/runs, GET /api/runs/:id, /next, /abort)
 - [x] 06-02-PLAN.md — Approval routes TDD (approve with safety re-check, reject with reason)
-- [ ] 06-03-PLAN.md — SSE events route (streamSSE, backfill, keepalive, bus cleanup)
+- [x] 06-03-PLAN.md — SSE events route (streamSSE, backfill, keepalive, bus cleanup)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -236,7 +236,7 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 | 3. Safety Layer + Run Store | 4/4 | Complete    | 2026-06-06 |
 | 4. SSH Executor | 5/5 | Complete    | 2026-06-06 |
 | 5. Agent Loop + Orchestrator | 4/5 | In Progress|  |
-| 6. Run API + Approvals + SSE | 2/4 | In Progress|  |
+| 6. Run API + Approvals + SSE | 3/4 | In Progress|  |
 | 7. Activity Generation | 0/TBD | Not started | - |
 | 8. Frontend | 0/TBD | Not started | - |
 | 9. Tests + Submission Polish | 0/TBD | Not started | - |
