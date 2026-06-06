@@ -1,0 +1,48 @@
+name: CI
+
+# Regression-prevention gate: type-check + the full backend test suite on every
+# push to main and every PR. The suite (safety blocklist, SSH executor, agent
+# orchestrator, phoenix client) is the contract that must never silently break —
+# B (troubleshooting) + C (safety/audit) are 55% of the score and live in code
+# this suite covers. A red check here means a regression, not a style nit.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend — typecheck + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Workspace install at the repo root. On Linux + Node 22, better-sqlite3
+      # resolves a prebuilt binary (no native toolchain needed), unlike Windows
+      # dev boxes where the build is skipped.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check (tsc --noEmit)
+        working-directory: backend
+        run: pnpm exec tsc --noEmit
+
+      - name: Run tests (vitest)
+        working-directory: backend
+        run: pnpm test
