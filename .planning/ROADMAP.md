@@ -51,7 +51,13 @@ Nine phases derived directly from the locked build-order critical path in docs/T
   4. A 401, 404, or empty ticket list from Phoenix degrades gracefully without crashing the server
   5. The in-memory mock returns valid fixtures for every client method used in the agent loop
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Phoenix Zod type schemas (TDD: schema parsing contracts)
+- [ ] 02-02-PLAN.md — Phoenix HTTP client with auth/retry/timeout + rubric-E tests (TDD)
+- [ ] 02-03-PLAN.md — In-memory mock + ticket route wiring
+
 **UI hint**: yes
 
 ### Phase 3: Safety Layer + Run Store
@@ -164,8 +170,8 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Repo Foundation | 3/3 | Complete   | 2026-06-06 |
-| 2. ERP Client + Ticket Routes | 0/TBD | Not started | - |
+| 1. Repo Foundation | 3/3 | Complete    | 2026-06-06 |
+| 2. ERP Client + Ticket Routes | 0/3 | Not started | - |
 | 3. Safety Layer + Run Store | 0/TBD | Not started | - |
 | 4. SSH Executor | 0/TBD | Not started | - |
 | 5. Agent Loop + Orchestrator | 0/TBD | Not started | - |
