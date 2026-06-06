@@ -285,9 +285,32 @@ Full backend suite **419 pass / 0 fail** (main 359 + Phase-5 orchestrator/agent 
 ### Deferred / for the deeper Phase-5 audit passes
 Domain/test-strategy/research lenses on the agents + prompts + state machine not yet run (this was the land-and-reconcile check). Candidate areas: agent prompt robustness (batch-flag steering, bounded reads — see carry-forwards), state-machine invariants (valid transitions only, no orphan phases), per-run concurrency/locking, and the activity-draft-from-audit-trail-only rule.
 
+### Phase 5 — Deep Audit (test strategy & regression-prevention pass, commit `739cf89`)
+Second pass with the *test-strategy / regression-prevention* lens. Read the full state machine (`reduce()` pure reducer + `advance()` driver + `agentDispatch`). Code as source of truth.
+
+**Executive summary.** The orchestrator is a clean reducer-plus-driver: a pure `reduce()` (terminal-phase short-circuit, abort/error/max-steps guards, per-phase transitions) and an async `advance()` that runs the safety gate, the executor, and redaction. It already honours the two hardest invariants (re-gate before execute; redact before persist). No happy-path defect found; the gaps were **audit completeness on blocked-command paths** and **missing tests for the two most safety-critical invariants**.
+
+**Issues found & repaired (commit `739cf89`).**
+1. **Blocked FIX command — unaudited + phase desync.** `reduce()` had no `command_blocked` case for `PLANNING_FIX`, so it emitted *no* effects: the block wasn't audited AND `updateRunPhase` never fired — the persisted phase stayed `PLANNING_FIX` while the returned state claimed `TRIAGING` (a desync that re-runs the solver on the next `advance()`). Added the case (audit + `phaseEffect(TRIAGING)`); the driver now just applies the reducer's effects.
+2. **Blocked re-gated edit — unaudited.** The most security-sensitive path: a technician edits an approved command to something dangerous → `advance()` correctly refuses to execute, but `reduce(WAITING_FOR_APPROVAL, command_blocked)` was unhandled → the block went unrecorded. Now audited; run stays `WAITING_FOR_APPROVAL` to retry.
+
+**Invariants now asserted (regression tests, +4):** approving `rm -rf /etc` never calls the executor + is audited + writes no `command_results` (Test 8); secrets in command output are redacted in **both** `command_results` and `observations` (Test 9, redaction-at-sink); the two reducer audit-gap fixes (16, 17). Existing coverage already had: terminal-phase no-op (15), abort scope (12), unrecoverable→FAILED (13), TRIAGING block→loop (2), step-count cap (Test 5), execute→OBSERVING (Test 4), agent-unavailable degradation (Test 6). Full suite **419 → 423**, `tsc` clean.
+
+**🔴 Top gap found — DOCUMENTED, not repaired (out of scope / next build):** the **diagnostic loop stalls at `OBSERVING`**. After a command executes the run sits in `OBSERVING`, but `agentDispatch` has **no `OBSERVING` case** and **`customer-system-analyzer` is never imported** — so nothing autonomously decides `root_cause_found` vs `more_diagnosis_needed`. The reducer *handles* those events, but no agent *emits* them. Net: the autonomous iterate-to-root-cause loop (core B-score) cannot progress past the first observation without an external event. This is a missing feature (likely the next GSD sub-phase / Phase 6 route-driven), not a regression — wiring a new agent dispatch unilaterally pre-freeze would risk colliding with Julian's GSD. **Recommended as the #1 immediate next build.**
+
+**Other findings (documented, not changed to avoid altering agent inputs pre-freeze):**
+- **Observation fidelity:** the `OBSERVING` observation stores only `stdout_redacted` — **not stderr or the exit code**. Many diagnostics put the signal on stderr (`nginx -t`) or in the exit code; the analyzer agent currently can't see them. Recommend including stderr + exit code in the observation content when the analyzer is wired (pairs with the OBSERVING gap above).
+- **Step-count bookkeeping rides in the `observations` table** (source `system`, JSON content) and is filtered out everywhere it's read. Works, but overloads the table; a dedicated column/table would be cleaner. Low priority.
+- `activity-log-generator` agent + `audit/phoenix/safety` tools are still 2-line stubs (Phase 7 scope). Expected.
+
+**Declined (over-engineering):** golden-master of full run transcripts (environment-dependent), property-based fuzzing of the reducer (the transition table is small and now well covered by examples), mutation testing (no time pre-freeze; the new adversarial tests cover the critical mutations).
+
+**Verdict.** State machine is sound and now audit-complete on every block path with the two critical safety invariants pinned by tests. The one structural gap — the unwired `OBSERVING` decision step — is the highest-value next build and is clearly flagged.
+
 ---
 
 ## Cross-phase open items (carry forward)
+- **🔴 Wire the OBSERVING decision step** (next build) — import/dispatch `customer-system-analyzer` to emit `root_cause_found` / `more_diagnosis_needed` after each observation; without it the autonomous diagnostic loop stalls at the first command. Include stderr + exit code in the observation it reads.
 - ~~**AI SDK v4 vs v5/v6**~~ ✅ **resolved in Phase 5** — stayed on v4 (`ai@^4.3.16`, `LanguageModelV1`), clean mock-model; no upgrade churn.
 - **`docker compose up` smoke on a real Docker host** — confirm the non-root image + graceful shutdown + (now) the live `createActivity` 422 shape. Mocks ≠ reality.
 - **Confirm with mentors:** R0 (does grading run the HITL flow unattended? → tiered auto-approve) and passwordless `sudo` for `azureuser`.
@@ -297,9 +320,9 @@ Domain/test-strategy/research lenses on the agents + prompts + state machine not
 - **Prefer bounded tail reads in agent prompt** (Phase 5) — `cat <huge log>` returns a truncated *head*; real errors are at the tail. Steer the model to `tail -n` / `journalctl -n`.
 - **Steer agent to non-interactive/batch flags** (Phase 5) — no PTY, so the model must use `--no-pager` (systemctl/journalctl), `top -b -n1`, `ps` (not `top`), and always pass a file to `grep`/`cat` (stdin is now EOF'd, so a missing file fails fast rather than hanging — but a batch flag is still cleaner output).
 - ~~**Per-command timeout for follow/stream commands**~~ ✅ **resolved in Phase 4** (`1d811fd`) — the 30 s channel-kill timeout makes `tail -f`/`journalctl -f`/`ping` time out cleanly instead of hanging the run.
-- ~~**Redaction-at-sink**~~ ✅ **resolved in Phase 5** (`4954f34`) — `advance()` runs `redactSecrets()` on stdout/stderr before persisting; a dedicated assertion test is still worth adding in the Phase-5 deep audit.
+- ~~**Redaction-at-sink**~~ ✅ **resolved in Phase 5** (`4954f34`, test added `739cf89`) — `advance()` runs `redactSecrets()` on stdout/stderr before persisting; Test 9 now asserts secrets never reach `command_results`/`observations`.
 - **Document safe disk-full-via-logs playbook** for demo/operators — `logrotate -f` / `gzip` / `mv`, never `truncate`/`rm` on `/var/log` (hard-fail).
 
 ---
 
-*Last updated: Phase 5 (agent loop reconciled + landed on main; real-VM wiring fixed; full suite 419 pass). Append a new section per phase as it is audited.*
+*Last updated: Phase 5 (deep-audit pass — blocked-command audit-gaps fixed + safety/redaction regression tests; full suite 423 pass). Append a new section per phase as it is audited.*
