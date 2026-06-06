@@ -36,11 +36,11 @@ Requirements for the hackathon submission (code freeze Sun Jun 7, 14:00). Each m
 
 ### Troubleshooting (Agents + Orchestrator)
 
-- [ ] **DIAG-01**: `problem_analyzer` agent returns ranked root-cause hypotheses with evidence, then one read-only diagnostic command (purpose + expected signal + risk) — *B/D*
-- [ ] **DIAG-02**: Agent prompts are scoped to local Linux services only and generalise — no branches keyed to ticket IDs, hostnames, or symptom strings — *B*
+- [x] **DIAG-01**: `problem_analyzer` agent returns ranked root-cause hypotheses with evidence, then one read-only diagnostic command (purpose + expected signal + risk) — *B/D*
+- [x] **DIAG-02**: Agent prompts are scoped to local Linux services only and generalise — no branches keyed to ticket IDs, hostnames, or symptom strings — *B*
 - [ ] **DIAG-03**: Deterministic orchestrator drives run phases (TRIAGING → WAITING_FOR_APPROVAL → EXECUTING → OBSERVING → … → DRAFTING_ACTIVITY) with a max-steps cap; block → ask alternative — *B/C*
-- [ ] **DIAG-04**: `problem_solver` agent proposes a minimal, reversible fix with a captured rollback — *B*
-- [ ] **DIAG-05**: `validator` agent proves the customer benefit is restored (never `is-active`) and checks persistence after reboot/restart; single success → `LIKELY_FIXED`, repeated → `VERIFIED_FIXED` — *B*
+- [x] **DIAG-04**: `problem_solver` agent proposes a minimal, reversible fix with a captured rollback — *B*
+- [x] **DIAG-05**: `validator` agent proves the customer benefit is restored (never `is-active`) and checks persistence after reboot/restart; single success → `LIKELY_FIXED`, repeated → `VERIFIED_FIXED` — *B*
 - [x] **DIAG-06**: Generalising loop solves all 5 practice VMs cleanly, reboot-persistent, with zero safety flags, via prompts/safety/validation (no per-incident hacks) — *B*
 
 ### Run API & Events
@@ -131,11 +131,11 @@ Explicitly excluded (PRD §6.3, §11). Documented to prevent scope creep.
 | SAFE-06 | Phase 3 | Pending |
 | API-04 | Phase 3 | Pending |
 | DIAG-06 | Phase 4 | Complete |
-| DIAG-01 | Phase 5 | Pending |
-| DIAG-02 | Phase 5 | Pending |
+| DIAG-01 | Phase 5 | Complete |
+| DIAG-02 | Phase 5 | Complete |
 | DIAG-03 | Phase 5 | Pending |
-| DIAG-04 | Phase 5 | Pending |
-| DIAG-05 | Phase 5 | Pending |
+| DIAG-04 | Phase 5 | Complete |
+| DIAG-05 | Phase 5 | Complete |
 | API-01 | Phase 6 | Pending |
 | API-02 | Phase 6 | Pending |
 | API-03 | Phase 6 | Pending |

@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: 05-02 complete — getModel() factory + four agent system prompt constants
-last_updated: "2026-06-06T23:45:00Z"
+last_updated: "2026-06-06T21:52:53.995Z"
 last_activity: 2026-06-06 -- Phase 05 Plan 02 complete
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 20
-  completed_plans: 15
+  completed_plans: 18
   percent: 44
 ---
 
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-06-06)
 ## Current Position
 
 Phase: 05 (agent-loop-orchestrator) — EXECUTING
-Plan: 3 of 5
-Status: Executing Phase 05
+Plan: 4 of 5
+Status: Ready to execute
 Last activity: 2026-06-06 -- Phase 05 Plan 02 complete
 
 Progress: [░░░░░░░░░░] 0%
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03-safety-layer-run-store P01 | 180 | 3 tasks | 3 files |
 | Phase 04 P01 | 1 | 1 tasks | 2 files |
 | Phase 04-ssh-executor P03 | 25min | 2 tasks | 2 files |
+| Phase 05 P03 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,8 @@ Recent decisions affecting current work:
 - Init: Mock mode is first-class — demo must survive flaky Wi-Fi and VM reboots
 - Init: Phases 2 and 3 can run in parallel (ERP client is independent of safety+store)
 - [Phase ?]: Reverse-flush process.nextTick queue in runCommand to fix ssh2 mock event-before-listener timing
+- [Phase 05]: Agents accept optional model param for test injection — getModel() used as default, enabling scripted mock responses in tests without env setup — Degradation and mock-output tests require injecting a LanguageModelV1 directly; optional param keeps production callers unchanged
+- [Phase 05]: AgentUnavailableError exported from problem-analyzer.ts as the shared error class — avoids a separate shared file for a single error type — All four agents share the same error class; co-locating with problem-analyzer keeps the surface small and tests can import it alongside runProblemAnalyzer
 
 ### Pending Todos
 
@@ -84,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-06T23:45:00Z
+Last session: 2026-06-06T21:51:49.180Z
 Stopped at: 05-02 complete — getModel() factory + four agent system prompt constants
 Resume file: .planning/phases/05-agent-loop-orchestrator/05-02-SUMMARY.md
