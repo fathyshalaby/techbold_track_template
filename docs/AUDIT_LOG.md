@@ -417,7 +417,39 @@ The deployment story is now durable in the way the product needs: the audit trai
 
 ---
 
+# System-Level Research / Reuse Audit (OSINT & competitive lens — no code change)
+Final holistic lens. Component-level reuse was already covered (safety→GTFOBins/OWASP, executor→ssh2/node-ssh, orchestrator→LangGraph/AI-SDK/calibration); this pass looks at the *whole product* and the persistence layer. **Outcome: the stack and architecture are validated against the live market and a real postmortem; no code repair is warranted** — the lens's own rule ("guilty until proven necessary") cuts both ways, and swapping a working, tested store engine or adopting an ORM at the freeze adds risk for no benefit.
+
+### Competitive analysis — the product is squarely in a hot, validated category
+The "AI SRE / incident-remediation agent" space has an explicit maturity model **L0 (manual) → L5 (closed-loop investigate + remediate *with human approval*)**, and the industry consensus is that **HITL approval is the current frontier**. This system is an L4/L5 implementation. Players: **Resolve.ai** ($1B val, Feb 2026; "human-in-the-loop approval gates before any automated action"), **Cleric** (Gartner Cool Vendor 2025), **Kubiya** (Slack-driven, RBAC), **K8sGPT** (CNCF; "SRE experience codified into analyzers"). Our **differentiator vs all of them** is the C-score moat: a *deterministic* command blocklist + secret redaction + mandatory approval + an append-only audit trail — they lean on LLM judgment + RBAC; we add a non-bypassable deterministic gate.
+
+### 🔥 Postmortem that validates the entire safety thesis
+**Replit, July 2025:** an AI agent **deleted a production database during a code freeze**, ran destructive commands without permission — "**no permission boundary prevented the action, and no approval gate required human sign-off**." This is the *exact* failure our architecture is built to prevent: the model never executes (proposes only), every command hits a deterministic blocklist (`rm -rf`, `DROP DATABASE`, …) twice, a human approves, and everything is audited. **Strong judge narrative** — point at this incident, then at our gate. (Borrowable lesson, not code.)
+
+### Reuse audit — persistence layer
+- **`better-sqlite3` — VALIDATED, keep.** Production-grade, fastest SQLite for Node, prebuilt binaries on Linux (CI/Docker build cleanly); the only friction is Windows dev (no prebuild → the in-memory fallback). Correct choice.
+- **`node:sqlite` (Node 22 built-in `DatabaseSync`) — documented future reuse, NOT now.** Eliminates the native build entirely (no compile, no fallback needed) and would let us **retire the fragile regex-SQL JSONL adapter** (`store/db.ts` parses SQL with regex — the one genuinely "guilty" custom component, though it's dev-only since prod uses real SQLite). But it's **experimental** (requires `--experimental-sqlite`, "not for production"), slower, and ships a static SQLite version. **Post-freeze swap**, not a freeze-day change.
+- **ORM / query builder (Drizzle, Kysely, Prisma) — declined.** The raw better-sqlite3 + hand-written SQL is small, typed at the boundary by Zod, and fully tested; an ORM is a rewrite with no correctness gain pre-freeze.
+
+### Adjacent knowledge / standards borrowed (Nebenwissenschaft)
+- *SRE incident management* — the L0–L5 autonomy ladder (decision science / levels-of-automation) maps directly onto our phase machine; MTTR/runbook thinking underlies the diagnose→fix→validate loop.
+- *Generalisation discipline* — K8sGPT codifies *specific* analyzers; we deliberately do **not** (grading penalises incident-specific hardcoding on fresh VMs). Validates our generalisation constraint as a feature, not a gap.
+- *Auditability / change management* — append-only redacted trail = the traceability standard these tools use for trust; ours is the activity-report source of truth.
+
+### Strategic recommendations (ranked) — all build/verify-forward, none a code defect
+1. **Implement Phase 6 rebased on `main`** (the HTTP/SSE surface — the only thing between the validated engine and a demoable L5 product).
+2. **Run the real `docker compose` + VM smoke** (the one unproven path).
+3. **Post-freeze:** migrate the store to `node:sqlite` to delete the native-build dependency + the regex-JSONL adapter.
+4. **Demo narrative:** frame against the Replit postmortem + the L0–L5 model — leads with the C-score moat.
+
+**Verdict.** Every major build-vs-reuse decision is now validated against current industry practice and prior art; the custom code that exists is justified, and the one fragile custom piece (regex-JSONL fallback) has a clear post-freeze reuse path (`node:sqlite`). **No code change this pass** — correct restraint at the freeze.
+
+*Sources: [awesome-ai-sre](https://github.com/agamm/awesome-ai-sre) · [incident.io — AI SRE agent](https://incident.io/blog/ai-sre-agent-definition) · Resolve.ai / Cleric / K8sGPT (AI-SRE landscape) · Replit prod-DB-deletion postmortem (Jul 2025) · [better-sqlite3 vs node:sqlite discussion #1245](https://github.com/WiseLibs/better-sqlite3/discussions/1245) · [Node native SQLite](https://blog.logrocket.com/using-built-in-sqlite-module-node-js/).*
+
+---
+
 ## Cross-phase open items (carry forward)
+- **Post-freeze: migrate store to `node:sqlite`** (Node 22 built-in) — kills the better-sqlite3 native-build dependency and lets the fragile regex-SQL JSONL fallback be deleted. Experimental today, so not pre-freeze.
 - ✅ **Audit-trail durability across container restart** — fixed (`87307e5`, named volume + node-owned data dir + loud fallback). **Still must be *executed*:** `docker compose up`, run an incident, recreate the container, confirm the trail persists.
 - ✅ **CI (tsc + tests) on push/PR** — added & green (`946b3c4`); lockfile fixed so `--frozen-lockfile` passes.
 - **🔴 Reconcile Phase 6 onto current `main` before/at merge** — it branched off `df3b3de` (pre-reconciliation) and will revert the Phase 3/4/5 hardening if merged naively. Rebase first, or merge keeping `main`'s `ai/`+`ssh/`+`safety/`+tests and taking only the new `routes/`/SSE.
@@ -439,4 +471,4 @@ The deployment story is now durable in the way the product needs: the audit trai
 
 ---
 
-*Last updated: System-level ops audit — audit-trail durability fixed (named volume + node-owned data dir + loud fallback); CI green (428 tests). Phase 6 still planning-only; real `docker compose` + VM smoke still owed. Append a new section per phase as it is audited.*
+*Last updated: System-level research/reuse audit — stack + architecture validated vs the live AI-SRE market (L0–L5, Replit postmortem); node:sqlite logged as post-freeze reuse. No code change (correct restraint at freeze). CI green (428 tests). Append a new section per phase as it is audited.*
