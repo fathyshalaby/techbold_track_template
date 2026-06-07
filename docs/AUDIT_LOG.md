@@ -505,6 +505,24 @@ Third Phase-7 pass, the workflow lens: does activity-submission match how a supp
 
 **Verdict.** The incident close-out now matches expert behaviour end-to-end (resolve → log → **close ticket** → audit). Full suite **474 → 475**, `tsc` clean, CI ✅. The only Phase-7 path still unproven against reality is the **live Phoenix `createActivity` + `setStatus` contract** — part of the standing real-VM/ERP smoke.
 
+### Phase 7 — Research / Reuse Audit (OSINT & ITSM-standards lens — no code change)
+Final Phase-7 lens: validate the activity-logging / incident-closure design against ITSM standards and AI-postmortem prior art. **Outcome: strong validation, no code change** (the lens's "guilty until proven necessary" rule applies to *adding* complexity too — at freeze, restraint).
+
+**Our activity record IS an ITIL incident-closure record.** The ITIL/ISO-20000 close-out fields — *summary, root cause (RCA), resolution details (steps/fixes), time-to-resolution, confirmation-of-resolution, category* — map ~1:1 onto the Phoenix activity (`summary`, `root_cause`, `actions_taken` + `commands_summary`, `start/end_datetime`, `validation_result`). The schema follows the industry-standard ITIL incident record, not an ad-hoc shape — and the **ticket→DONE close (just added in the ops pass)** is the ITIL "verify resolved + close" step. Validated.
+
+**The activity-log-generator matches AI-SRE best practice exactly.** Auto-drafting incident postmortems/RCA from the timeline is established prior art (Rootly AI postmortems, incident.io auto-draft). The two consensus reliability techniques are (1) **grounding** — "ground the model in the actual incident data, not generic knowledge" (RAG-style) — and (2) **human-in-the-loop** — AI drafts, human reviews/edits/approves. Our generator does **both**: grounded *only* in the audit trail (even stronger than RAG — we pass the exact trail, no retrieval gap) + the technician reviews and submits. The architecture is the documented industry pattern.
+
+**Reuse audit:**
+- *ITIL/ITSM templates* — borrowed the **field set** (already matches); no library to adopt (it's a documentation standard).
+- *Rootly AI Labs / incident.io* — their postmortem generators are platform products, not adoptable libs; we already implement the underlying pattern (ground + HITL-edit). Declined.
+- *ITIL "resolution_type" (permanent fix vs workaround)* — the one standard field we don't capture explicitly. **Cannot be added**: the Phoenix `createActivity` contract is fixed by `phoenix-openapi.yaml` and has no such field; the distinction already lives implicitly in `root_cause`/`actions_taken` (and the validator's VERIFIED-vs-LIKELY persistence check). Not a gap.
+
+**Adjacent knowledge (Nebenwissenschaft):** *ITSM / change management* — the close-out workflow (resolve → document → close → verify) is the ITIL incident lifecycle; we now implement it faithfully. *Knowledge management* — the audit-trail-grounded report is institutional memory (future RAG corpus, à la "past post-mortems"). *Decision science / HCI* — AI-drafts-human-approves is the validated trust pattern for AI-authored records.
+
+**Verdict.** The ERP integration is built to the ITSM standard and the activity generator to the AI-SRE best-practice pattern (grounded + HITL); every reuse candidate is either already adopted (the standard field set / the grounding pattern) or correctly declined (platform products; an ERP-contract-bound field). **No code change** — the right call at freeze.
+
+*Sources: [ITIL incident closure record (IT Process Wiki)](https://wiki.en.it-processmaps.com/index.php/Checklist_Incident_Record) · [ITIL incident resolution & closure (Advisera)](https://advisera.com/20000academy/knowledgebase/incident-resolution-closure-waiting-fat-lady-sing/) · [Rootly AI-generated postmortems](https://rootly.com/sre/ai-generated-postmortems-rootlys-automated-rca-tool) · [incident.io AI SRE](https://incident.io/blog/what-is-ai-sre-complete-guide-2026) · LLM RCA grounding/RAG ([DZone](https://dzone.com/articles/llms-automated-root-cause-analysis-incident-response)).*
+
 ---
 
 ## Cross-phase open items (carry forward)
@@ -530,4 +548,4 @@ Third Phase-7 pass, the workflow lens: does activity-submission match how a supp
 
 ---
 
-*Last updated: Phase 7 ops audit — submit now closes the ERP ticket (setStatus DONE), which was never called. Full suite 475 pass, tsc clean, CI ✅. ALL 7 phases on main; incident close-out matches expert workflow end to end. Remaining: real docker compose + VM/ERP smoke. Append a new section per phase as it is audited.*
+*Last updated: Phase 7 research/reuse audit — activity record validated as an ITIL incident-closure record; generator matches AI-SRE grounded+HITL best practice. No code change (restraint at freeze). ALL 7 phases on main, 475 tests, CI ✅, full lifecycle wired (resolve→log→close ticket→audit). Remaining: real docker compose + VM/ERP smoke. Append a new section per phase as it is audited.*
