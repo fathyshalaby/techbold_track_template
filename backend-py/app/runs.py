@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from . import activity as activity_mod
-from . import agent, llm, safety
+from . import agent, knowledge, llm, memory, safety
 from .config import settings
 from .erp import PhoenixClient
 from .ssh import SSHError, SSHRunner
@@ -165,6 +165,18 @@ def create_run(ticket_id: int) -> Run:
     run = Run("run_" + uuid.uuid4().hex[:8], ticket, system)
     RUNS[run.id] = run
     run.messages = agent.initial_messages(ticket, system)
+    # Inject per-ticket context between the system prompt and the user ticket message:
+    #   1) the single most relevant static runbook, 2) similar past cases from solution memory.
+    extras: list[dict] = []
+    runbook = knowledge.route_runbook(ticket)
+    if runbook:
+        extras.append({"role": "system", "content": runbook})
+    prior = memory.recall(ticket)
+    if prior:
+        extras.append({"role": "system", "content": prior})
+        run.log("system", "recalled", note="injected similar past solved cases from memory")
+    if extras:
+        run.messages[1:1] = extras
     run._ssh = SSHRunner(
         host=system.get("ip"),
         port=int(system.get("port") or 22),
@@ -204,6 +216,7 @@ def _advance(run: Run) -> None:
             run.status = "done"
             run.pending_step_id = None
             run.log("agent", "validated", note=safety.redact(run.conclusion.get("validation_result", "")))
+            memory.save_solution(run)  # self-evolving: this solved case enriches the store for future runs
             if run._ssh:
                 run._ssh.close()
             run.emit()

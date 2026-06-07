@@ -2,10 +2,17 @@
 
 ## Problem
 
-Today, remote IT troubleshooting is manual and under-documented: a technician SSHes into a
-customer VM, tries things, and fixes the issue — but the decisive steps rarely make it into the
-ERP. Knowledge evaporates after every ticket. We build an AI copilot that does the troubleshooting
-**under the technician's control** and **documents every step automatically**.
+techbold's technicians fix customer IT incidents by SSHing into remote Linux VMs and running
+diagnostics and repairs by hand — but that work is **risky** (one careless command on a production
+box can wipe a database) and **under-documented** (the decisive steps rarely reach the ERP, so
+hard-won knowledge evaporates after every ticket). The real challenge isn't "can an LLM suggest
+shell commands" — it's whether an agent can troubleshoot a machine it has **never seen**, fix the
+**root cause** so the fix survives a reboot, and do it under tight human control with a complete
+audit trail and zero destructive actions. So what we build is **trustworthy, self-documenting
+remote troubleshooting**: an AI copilot that proposes one command at a time, a deterministic safety
+layer plus a per-command human gate that make a catastrophic action impossible, an automatic
+write-back that turns the whole session into a proper ERP activity — and a system that gets
+**smarter with every incident it resolves**.
 
 ## Solution overview
 
@@ -46,22 +53,48 @@ precise activity that is written back to the ERP.
    survives a reboot/restart (`systemctl enable --now`, persisted config) — matching the grader's
    reboot/restart persistence check.
 
-5. **Model choice.** Primary is Azure OpenAI `gpt-5.4-nano` (native function calling, cheap, fast).
-   Because it's a small model, tool defs are simple, tool-call JSON is validated with a repair
-   path, and documentation uses structured output. A local model (Qwen3-Coder-30B via LM Studio)
-   is a config-switch fallback for offline/rate-limit resilience — not the primary brain.
+5. **Pluggable models, with a real local fallback.** Three interchangeable providers behind one
+   `LLM_PROVIDER` env var, zero code change: Azure OpenAI `gpt-5.4-nano` (primary — native function
+   calling, cheap, fast), OpenRouter (hosted escape hatch to a stronger model on a hard incident),
+   and a **fully local** model (Qwen3-Coder-30B via LM Studio / Ollama) for offline / rate-limit /
+   data-residency resilience — the agent keeps working with no internet and no customer data leaving
+   the box. Because the primary is a small model, tool defs are kept simple, tool-call JSON is
+   validated with a repair path, and documentation uses structured output, so flipping to the 30B
+   or a hosted model only raises the ceiling. A PII/secret guard scrubs every message *before* it
+   reaches any provider, so the choice of brain never changes the safety posture.
+
+6. **A knowledge harness + an agent that evolves.** Two layers feed the model real Linux expertise
+   instead of leaning on its parametric memory (both in `backend-py`, the demoed build):
+   - **Static knowledge pack** (`docs/knowledge/` → `knowledge.py`): a human-authored *diagnostic
+     playbook* (triage → isolate → root cause → durable fix → validate → document) is baked into the
+     system prompt as the method for **any** incident, alongside four symptom-routed runbooks
+     (systemd services, networking/web/TLS, resource exhaustion, data-access/scheduling) and a
+     command-policy doc. Cheap keyword routing injects the **single most relevant** runbook per
+     ticket — guidance, not a script — so the agent generalises to unseen incidents instead of
+     guessing. Missing files degrade to empty strings; it never raises.
+   - **Self-evolving solution memory** (`memory.py`): a local **SQLite FTS5** store of the agent's
+     *own* solved cases. On `conclude` the solution (symptom → root cause → fix commands →
+     validation) is saved; at the start of each new run, similar past cases are recalled by keyword
+     and injected as the **first hypotheses to check**. Each solved incident makes the next one
+     smarter — a closed learning loop with **zero new dependencies** (stdlib `sqlite3` + FTS5),
+     thread-safe and best-effort (a DB hiccup never breaks a run). Every field passes through
+     `safety.redact()` before insertion, so **no secret ever lands in the store** (rubric C), and the
+     DB persists across container restarts via a Docker volume.
 
 ## Tech stack
 
 React + Vite + TypeScript · FastAPI + paramiko + OpenAI SDK · Hono + Vercel AI SDK v6 (`@ai-sdk/azure`) +
-ssh2 · Azure OpenAI `gpt-5.4-nano` (+ local Qwen fallback) · Docker Compose.
+ssh2 · Pluggable LLM: Azure `gpt-5.4-nano` | OpenRouter | local Qwen3-Coder-30B (LM Studio/Ollama) ·
+Markdown knowledge pack + SQLite FTS5 self-evolving solution memory · Docker Compose.
 
 ## How it maps to the rubric
 
 - **A (ERP workflow):** ERP client with auth/retries; ticket list with sort + status/priority
   filters; system load; complete activity create; clean 401/404/empty handling.
 - **B (troubleshooting):** diagnosis-first agent, minimal/persistent fixes, validation; built for
-  generalisation (no hardcoded incidents).
+  generalisation (no hardcoded incidents), grounded by a static runbook harness and a self-evolving
+  solution memory that recalls the agent's own past fixes; one env var swaps in a stronger/local
+  model for hard incidents.
 - **C (safety/audit):** deny-list, risk-tiered human gate (writes), full audit trail, LLM input
   guard + PII redaction, minimal-change prompting. No secrets in repo/logs/activity.
 - **D (technician UX):** ticket overview + detail with system info, visible agent progress,
@@ -72,7 +105,12 @@ ssh2 · Azure OpenAI `gpt-5.4-nano` (+ local Qwen fallback) · Docker Compose.
 
 ## Known limitations / next steps
 
-- Runs are in-memory (single-user demo); persist to a DB for multi-technician use.
+- Live run state is in-memory (single-user demo); the **solution memory** persists across restarts,
+  but active runs would need a DB for multi-technician use.
+- The knowledge harness + self-evolving memory currently live in `backend-py` (the demoed build);
+  porting them to the Node build is mechanical glue, not yet done.
+- Memory recall is keyword-based (FTS5); semantic embeddings would improve recall on paraphrased
+  symptoms.
 - SSE progress streaming is deferred — the frontend renders progress from each POST response.
 - Per-VM key mapping is solved by trying all keys; a deterministic map would be marginally faster.
 - `gpt-5.4-nano` is small; a stronger model (or the local 30B) would lift hard-incident accuracy.

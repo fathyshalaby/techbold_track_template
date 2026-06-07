@@ -93,6 +93,23 @@ run-as-root DB bypass — all on the deny-list and never executed even if approv
 prompt. 5. **Fewer unnecessary commands/restarts** — one-command-per-turn, diagnosis-first, proportionate
 restarts. 6. **Shorter eval time** — auto-run read-only diagnostics keeps the loop tight.
 
+## Beyond the brief — differentiators (lift B & C, not separately scored)
+
+- **Knowledge harness (`knowledge.py` + `docs/knowledge/`)** — a human-authored diagnostic playbook
+  baked into the system prompt + four symptom-routed runbooks (systemd / networking-web-TLS /
+  resource-exhaustion / data-access-scheduling) + a command-policy doc. Keyword routing injects the
+  *single* most relevant runbook per ticket, so the agent generalises to unseen incidents (→ B).
+- **Self-evolving solution memory (`memory.py`)** — local SQLite **FTS5** store of the agent's own
+  solved cases (symptom → root cause → fix → validation). Saved on `conclude`, recalled into the next
+  run as first hypotheses — a closed learning loop, zero new deps, persisted via a Docker volume.
+  Every field is `safety.redact()`-ed before insert, so no secret reaches the store (→ B & C).
+- **Pluggable models incl. a real local brain** — Azure `gpt-5.4-nano` | OpenRouter | local
+  Qwen3-Coder-30B (LM Studio/Ollama), switched by one `LLM_PROVIDER` env var; offline / rate-limit /
+  data-residency resilience, and a one-flag upgrade path if nano underperforms a hard incident (→ B).
+
+> Honest scope: the knowledge harness + memory currently run in `backend-py` (the demoed build, the
+> one the frontend points at on `:8000`); the Node build does not yet have them.
+
 ## Known gaps (honest)
 - **Live fix success on hidden VMs** is the genuine variable (B). Everything else is verified.
 - **SSE live streaming** has emit hooks in place; full push (`/events` + background drive) is partially wired —

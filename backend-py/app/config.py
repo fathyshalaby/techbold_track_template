@@ -51,5 +51,9 @@ class Settings(BaseSettings):
     # ---- Shared assets ----
     shared_dir: str = "/shared"
 
+    # ---- Knowledge pack (static runbooks) + solution memory (self-evolving SQLite) ----
+    knowledge_dir: str = ""                       # blank -> /knowledge (Docker) or docs/knowledge (local dev)
+    solutions_db_path: str = "data/solutions.db"  # local SQLite FTS5 store the agent writes solved cases to
+
 
 settings = Settings()

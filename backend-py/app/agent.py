@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from . import llm
+from . import knowledge, llm
 
 SYSTEM_PROMPT = """You are an expert Linux service-desk technician's copilot. You troubleshoot ONE \
 customer incident on a remote Ubuntu server over SSH, under the technician's control.
@@ -35,6 +35,9 @@ Safety contract (non-negotiable):
 - One command per run_command call. Avoid chaining with ; && | $() or backticks unless truly required \
 and justified.
 - Minimal changes. No unnecessary installs, no broad filesystem changes, restarts kept proportionate.
+- Use sudo ONLY when a command truly needs root: writing protected files, enabling/restarting \
+services, reading root-only paths. Run ordinary read-only diagnostics WITHOUT sudo so they don't \
+interrupt the technician; if one specific read is denied, retry just that command with sudo.
 - NEVER propose: deleting/reinitialising databases or customer data; chmod -R 777 on system dirs; \
 deleting /etc, /home, /var/lib/postgresql; disabling the firewall/audit/security controls; clearing \
 logs or history; running the app as root to dodge DB permissions.
@@ -44,6 +47,11 @@ not secret contents.
 
 Be decisive and economical — fewer, well-targeted commands score better. You are facing an incident \
 you have never seen; reason from first principles, do not assume a specific product."""
+
+# Embed the static diagnostic playbook (general method for any incident) into the system prompt.
+_PLAYBOOK = knowledge.playbook_block()
+if _PLAYBOOK:
+    SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n" + _PLAYBOOK
 
 TOOLS: list[dict] = [
     {

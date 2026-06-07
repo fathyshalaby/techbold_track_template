@@ -62,8 +62,10 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./keys:/keys:ro          # your SSH private key(s) — git-ignored
-      - ./shared:/shared:ro      # safety rules + prompts (single source of truth)
+      - ./keys:/keys:ro                      # your SSH private key(s) — git-ignored
+      - ./shared:/shared:ro                  # safety rules + prompts (single source of truth)
+      - ./docs/knowledge:/knowledge:ro       # static diagnostic playbook + runbooks for the agent
+      - solutions-db:/app/data               # self-evolving SQLite solution memory (persists across restarts)
     extra_hosts:
       - "host.docker.internal:host-gateway"   # reach host services / local LLM
     healthcheck:
@@ -112,3 +114,6 @@ services:
     depends_on:
       backend-py:
         condition: service_healthy
+
+volumes:
+  solutions-db:   # self-evolving solution memory (SQLite); survives container restarts

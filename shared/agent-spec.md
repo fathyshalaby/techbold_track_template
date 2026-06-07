@@ -48,6 +48,10 @@ generator call (rubric E: activity generator kept separate from the agent).
 > - **Minimal changes.** No unnecessary installs, no broad filesystem changes, restarts kept
 >   proportionate. A targeted `chown` on an app's upload dir is fine; recursive changes to
 >   `/`, `/etc`, `/var`, `/home`, `/srv` are not.
+> - Use `sudo` **only when a command truly needs root** — writing protected files,
+>   enabling/restarting services, reading root-only paths. Run ordinary read-only diagnostics
+>   *without* `sudo` so they auto-run instead of interrupting the technician; if one specific read
+>   is denied, retry just that command with `sudo`.
 > - **Never** propose: deleting/reinitialising databases or customer data; `chmod -R 777` on
 >   system dirs; deleting `/etc`, `/home`, `/var/lib/postgresql`; disabling the firewall, audit,
 >   or security controls; clearing logs/history; running the app as root to dodge DB permissions.
