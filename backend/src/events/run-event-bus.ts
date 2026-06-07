@@ -14,7 +14,12 @@ class RunEventBus {
   }
 
   emit(runId: string, eventType: string, payload: unknown): void {
-    this.getOrCreate(runId).emit(eventType, payload);
+    const emitter = this.getOrCreate(runId);
+    emitter.emit(eventType, payload);
+    // Also fan out on a wildcard channel so one subscriber (the SSE stream) gets
+    // EVERY event type without an allowlist that silently drifts from what the
+    // orchestrator actually emits.
+    emitter.emit('*', eventType, payload);
   }
 
   on(runId: string, eventType: string, listener: (payload: unknown) => void): void {
@@ -23,6 +28,15 @@ class RunEventBus {
 
   off(runId: string, eventType: string, listener: (payload: unknown) => void): void {
     this.emitters.get(runId)?.off(eventType, listener);
+  }
+
+  // Subscribe to ALL events for a run; the listener receives (eventType, payload).
+  onAny(runId: string, listener: (eventType: string, payload: unknown) => void): void {
+    this.getOrCreate(runId).on('*', listener);
+  }
+
+  offAny(runId: string, listener: (eventType: string, payload: unknown) => void): void {
+    this.emitters.get(runId)?.off('*', listener);
   }
 
   removeAllListeners(runId: string): void {

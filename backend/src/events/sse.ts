@@ -37,29 +37,25 @@ export function createSseStream(c: Context, runId: string) {
       });
     }
 
-    const listeners = new Map<string, (payload: unknown) => void>();
-
-    for (const eventType of SSE_EVENT_TYPES) {
-      const listener = (payload: unknown) => {
-        void stream.writeSSE({
-          data: JSON.stringify({
-            type: eventType,
-            runId,
-            ts: new Date().toISOString(),
-            payload,
-          }),
-          event: eventType,
-          id: ulid(),
-        });
-      };
-      listeners.set(eventType, listener);
-      runEventBus.on(runId, eventType, listener);
-    }
+    // Subscribe to ALL events for this run via the wildcard channel, so every
+    // event the orchestrator emits streams live — no allowlist to drift out of
+    // sync with the real event names (the prior fixed list missed several).
+    const anyListener = (eventType: string, payload: unknown) => {
+      void stream.writeSSE({
+        data: JSON.stringify({
+          type: eventType,
+          runId,
+          ts: new Date().toISOString(),
+          payload,
+        }),
+        event: eventType,
+        id: ulid(),
+      });
+    };
+    runEventBus.onAny(runId, anyListener);
 
     stream.onAbort(() => {
-      for (const [eventType, listener] of listeners) {
-        runEventBus.off(runId, eventType, listener);
-      }
+      runEventBus.offAny(runId, anyListener);
     });
 
     while (!stream.aborted) {
