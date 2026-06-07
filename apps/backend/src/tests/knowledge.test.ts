@@ -65,7 +65,9 @@ describe("encoded knowledge - fault-family completeness (covers the real inciden
   });
 
   it("name-resolution: routes to networking with /etc/hosts + getent technique", () => {
-    const d = selectRunbooks("cannot reach the partner dependency host, name resolves to a wrong ip");
+    const d = selectRunbooks(
+      "cannot reach the partner dependency host, name resolves to a wrong ip",
+    );
     expect(d).toMatch(/\/etc\/hosts/);
     expect(d).toMatch(/getent hosts/);
   });
@@ -77,13 +79,17 @@ describe("encoded knowledge - fault-family completeness (covers the real inciden
   });
 
   it("file-ownership: writable-dir + preserve-existing-data guidance is present", () => {
-    const d = selectRunbooks("uploads return a server error, the directory is not writable by the service user");
+    const d = selectRunbooks(
+      "uploads return a server error, the directory is not writable by the service user",
+    );
     expect(d).toMatch(/chown/);
     expect(d).toMatch(/preserve existing|existing data is intact|existing files/i);
   });
 
   it("bad drop-in override: systemctl cat reveals the override as the cause", () => {
-    const d = selectRunbooks("service is active but shows stale data, a bad environment override is set");
+    const d = selectRunbooks(
+      "service is active but shows stale data, a bad environment override is set",
+    );
     expect(d).toMatch(/drop-in|override/i);
     expect(d).toMatch(/systemctl cat/);
   });
