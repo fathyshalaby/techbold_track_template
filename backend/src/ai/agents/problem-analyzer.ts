@@ -4,6 +4,7 @@ import { getModel } from '../model.js';
 import { DiagnosticProposalSchema } from '../types.js';
 import { PROBLEM_ANALYZER_SYSTEM_PROMPT } from '../prompts.js';
 import { selectRunbooks } from '../knowledge.js';
+import { guardModelInput } from '../input-guard.js';
 
 export { DiagnosticProposalSchema };
 export type { DiagnosticProposal } from '../types.js';
@@ -51,7 +52,7 @@ export async function runProblemAnalyzer(
         model: resolvedModel,
         schema: DiagnosticProposalSchema,
         system: PROBLEM_ANALYZER_SYSTEM_PROMPT,
-        prompt: JSON.stringify({
+        prompt: guardModelInput({
           ticketDescription: input.ticketDescription,
           observations: input.observations,
           ...(runbook ? { runbook } : {}),

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getModel } from '../model.js';
 import { CUSTOMER_SYSTEM_ANALYZER_SYSTEM_PROMPT } from '../prompts.js';
 import { AgentUnavailableError } from './problem-analyzer.js';
+import { guardModelInput } from '../input-guard.js';
 
 export { AgentUnavailableError };
 
@@ -29,7 +30,7 @@ export async function runCustomerSystemAnalyzer(
         model: resolvedModel,
         schema: CustomerSystemContextSchema,
         system: CUSTOMER_SYSTEM_ANALYZER_SYSTEM_PROMPT,
-        prompt: JSON.stringify({
+        prompt: guardModelInput({
           ticketDescription: input.ticketDescription,
           observations: input.observations,
         }),

@@ -23,6 +23,17 @@ const SAFE_READ_ONLY_PATTERNS: RegExp[] = [
   // curl read-only probes
   /^curl\s+-I\s+\S+$/,
   /^curl\s+-s\s+-o\s+\/dev\/null\s+-w\s+\S+\s+\S+$/,
+  // Config validation / version checks — inspect-only, never mutate state.
+  // (nginx -t, apache configtest, sshd -t, etc. are standard read-only probes.)
+  /^nginx\s+-t$/,
+  /^(apachectl|apache2ctl)\s+(configtest|-t)$/,
+  /^sshd\s+-t$/,
+  /^named-checkconf(\s+\S+)?$/,
+  /^postconf\s+-n$/,
+  /^(php|node)\s+-v$/,
+  /^python3?\s+--version$/,
+  /^psql\s+--version$/,
+  /^systemctl\s+--version$/,
   // File reads — non-secret paths only; secret-path rejection handled in policy
   /^cat\s+(?!.*\/etc\/shadow)(?!.*\/.ssh\/)(?!.*\.env)\S+$/,
   /^tail\s+-n\s+\d+\s+\S+$/,

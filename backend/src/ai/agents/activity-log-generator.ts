@@ -5,6 +5,7 @@ import { ACTIVITY_LOG_GENERATOR_SYSTEM_PROMPT } from '../prompts.js';
 import { ActivityDraftFieldsSchema } from '../types.js';
 import type { ActivityDraftFields } from '../types.js';
 import { AgentUnavailableError } from './problem-analyzer.js';
+import { guardModelInput } from '../input-guard.js';
 
 export { AgentUnavailableError };
 export { ActivityDraftFieldsSchema };
@@ -37,7 +38,7 @@ export async function runActivityLogGenerator(
         model: resolvedModel,
         schema: ActivityDraftFieldsSchema,
         system: ACTIVITY_LOG_GENERATOR_SYSTEM_PROMPT,
-        prompt: JSON.stringify(input),
+        prompt: guardModelInput(input),
         maxTokens: 2048,
       }),
       new Promise<never>((_, rej) => {

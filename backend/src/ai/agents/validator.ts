@@ -5,6 +5,7 @@ import { VALIDATOR_SYSTEM_PROMPT } from '../prompts.js';
 import { ValidationResultSchema } from '../types.js';
 import type { ValidationResult } from '../types.js';
 import { AgentUnavailableError } from './problem-analyzer.js';
+import { guardModelInput } from '../input-guard.js';
 
 export { AgentUnavailableError };
 export { ValidationResultSchema };
@@ -34,7 +35,7 @@ export async function runValidator(
         model: resolvedModel,
         schema: ValidationResultSchema,
         system: VALIDATOR_SYSTEM_PROMPT,
-        prompt: JSON.stringify({
+        prompt: guardModelInput({
           ticketDescription: input.ticketDescription,
           observations: input.observations,
           fixApplied: input.fixApplied,

@@ -6,6 +6,7 @@ import { FixProposalSchema } from '../types.js';
 import type { FixProposal } from '../types.js';
 import { AgentUnavailableError } from './problem-analyzer.js';
 import { selectRunbooks } from '../knowledge.js';
+import { guardModelInput } from '../input-guard.js';
 
 export { AgentUnavailableError };
 export { FixProposalSchema };
@@ -30,7 +31,7 @@ export async function runProblemSolver(
         model: resolvedModel,
         schema: FixProposalSchema,
         system: PROBLEM_SOLVER_SYSTEM_PROMPT,
-        prompt: JSON.stringify({
+        prompt: guardModelInput({
           ticketDescription: input.ticketDescription,
           observations: input.observations,
           ...(runbook ? { runbook } : {}),
