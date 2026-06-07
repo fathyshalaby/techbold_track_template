@@ -41,7 +41,7 @@ const TARGET: SshTarget = {
   host: "10.0.0.1",
   port: 22,
   username: "azureuser",
-  privateKeyPath: "/keys/test.pem",
+  privateKeyPaths: ["/keys/test.pem"],
 };
 
 describe("ssh-mock", () => {

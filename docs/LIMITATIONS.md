@@ -1,4 +1,4 @@
-# Limitations: Service Desk Autopilot
+# Limitations: Sphinx
 
 Last updated: 2026-06-07.
 
@@ -6,27 +6,26 @@ This file lists current limits and accepted blockers. It is intentionally conser
 
 ## Scope Limits
 
-| Limit | Current stance |
-|---|---|
-| Fully autonomous remediation | Out of scope. A human approves or edits every command before execution. |
-| Enterprise deployment hardening | Out of scope. No auth layer, RBAC, queue, Kubernetes, or multi-tenant controls. |
-| Generic shell assistant | Out of scope. The product is scoped to service-desk incidents from Phoenix tickets. |
-| Hidden VM guarantee | Not claimed. The system is designed for generalization, but this workspace lacks real VM access. |
-| Production frontend hosting | Out of scope. The primary UI is the local Next.js dashboard on port 3000. |
-| Vite frontend ownership | The Vite app is a temporary compatibility fallback on port 5173 until documented dashboard parity and retirement criteria are satisfied. |
-| Postgres and pgvector | Deferred to Phase 2 and Phase 3. Phase 1 still uses the current backend store path. |
-| RAG memory implementation | Deferred to Phase 4. Phase 1 memory panels are read-only deferred statuses. |
-| Observability instrumentation | Deferred to Phase 5. Phase 1 observability panels are read-only deferred or health-only statuses. |
-| Full v1.3 integration | Deferred to Phase 6. Phase 1 does not claim the full dashboard-to-memory-to-observability integration path. |
+| Limit                           | Current stance                                                                                                                                                               |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fully autonomous remediation    | Out of scope. A human approves or edits every command before execution.                                                                                                      |
+| Enterprise deployment hardening | Out of scope. No auth layer, RBAC, queue, Kubernetes, or multi-tenant controls.                                                                                              |
+| Generic shell assistant         | Out of scope. The product is scoped to service-desk incidents from Phoenix tickets.                                                                                          |
+| Hidden VM guarantee             | Not claimed. The system is designed for generalization, but this workspace lacks real VM access.                                                                             |
+| Production frontend hosting     | Out of scope. The UI is the local Next.js dashboard on port 3000.                                                                                                            |
+| Postgres and pgvector           | Available when `DATABASE_URL` points at a Postgres instance with the pgvector extension. Docker Compose starts `db` automatically.                                           |
+| RAG memory implementation       | Implemented. Validated run solutions are embedded into pgvector; agents retrieve similar past solutions before proposing diagnostics/fixes. Seed corpus loads on first boot. |
+| Observability instrumentation   | Deferred to Phase 5. Phase 1 observability panels are read-only deferred or health-only statuses.                                                                            |
+| Full v1.3 integration           | Deferred to Phase 6. Phase 1 does not claim the full dashboard-to-memory-to-observability integration path.                                                                  |
 
 ## Current External Blockers
 
-| Area | Blocker | Effect |
-|---|---|---|
-| Phoenix | Placeholder `PHOENIX_API_TOKEN` | Live API calls return `401 Invalid team token`. |
-| SSH | Missing `/keys/your-key.pem` | No real VM command can be attempted safely. |
-| VM target | No real host/port from Phoenix | SSH and sudo cannot be validated. |
-| LLM | Placeholder `OPENAI_API_KEY` | Real model loop cannot be validated. |
+| Area      | Blocker                         | Effect                                          |
+| --------- | ------------------------------- | ----------------------------------------------- |
+| Phoenix   | Placeholder `PHOENIX_API_TOKEN` | Live API calls return `401 Invalid team token`. |
+| SSH       | Missing `/keys/your-key.pem`    | No real VM command can be attempted safely.     |
+| VM target | No real host/port from Phoenix  | SSH and sudo cannot be validated.               |
+| LLM       | Placeholder `OPENAI_API_KEY`    | Real model loop cannot be validated.            |
 
 Exact Phase 4 evidence is in `.planning/phases/04-real-integration-validation/04-VERIFICATION.md`.
 
@@ -48,7 +47,7 @@ Mock mode does not prove:
 - `azureuser` has passwordless sudo.
 - A real LLM can complete the troubleshooting loop.
 - A hidden VM incident can be solved.
-- Postgres, pgvector, RAG memory, or observability instrumentation is implemented.
+- Postgres/pgvector/RAG memory or observability instrumentation is implemented for memory only; observability remains deferred.
 
 ## Safety Boundaries
 
@@ -69,10 +68,10 @@ The deterministic gate reduces hard-fail risk, but it is not a sandbox.
 
 ## Demo Fallbacks
 
-| Risk | Fallback |
-|---|---|
-| Phoenix token missing or expired | Keep `MOCK_MODE=true` and use seeded mock tickets. |
-| SSH key or VM unavailable | Use mock SSH in the deterministic demo path. |
-| LLM key unavailable or rate-limited | Use the built-in mock model path. |
-| Browser plugin unavailable | Use the recorded fallback browser UAT evidence in Phase 2. |
-| Real validation requested | Use Phase 4 blocker notes and list exact missing inputs. |
+| Risk                                | Fallback                                                   |
+| ----------------------------------- | ---------------------------------------------------------- |
+| Phoenix token missing or expired    | Keep `MOCK_MODE=true` and use seeded mock tickets.         |
+| SSH key or VM unavailable           | Use mock SSH in the deterministic demo path.               |
+| LLM key unavailable or rate-limited | Use the built-in mock model path.                          |
+| Browser plugin unavailable          | Use the recorded fallback browser UAT evidence in Phase 2. |
+| Real validation requested           | Use Phase 4 blocker notes and list exact missing inputs.   |

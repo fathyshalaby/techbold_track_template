@@ -110,7 +110,25 @@ def main(
     if not allow_quality_warnings:
         fail_on_blocking_issues(audits)
 
-    if use_examples:
+    explicit_split = any(
+        isinstance(record.get("meta"), dict) and record["meta"].get("split") in {"train", "eval"}
+        for record in records
+    )
+
+    if explicit_split:
+        train = [
+            record
+            for record in records
+            if not isinstance(record.get("meta"), dict) or record["meta"].get("split") != "eval"
+        ]
+        eval_rows = [
+            record
+            for record in records
+            if isinstance(record.get("meta"), dict) and record["meta"].get("split") == "eval"
+        ]
+        if not train or not eval_rows:
+            raise typer.BadParameter("Explicit meta.split data must include train and eval rows.")
+    elif use_examples:
         train = [
             record
             for path, rows in records_by_file.items()

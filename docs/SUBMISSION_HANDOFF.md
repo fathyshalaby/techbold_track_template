@@ -14,7 +14,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-3. Open `http://localhost:5173`.
+3. Open `http://localhost:3000`.
 4. Confirm backend health at `http://localhost:8000/health`.
 5. Start the primary status-api ticket.
 6. Click through the agent steps until the diagnostic approval appears.
@@ -28,17 +28,18 @@ docker compose up --build
 
 ## Evidence to Cite
 
-| Claim | Evidence |
-|---|---|
-| Fresh clone Docker Compose startup works | `.planning/phases/01-fresh-clone-runtime-validation/01-VERIFICATION.md` |
-| Browser UAT works in mounted frontend | `.planning/phases/02-browser-sse-uat/02-VERIFICATION.md` |
-| SSE lifecycle updates are observed | `.planning/phases/02-browser-sse-uat/02-VERIFICATION.md` |
-| Vertical-slice coverage exists | `.planning/phases/03-vertical-slice-coverage/03-VERIFICATION.md` |
-| Real integrations are blocked with exact causes | `.planning/phases/04-real-integration-validation/04-VERIFICATION.md` |
+| Claim                                           | Evidence                                                                 |
+| ----------------------------------------------- | ------------------------------------------------------------------------ |
+| Fresh clone Docker Compose startup works        | [`README.md`](../README.md) quick start; `docker compose up --build`     |
+| Browser workflow and SSE lifecycle              | [`apps/dashboard/app/dashboard/dashboard.test.tsx`](../apps/dashboard/app/dashboard/dashboard.test.tsx) |
+| Run creation, approvals, validation, activity   | [`apps/backend/src/tests/runs.test.ts`](../apps/backend/src/tests/runs.test.ts), [`orchestrator.test.ts`](../apps/backend/src/tests/orchestrator.test.ts) |
+| SSE audit and bus symmetry                      | [`apps/backend/src/tests/sse-audit-symmetry.test.ts`](../apps/backend/src/tests/sse-audit-symmetry.test.ts) |
+| Safety gating and command policy                | [`apps/backend/src/tests/safety.test.ts`](../apps/backend/src/tests/safety.test.ts), [`safety-policy.test.ts`](../apps/backend/src/tests/safety-policy.test.ts) |
+| Full CI gate (lint, test, build)                | Root `package.json` script `bun run check`                               |
 
 ## Submission Summary
 
-Service Desk Autopilot is a technician-controlled AI troubleshooting copilot. It loads Phoenix tickets, proposes one command at a time, gates every command through deterministic safety checks, executes only technician-approved commands, validates the result, and drafts an ERP activity from the audit trail.
+Sphinx is a technician-controlled AI troubleshooting copilot. It loads Phoenix tickets, proposes one command at a time, gates every command through deterministic safety checks, executes only technician-approved commands, validates the result, and drafts an ERP activity from the audit trail.
 
 Current verified path:
 
@@ -70,4 +71,4 @@ To move from mock evidence to real evidence, provide:
 3. Practice VM access through Phoenix customer-system data.
 4. Real LLM credential for the selected provider.
 
-Then rerun Phase 4 checks from `.planning/phases/04-real-integration-validation/04-VERIFICATION.md`.
+Then rerun live integration checks with real credentials listed above and confirm `/health` reports `"mode": "real"`.

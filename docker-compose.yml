@@ -1,11 +1,47 @@
+# Single source of truth for the local stack (Mac dev).
+#
+#   docker compose up --build                      core demo (backend + frontend), mock mode
+#   docker compose --profile sandbox up sandbox     build + run the 5 fake-VM incidents
+#
+# The trained adapter runs on the Mac host via MLX (`bun run model:serve`, :8011).
+# The compose backend reaches it through host.docker.internal. Set MOCK_LLM=false in
+# .env to route live agent calls to the adapter.
 services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: autopilot
+      POSTGRES_PASSWORD: autopilot
+      POSTGRES_DB: autopilot
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autopilot -d autopilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
     env_file:
       - path: .env
         required: false
+    environment:
+      DATABASE_URL: postgresql://autopilot:autopilot@db:5432/autopilot
+      # The repo keys/ dir is mounted read-only at /keys (see volumes below). Pin
+      # the key directory to that container path so live SSH works regardless of
+      # any host-absolute SSH_PRIVATE_KEY_DIR left in .env (the env block wins
+      # over env_file). The executor tries every *.pem in it until one auths.
+      SSH_PRIVATE_KEY_DIR: ${SSH_PRIVATE_KEY_DIR_CONTAINER:-/keys}
+      # Trained MLX adapter on the Mac host (bun run model:serve, :8011).
+      CUSTOM_MODEL_BASE_URL: ${CUSTOM_MODEL_BASE_URL:-http://host.docker.internal:8011/v1}
+      CUSTOM_MODEL_SERVED_ID: ${CUSTOM_MODEL_SERVED_ID:-mlx-community/Qwen2.5-1.5B-Instruct-4bit}
     ports:
       - "8000:8000"
     volumes:
@@ -13,58 +49,78 @@ services:
       - autopilot-data:/app/apps/backend/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
 
   frontend:
     build:
       context: .
       dockerfile: apps/dashboard/Dockerfile
+      args:
+        # Baked into the client bundle at build time (Next inlines NEXT_PUBLIC_*).
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8000}
+    restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_BASE: http://localhost:8000
+      # Server-rendered code reads this at runtime; the browser bundle uses the
+      # build arg above. Both default to the host-mapped backend port.
+      NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8000}
+      # Server-rendered pages run inside this container and reach the backend
+      # by its compose service name.
+      API_BASE_INTERNAL: http://backend:8000
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
 
-  frontend-vite:
+  # One-shot seeder that builds and launches the systemd "fake VM" incidents on
+  # the host Docker daemon, then injects each fault and exits. The VMs bind SSH on
+  # the host (127.0.0.1:2201-2205); the backend reaches them via host.docker.internal.
+  # Point the backend at the sandbox by setting MOCK_SCENARIOS=true (and SSH vars)
+  # in .env. Requires keys/bench_incident_key.pub.
+  sandbox:
     profiles:
-      - fallback
+      - sandbox
     build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
+      context: ./infra/sandbox
+      dockerfile: Dockerfile.seed
     environment:
-      VITE_API_BASE: http://localhost:8000
-    ports:
-      - "5173:5173"
-    depends_on:
-      - backend
-
-  model:
-    profiles:
-      - model
-    build:
-      context: ./apps/model
-      dockerfile: Dockerfile
-    environment:
-      PORT: 8001
-      HF_HOME: /workspace/model/.cache/huggingface
-      HF_TOKEN: ${HF_TOKEN:-}
-      BASE_MODEL: ${MODEL_BASE_MODEL:-mistralai/Ministral-3-14B-Instruct-2512}
-      ADAPTER_PATH: ${MODEL_ADAPTER_PATH:-outputs/adapter}
-      LORA_NAME: ${MODEL_LORA_NAME:-msp}
-    ports:
-      - "${MODEL_PORT:-8001}:8001"
+      SANDBOX_CASE_COUNT: ${SANDBOX_CASE_COUNT:-5}
+      SANDBOX_DOCKER_PRIVILEGED: ${SANDBOX_DOCKER_PRIVILEGED:-true}
+      SANDBOX_SSH_HOST: ${SANDBOX_SSH_HOST:-host.docker.internal}
     volumes:
-      - ./apps/model/outputs:/workspace/model/outputs:ro
-      - model-hf-cache:/workspace/model/.cache/huggingface
-    command: make serve
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./infra/sandbox:/workspace
+      - ./keys:/keys:ro
+    working_dir: /workspace
+    command: bun run seed.ts up
+    restart: "no"
 
 volumes:
   autopilot-data:
-  model-hf-cache:
+  pgdata:

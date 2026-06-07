@@ -111,3 +111,17 @@ export interface ActivityStateSummary {
   updatedAt: string | null;
   source: SourceLabel;
 }
+
+export interface MemoryIncidentSummary {
+  runId: string;
+  ticketId: number;
+  ticketTitle: string | null;
+  customerName: string | null;
+  status: string;
+  rootCause: string | null;
+  durableFix: string | null;
+  validationResult: string | null;
+  resolvedAt: string | null;
+  state: "not-drafted" | "drafted" | "submitted";
+  source: SourceLabel;
+}

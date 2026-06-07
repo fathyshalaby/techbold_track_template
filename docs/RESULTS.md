@@ -1,4 +1,4 @@
-# Results: Service Desk Autopilot
+# Results: Sphinx
 
 Last verified: 2026-06-07.
 
@@ -15,26 +15,26 @@ docker compose up --build
 
 Results:
 
-| Check | Result | Evidence |
-|---|---|---|
-| Backend tests | Pass, 27 files and 559 tests in the Phase 3 focused run | `.planning/phases/03-vertical-slice-coverage/03-VERIFICATION.md` |
-| Backend typecheck | Pass | `.planning/phases/03-vertical-slice-coverage/03-VERIFICATION.md` |
-| Fresh Docker Compose startup | Pass in mock mode | `.planning/phases/01-fresh-clone-runtime-validation/01-VERIFICATION.md` |
-| Browser UAT | Pass in mock mode | `.planning/phases/02-browser-sse-uat/02-VERIFICATION.md` |
-| Real integrations | Blocked by exact missing inputs | `.planning/phases/04-real-integration-validation/04-VERIFICATION.md` |
+| Check                        | Result                                                  | Evidence                                                                |
+| ---------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Backend tests                | Pass, 27 files and 559 tests in the Phase 3 focused run | `.planning/phases/03-vertical-slice-coverage/03-VERIFICATION.md`        |
+| Backend typecheck            | Pass                                                    | `.planning/phases/03-vertical-slice-coverage/03-VERIFICATION.md`        |
+| Fresh Docker Compose startup | Pass in mock mode                                       | `.planning/phases/01-fresh-clone-runtime-validation/01-VERIFICATION.md` |
+| Browser UAT                  | Pass in mock mode                                       | `.planning/phases/02-browser-sse-uat/02-VERIFICATION.md`                |
+| Real integrations            | Blocked by exact missing inputs                         | `.planning/phases/04-real-integration-validation/04-VERIFICATION.md`    |
 
 ## Current Build Status
 
-| Area | Status | Notes |
-|---|---|---|
-| Backend API | Built | Hono routes for tickets, runs, approvals, SSE, activity draft, and activity submit. |
-| Frontend | Built | React/Vite workspace at `apps/frontend/src/App.tsx`. |
-| Safety gate | Built and tested | Proposal check and edited-command recheck before execution. |
-| Audit trail | Built and tested | SQLite durable store plus JSONL mock fallback. |
-| Mock Phoenix, SSH, LLM | Built and tested | Supports offline demo and deterministic coverage. |
-| Real Phoenix | Blocked | Endpoint reachable, placeholder token returns `401 Invalid team token`. |
-| Real SSH and sudo | Blocked | Missing key at `/keys/your-key.pem`; no real VM host/port available without Phoenix token. |
-| Real LLM | Blocked | `OPENAI_API_KEY` is a placeholder. |
+| Area                   | Status           | Notes                                                                                      |
+| ---------------------- | ---------------- | ------------------------------------------------------------------------------------------ |
+| Backend API            | Built            | Hono routes for tickets, runs, approvals, SSE, activity draft, and activity submit.        |
+| Frontend               | Built            | Next.js dashboard at `apps/dashboard`.                                                     |
+| Safety gate            | Built and tested | Proposal check and edited-command recheck before execution.                                |
+| Audit trail            | Built and tested | SQLite durable store plus JSONL mock fallback.                                             |
+| Mock Phoenix, SSH, LLM | Built and tested | Supports offline demo and deterministic coverage.                                          |
+| Real Phoenix           | Blocked          | Endpoint reachable, placeholder token returns `401 Invalid team token`.                    |
+| Real SSH and sudo      | Blocked          | Missing key at `/keys/your-key.pem`; no real VM host/port available without Phoenix token. |
+| Real LLM               | Blocked          | `OPENAI_API_KEY` is a placeholder.                                                         |
 
 ## Vertical Slice Evidence
 
@@ -61,7 +61,7 @@ docker compose up --build
 
 Open:
 
-- Frontend: `http://localhost:5173`
+- Dashboard: `http://localhost:3000`
 - Backend health: `http://localhost:8000/health`
 
 Mock mode is the only fully verified path in this workspace. It demonstrates the primary workflow without Phoenix credentials, SSH key material, or LLM credentials.
@@ -70,12 +70,12 @@ Mock mode is the only fully verified path in this workspace. It demonstrates the
 
 Real integration validation did not succeed because required external inputs are missing.
 
-| Integration | Status | Exact blocker |
-|---|---|---|
-| Phoenix | Blocked | `PHOENIX_API_TOKEN` is still `your-phoenix-token-here`; `/api/v1/me` returns 401. |
-| SSH | Blocked | `/keys/your-key.pem` does not exist and no real VM host/port is available. |
-| Sudo | Blocked | Cannot run `sudo -n true` until SSH succeeds. |
-| LLM | Blocked | `OPENAI_API_KEY` is still `your-openai-key-here`. |
+| Integration | Status  | Exact blocker                                                                     |
+| ----------- | ------- | --------------------------------------------------------------------------------- |
+| Phoenix     | Blocked | `PHOENIX_API_TOKEN` is still `your-phoenix-token-here`; `/api/v1/me` returns 401. |
+| SSH         | Blocked | `/keys/your-key.pem` does not exist and no real VM host/port is available.        |
+| Sudo        | Blocked | Cannot run `sudo -n true` until SSH succeeds.                                     |
+| LLM         | Blocked | `OPENAI_API_KEY` is still `your-openai-key-here`.                                 |
 
 ## Requirement Status
 

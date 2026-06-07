@@ -9,11 +9,11 @@
     "ignore": [
       "node_modules",
       "**/dist",
+      "**/.next",
       "**/*.tsbuildinfo",
       "apps/model/outputs",
       "apps/model/data/processed",
       "graphify-out",
-      "tools/demo",
       ".planning",
       "docs/AUDIT_LOG.md",
       "docs/phoenix-openapi.yaml"
@@ -59,6 +59,23 @@
           },
           "performance": {
             "noDelete": "off"
+          }
+        }
+      }
+    },
+    {
+      "include": ["apps/dashboard/components/ui/**"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useFocusableInteractive": "off",
+            "useSemanticElements": "off"
+          },
+          "correctness": {
+            "useExhaustiveDependencies": "off"
+          },
+          "security": {
+            "noDangerouslySetInnerHtml": "off"
           }
         }
       }

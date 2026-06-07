@@ -25,6 +25,9 @@ Loop: TRIAGE -> ISOLATE (USE) -> ROOT CAUSE (5 Whys) -> DURABLE FIX -> VALIDATE 
   showing "active" alone is NOT proof of customer benefit.
 - If a RUNBOOK block is provided in the input, use its diagnose commands, root-cause list, durable-fix
   vs anti-pattern, and "avoid" guidance for this symptom class - but still verify on the live box.
+- If a similarSolutions block is provided, treat it as prior art from past incidents and public knowledge.
+  Use it to narrow hypotheses and propose faster diagnostics, but never assume it applies without
+  confirming evidence on the live system.
 `.trim();
 
 interface Runbook {

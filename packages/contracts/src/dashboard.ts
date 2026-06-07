@@ -2,7 +2,9 @@ import type {
   ActivityStateSummary,
   AuditEvidenceSummary,
   DashboardRunSummary,
+  MemoryIncidentSummary,
   PendingApprovalSummary,
+  RiskLevel,
 } from "./runs.js";
 import type { SourceLabel, TicketSummary } from "./tickets.js";
 
@@ -21,18 +23,61 @@ export interface HealthSummary {
   source: SourceLabel;
 }
 
+export interface ObservabilityMetrics {
+  runs: {
+    total: number;
+    active: number;
+    completed: number;
+    failed: number;
+    aborted: number;
+    successRate: number | null;
+  };
+  approvals: {
+    total: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+    byRisk: Record<RiskLevel, number>;
+  };
+  commands: {
+    executed: number;
+    failed: number;
+    timedOut: number;
+    avgDurationMs: number | null;
+  };
+  auditByActor: Record<string, number>;
+}
+
+export interface MemoryEntrySummary {
+  id: string;
+  source: "run" | "runbook" | "training-contract" | "public-seed";
+  symptom: string;
+  rootCause: string;
+  fix: string;
+  score: number;
+}
+
+export interface MemoryStatsSummary {
+  total: number;
+  bySource: Record<MemoryEntrySummary["source"], number>;
+}
+
 export interface DashboardMemoryStatus {
   status: "deferred" | "unavailable" | "available";
   label: "Deferred" | "Unavailable" | "Live backend";
-  message: "Memory evidence is deferred to Phase 3 and Phase 4." | string;
+  message: string;
   source: SourceLabel;
+  incidents?: MemoryIncidentSummary[];
+  stats?: MemoryStatsSummary;
+  entries?: MemoryEntrySummary[];
 }
 
 export interface DashboardObservabilityStatus {
   status: "deferred" | "health-only" | "available";
   label: "Deferred" | "Live backend";
-  message: "Operational signals are deferred to Phase 5." | string;
+  message: string;
   source: SourceLabel;
+  metrics?: ObservabilityMetrics;
 }
 
 export interface DashboardResponse {

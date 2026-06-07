@@ -1,0 +1,13 @@
+# Shared base for every sandbox archetype. Runs the slow apt install + ssh/user
+# setup exactly once so per-VM builds only layer on the archetype-specific bits.
+FROM ubuntu:22.04
+
+ENV container=docker
+ENV DEBIAN_FRONTEND=noninteractive
+ARG BENCH_PUBLIC_KEY
+
+COPY archetypes/common/setup-base.sh /tmp/setup-base.sh
+RUN chmod +x /tmp/setup-base.sh && /tmp/setup-base.sh "$BENCH_PUBLIC_KEY"
+
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]

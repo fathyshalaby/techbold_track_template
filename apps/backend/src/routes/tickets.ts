@@ -8,6 +8,11 @@ import {
   PhoenixNotFoundError,
   PhoenixValidationError,
 } from "../phoenix/client.js";
+import {
+  getOverlayCustomerSystem,
+  getOverlayTicket,
+  mergeDynamicTickets,
+} from "../phoenix/dynamic-overlay.js";
 import MockPhoenixClient from "../phoenix/mock.js";
 import { TicketStatusSchema } from "../phoenix/types.js";
 
@@ -35,7 +40,7 @@ ticketsRouter.get("/", async (c) => {
   const query = parsed.data;
 
   try {
-    const tickets = await getClient().listTickets(query);
+    const tickets = mergeDynamicTickets(await getClient().listTickets(query));
     return c.json(tickets, 200);
   } catch (err) {
     if (err instanceof PhoenixAuthError) {
@@ -60,6 +65,9 @@ ticketsRouter.get("/:id/customer-system", async (c) => {
   if (!Number.isInteger(id) || id <= 0) {
     return c.json({ error: "invalid ticket id" }, 400);
   }
+
+  const overlaySystem = getOverlayCustomerSystem(id);
+  if (overlaySystem) return c.json(overlaySystem, 200);
 
   try {
     const customerSystem = await getClient().getCustomerSystem(id);
@@ -87,6 +95,9 @@ ticketsRouter.get("/:id", async (c) => {
   if (!Number.isInteger(id) || id <= 0) {
     return c.json({ error: "invalid ticket id" }, 400);
   }
+
+  const overlayTicket = getOverlayTicket(id);
+  if (overlayTicket) return c.json(overlayTicket, 200);
 
   try {
     const ticket = await getClient().getTicket(id);

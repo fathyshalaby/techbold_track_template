@@ -1,12 +1,13 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { AppSidebar, SIDEBAR_ITEMS } from "@/components/app-sidebar";
-import { RunWorkflow } from "@/components/run-workflow";
-import { TicketTable } from "@/components/ticket-table";
+import { RunConversation } from "@/components/run-conversation";
+import { TicketsDataTable } from "@/components/tickets-data-table";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import * as api from "@/lib/api";
 import { sourceLabel } from "@/lib/source-labels";
 import type { DashboardResponse, RunDetail } from "@techbold/contracts";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import BackendStatusPage from "./backend-status/page";
@@ -21,6 +22,7 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
   useRouter: () => ({ push, refresh }),
+  usePathname: () => "/dashboard",
 }));
 
 vi.mock("next/link", () => ({
@@ -62,29 +64,25 @@ describe("dashboard shell and data mapping", () => {
   it("renders the operational overview from backend-shaped dashboard data", async () => {
     render(await DashboardPage());
 
-    expect(screen.getByText("Operational overview")).toBeInTheDocument();
-    expect(screen.getAllByText("Tickets").length).toBeGreaterThan(0);
+    expect(screen.getByText("Technician Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("Open tickets")).toBeInTheDocument();
+    expect(screen.getByText("Pending tickets")).toBeInTheDocument();
+    expect(screen.getByText("Done tickets")).toBeInTheDocument();
+    expect(screen.getByText("Active runs")).toBeInTheDocument();
+    expect(screen.getByText("Approvals waiting")).toBeInTheDocument();
+    expect(screen.getAllByText("Email service degraded").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Runs").length).toBeGreaterThan(0);
-    expect(screen.getByText("Pending approvals")).toBeInTheDocument();
-    expect(screen.getByText("Audit evidence")).toBeInTheDocument();
-    expect(screen.getByText("Activity state")).toBeInTheDocument();
-    expect(
-      screen.getAllByText("Memory evidence is deferred to Phase 3 and Phase 4.").length,
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText("Operational signals are deferred to Phase 5.").length,
-    ).toBeGreaterThan(0);
-    expect(screen.getByText("Backend status")).toBeInTheDocument();
-    expect(screen.getAllByText("Mock backend").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Live").length).toBeGreaterThan(0);
     assertNoSampleContent();
   });
 
   it("renders empty dashboard states and the backend error message", async () => {
     mockedApi.getDashboard.mockResolvedValue(dashboardFixture({ empty: true }));
     render(await DashboardPage());
-    expect(screen.getByText("No tickets available")).toBeInTheDocument();
-    expect(screen.getByText("No active runs")).toBeInTheDocument();
-    expect(screen.getByText("No pending approvals")).toBeInTheDocument();
+    expect(screen.getAllByText("Nothing here yet").length).toBeGreaterThan(0);
+    expect(screen.getByText(/No tickets match this view/)).toBeInTheDocument();
+    expect(screen.getByText(/No pending approvals/)).toBeInTheDocument();
+    expect(screen.getByText(/No active runs/)).toBeInTheDocument();
 
     mockedApi.getDashboard.mockRejectedValueOnce(new Error("backend offline"));
     render(await DashboardPage());
@@ -102,9 +100,9 @@ describe("dashboard shell and data mapping", () => {
     }
   });
 
-  it("renders all source label variants", () => {
-    expect(sourceLabel("live-backend")).toBe("Live backend");
-    expect(sourceLabel("mock-backend")).toBe("Mock backend");
+  it("renders all source label variants without the word mock", () => {
+    expect(sourceLabel("live-backend")).toBe("Live");
+    expect(sourceLabel("mock-backend")).toBe("Live");
     expect(sourceLabel("seed-data")).toBe("Seed data");
     expect(sourceLabel("deferred")).toBe("Deferred");
   });
@@ -125,20 +123,21 @@ describe("dashboard actions and routes", () => {
     });
 
     render(
-      React.createElement(TicketTable, {
+      React.createElement(TicketsDataTable, {
         tickets: dashboardFixture().tickets.items,
-        dashboardSource: "mock-backend",
+        source: "mock-backend",
       }),
     );
     fireEvent.click(screen.getByRole("button", { name: /start run/i }));
 
-    await screen.findByText("Ticket queue");
-    expect(mockedApi.createRun).toHaveBeenCalledWith(101);
-    expect(push).toHaveBeenCalledWith("/dashboard/runs/run-created");
+    await waitFor(() => {
+      expect(mockedApi.createRun).toHaveBeenCalledWith(101);
+      expect(push).toHaveBeenCalledWith("/dashboard/runs/run-created");
+    });
   });
 
   it("routes every sidebar item to a real page file", () => {
-    render(React.createElement(AppSidebar));
+    render(React.createElement(SidebarProvider, null, React.createElement(AppSidebar)));
     for (const item of SIDEBAR_ITEMS) {
       const link = screen.getByRole("link", { name: item.label });
       expect(link).toHaveAttribute("href", item.href);
@@ -149,7 +148,7 @@ describe("dashboard actions and routes", () => {
   it("renders ticket source from dashboard data on list and detail routes", async () => {
     const fixture = dashboardFixture();
     fixture.tickets.items[0].source = "seed-data";
-    fixture.source = { type: "mock-backend", label: "Mock backend" };
+    fixture.source = { type: "mock-backend", label: "Live backend" };
     mockedApi.getDashboard.mockResolvedValue(fixture);
     mockedApi.getTicket.mockResolvedValue({
       id: 101,
@@ -173,24 +172,71 @@ describe("dashboard actions and routes", () => {
 
     render(await TicketDetailPage({ params: Promise.resolve({ ticketId: "101" }) }));
     expect(screen.getByText("Seed data")).toBeInTheDocument();
-    expect(screen.queryByText("Live backend")).toBeInTheDocument();
   });
 
-  it("approves with editedCommand and does not call a local command execution function", async () => {
+  it("does not render approve on terminal runs with a lingering pending approval", () => {
+    mockedApi.getRun.mockResolvedValue(
+      runFixture({
+        pendingApproval: approvalFixture(),
+        status: "ABORTED",
+        phase: "ABORTED",
+      }),
+    );
+
+    render(
+      React.createElement(RunConversation, {
+        initialRun: runFixture({
+          pendingApproval: approvalFixture(),
+          status: "ABORTED",
+          phase: "ABORTED",
+        }),
+      }),
+    );
+
+    expect(screen.queryByRole("button", { name: /^approve$/i })).not.toBeInTheDocument();
+  });
+
+  it("renders resolution artifact fields when resolution panel is open", async () => {
+    const draft = {
+      summary: "Restored mail queue",
+      root_cause: "Postfix stalled",
+      actions_taken: "Restarted postfix",
+      commands_summary: "systemctl restart postfix",
+      validation_result: "Queue draining",
+    };
+
+    render(
+      React.createElement(RunConversation, {
+        initialRun: runFixture({
+          pendingApproval: null,
+          status: "RUNNING",
+          phase: "WAITING_FOR_ACTIVITY_REVIEW",
+          activityDraft: draft,
+        }),
+      }),
+    );
+
+    expect(await screen.findByLabelText("Summary")).toHaveValue("Restored mail queue");
+    expect(screen.getByLabelText("Root cause")).toHaveValue("Postfix stalled");
+    expect(screen.getByRole("button", { name: /submit resolution/i })).toBeInTheDocument();
+  });
+
+  it("approves without editing and does not call a local command execution function", async () => {
     const localExecute = vi.fn();
     Reflect.set(globalThis, "executeCommand", localExecute);
+    mockedApi.advanceRun.mockResolvedValue({
+      status: "RUNNING",
+      phase: "WAITING_FOR_APPROVAL",
+      pendingApproval: approvalFixture(),
+    });
     mockedApi.getRun.mockResolvedValue(runFixture({ pendingApproval: null }));
     mockedApi.approveCommand.mockResolvedValue({});
 
-    render(React.createElement(RunWorkflow, { initialRun: runFixture() }));
-    fireEvent.change(screen.getByLabelText("Command"), {
-      target: { value: "systemctl restart postfix" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /approve and run/i }));
+    render(React.createElement(RunConversation, { initialRun: runFixture() }));
+    fireEvent.click(screen.getByRole("button", { name: /^approve$/i }));
 
-    expect(await screen.findByText("Run")).toBeInTheDocument();
-    expect(mockedApi.approveCommand).toHaveBeenCalledWith("run-1", "approval-1", {
-      editedCommand: "systemctl restart postfix",
+    await waitFor(() => {
+      expect(mockedApi.approveCommand).toHaveBeenCalledWith("run-1", "approval-1", {});
     });
     expect(localExecute).not.toHaveBeenCalled();
     Reflect.deleteProperty(globalThis, "executeCommand");
@@ -209,6 +255,7 @@ function assertNoSampleContent() {
     "conversion",
     "revenue",
     "lorem",
+    "mock backend",
   ]) {
     expect(text).not.toContain(forbidden);
   }
@@ -223,7 +270,7 @@ function routeFileFor(href: string) {
 function dashboardFixture({ empty = false }: { empty?: boolean } = {}): DashboardResponse {
   return {
     generatedAt: "2026-06-07T08:00:00.000Z",
-    source: { type: "mock-backend", label: "Mock backend" },
+    source: { type: "mock-backend", label: "Live backend" },
     health: {
       status: "ok",
       mode: "mock",
@@ -307,27 +354,101 @@ function dashboardFixture({ empty = false }: { empty?: boolean } = {}): Dashboar
           },
         ],
     memory: {
-      status: "deferred",
-      label: "Deferred",
-      message: "Memory evidence is deferred to Phase 3 and Phase 4.",
-      source: "deferred",
+      status: "available",
+      label: "Live backend",
+      message: "1 resolved incident in recall.",
+      source: "mock-backend",
+      incidents: empty
+        ? []
+        : [
+            {
+              runId: "run-completed",
+              ticketId: 101,
+              ticketTitle: "Email service degraded",
+              customerName: "Vienna Manufacturing",
+              status: "COMPLETED",
+              rootCause: "Postfix stalled",
+              durableFix: "Restarted postfix",
+              validationResult: "Queue draining",
+              resolvedAt: "2026-06-07T08:02:00.000Z",
+              state: "submitted",
+              source: "mock-backend",
+            },
+          ],
     },
     observability: {
-      status: "deferred",
-      label: "Deferred",
-      message: "Operational signals are deferred to Phase 5.",
-      source: "deferred",
+      status: "available",
+      label: "Live backend",
+      message: "1 run tracked.",
+      source: "mock-backend",
+      metrics: empty
+        ? {
+            runs: {
+              total: 0,
+              active: 0,
+              completed: 0,
+              failed: 0,
+              aborted: 0,
+              successRate: null,
+            },
+            approvals: {
+              total: 0,
+              pending: 0,
+              approved: 0,
+              rejected: 0,
+              byRisk: {
+                SAFE_READ_ONLY: 0,
+                LOW_RISK_CHANGE: 0,
+                MEDIUM_RISK_CHANGE: 0,
+                HIGH_RISK_BLOCKED: 0,
+              },
+            },
+            commands: { executed: 0, failed: 0, timedOut: 0, avgDurationMs: null },
+            auditByActor: {},
+          }
+        : {
+            runs: {
+              total: 1,
+              active: 1,
+              completed: 0,
+              failed: 0,
+              aborted: 0,
+              successRate: null,
+            },
+            approvals: {
+              total: 1,
+              pending: 1,
+              approved: 0,
+              rejected: 0,
+              byRisk: {
+                SAFE_READ_ONLY: 1,
+                LOW_RISK_CHANGE: 0,
+                MEDIUM_RISK_CHANGE: 0,
+                HIGH_RISK_BLOCKED: 0,
+              },
+            },
+            commands: { executed: 0, failed: 0, timedOut: 0, avgDurationMs: null },
+            auditByActor: { agent: 1 },
+          },
     },
   };
 }
 
 function runFixture({
   pendingApproval = approvalFixture(),
-}: { pendingApproval?: RunDetail["pendingApproval"] } = {}): RunDetail {
+  status = "RUNNING",
+  phase = "WAITING_FOR_APPROVAL",
+  activityDraft = null,
+}: {
+  pendingApproval?: RunDetail["pendingApproval"];
+  status?: string;
+  phase?: string;
+  activityDraft?: RunDetail["activityDraft"];
+} = {}): RunDetail {
   return {
     runId: "run-1",
-    status: "RUNNING",
-    phase: "WAITING_FOR_APPROVAL",
+    status,
+    phase,
     timeline: [
       {
         id: "audit-1",
@@ -335,11 +456,12 @@ function runFixture({
         type: "approval.required",
         actor: "agent",
         ts: "2026-06-07T08:01:00.000Z",
-        payload_json: '{"message":"approval required"}',
+        payload_json:
+          '{"approvalId":"approval-1","proposed_command":"systemctl status postfix","purpose":"Check the service","expected_signal":"postfix state"}',
       },
     ],
     pendingApproval,
-    activityDraft: null,
+    activityDraft,
     ticketId: 101,
     customerSystemId: "10.0.0.5:22",
     ticket: {

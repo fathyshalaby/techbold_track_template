@@ -6,11 +6,13 @@ import {
 } from "../ai/agents/activity-log-generator.js";
 import type { ActivityLogGeneratorInput } from "../ai/agents/activity-log-generator.js";
 import { runEventBus } from "../events/run-event-bus.js";
+import { upsertSolution } from "../memory/store.js";
 import {
   PhoenixAuthError,
   PhoenixNetworkError,
   PhoenixValidationError,
 } from "../phoenix/client.js";
+import { getPhoenixClient } from "../phoenix/factory.js";
 import { redactSecrets } from "../safety/redaction.js";
 import {
   appendAuditEvent,
@@ -20,7 +22,6 @@ import {
 } from "../store/audit.js";
 import { getDb } from "../store/db.js";
 import { getRunById, markRunCompleted } from "../store/runs.js";
-import { getPhoenixClient } from "./runs.js";
 
 export const activityRouter = new Hono();
 
@@ -74,14 +75,17 @@ activityRouter.post("/:runId/activity/draft", async (c) => {
     [runId],
   );
 
-  const observationRows = db.all<{ content: string }>(
-    "SELECT content FROM observations WHERE run_id = ? ORDER BY created_at ASC",
+  const observationRows = db.all<{ content: string; source: string }>(
+    "SELECT content, source FROM observations WHERE run_id = ? ORDER BY created_at ASC",
     [runId],
   );
 
   const startedEvent = auditEvents.find((e) => e.type === "run.started");
   let ticketDescription = "";
-  if (startedEvent) {
+  const phoenixObservation = observationRows.find((row) => row.source === "phoenix");
+  if (phoenixObservation?.content.trim()) {
+    ticketDescription = phoenixObservation.content;
+  } else if (startedEvent) {
     const payload = parseAuditPayload(startedEvent.payload_json);
     ticketDescription =
       typeof payload?.ticketDescription === "string" ? payload.ticketDescription : "";
@@ -181,6 +185,7 @@ activityRouter.post("/:runId/activity/submit", async (c) => {
       ticket_id: run.ticket_id,
       start_datetime: startDatetime,
       end_datetime: endDatetime,
+      description: summary || rootCause || "Service desk activity",
       summary,
       root_cause: rootCause,
       actions_taken: actionsTaken,
@@ -242,6 +247,41 @@ activityRouter.post("/:runId/activity/submit", async (c) => {
   }
 
   markRunCompleted(runId);
+
+  if (validated) {
+    try {
+      const commandRows = getDb().all<{ command: string; exit_code: number }>(
+        "SELECT command, exit_code FROM command_results WHERE run_id = ? ORDER BY created_at ASC",
+        [runId],
+      );
+      const commands = commandRows
+        .map((row) => `$ ${row.command} (exit ${row.exit_code})`)
+        .join("\n");
+      const startedEvent = auditEvents.find((e) => e.type === "run.started");
+      const startedPayload = startedEvent ? parseAuditPayload(startedEvent.payload_json) : null;
+      const symptom =
+        typeof startedPayload?.ticketDescription === "string"
+          ? startedPayload.ticketDescription
+          : `Ticket #${run.ticket_id}`;
+
+      await upsertSolution({
+        source: "run",
+        runId,
+        ticketId: run.ticket_id,
+        symptom,
+        rootCause,
+        fix: actionsTaken,
+        commands: commandsSummary || commands,
+        validationStatus: validationResult,
+        tags: ["validated", "run"],
+      });
+      appendAuditEvent(runId, "memory.indexed", "system", { runId });
+    } catch (err) {
+      appendAuditEvent(runId, "memory.index_failed", "system", {
+        message: (err as Error).message,
+      });
+    }
+  }
 
   return c.json(activity, 200);
 });

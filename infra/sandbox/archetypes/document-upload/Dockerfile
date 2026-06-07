@@ -1,8 +1,6 @@
-FROM ubuntu:22.04
+ARG BASE_IMAGE=sda-sandbox-base:latest
+FROM ${BASE_IMAGE}
 
-ENV container=docker
-ENV DEBIAN_FRONTEND=noninteractive
-ARG BENCH_PUBLIC_KEY
 ARG SERVICE_NAME=document-hub
 ARG SERVICE_USER=docsvc
 ARG SERVICE_UID=1999
@@ -10,9 +8,6 @@ ARG SERVICE_PORT=8081
 ARG ROOT_DIR=/srv/document-hub
 ARG UPLOAD_DIR=/srv/document-hub/uploads
 ARG EXISTING_DIR=/srv/document-hub/existing
-
-COPY archetypes/common/setup-base.sh /tmp/setup-base.sh
-RUN chmod +x /tmp/setup-base.sh && /tmp/setup-base.sh "$BENCH_PUBLIC_KEY"
 
 RUN useradd -u ${SERVICE_UID} -r -m -s /usr/sbin/nologin ${SERVICE_USER} \
   && install -d -m 755 -o ${SERVICE_USER} -g ${SERVICE_USER} ${ROOT_DIR} ${UPLOAD_DIR} ${EXISTING_DIR} /opt/${SERVICE_NAME} /opt/hackathon \

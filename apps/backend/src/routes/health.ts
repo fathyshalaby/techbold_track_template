@@ -1,13 +1,19 @@
 import { Hono } from "hono";
 import { isMockMode } from "../env.js";
+import { getMemoryStatus } from "../memory/store.js";
 import { getStoreStatus } from "../store/db.js";
 
 export const healthRouter = new Hono();
 
-healthRouter.get("/", (c) => {
+healthRouter.get("/", async (c) => {
+  const memory = await getMemoryStatus();
   return c.json({
     status: "ok",
     mode: isMockMode() ? "mock" : "real",
     store: getStoreStatus(),
+    memory: {
+      available: memory.available,
+      count: memory.count,
+    },
   });
 });

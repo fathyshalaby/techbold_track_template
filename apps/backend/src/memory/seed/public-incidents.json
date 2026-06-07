@@ -1,0 +1,142 @@
+[
+  {
+    "symptom": "nginx returns 502 Bad Gateway after deploy",
+    "rootCause": "Upstream application service stopped and nginx proxy_pass target is down",
+    "fix": "Restart the upstream app service and verify nginx upstream health before reload",
+    "commands": "systemctl status app.service\ncurl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/health\nsudo systemctl restart app.service",
+    "tags": ["nginx", "502", "proxy"]
+  },
+  {
+    "symptom": "Website certificate expired and browsers show NET::ERR_CERT_DATE_INVALID",
+    "rootCause": "TLS certificate past notAfter date and auto-renewal timer failed",
+    "fix": "Renew certificate with certbot and reload the web server",
+    "commands": "certbot certificates\nsudo certbot renew --dry-run\nsudo certbot renew && systemctl reload nginx",
+    "tags": ["tls", "cert", "nginx"]
+  },
+  {
+    "symptom": "PostgreSQL connection refused on port 5432",
+    "rootCause": "postgresql service not running after host reboot",
+    "fix": "Start and enable postgresql service",
+    "commands": "systemctl status postgresql\nsudo systemctl enable --now postgresql",
+    "tags": ["postgresql", "database", "service"]
+  },
+  {
+    "symptom": "Disk full errors in application logs and writes failing",
+    "rootCause": "Root filesystem at 100% capacity due to uncompressed log growth",
+    "fix": "Rotate and compress old logs, remove stale temp files, extend monitoring",
+    "commands": "df -h\ndu -xh /var/log | sort -hr | head\njournalctl --vacuum-time=7d",
+    "tags": ["disk", "logs", "capacity"]
+  },
+  {
+    "symptom": "Cron job not running at scheduled time",
+    "rootCause": "systemd timer unit disabled or wrong OnCalendar expression",
+    "fix": "Enable timer and fix OnCalendar in unit file",
+    "commands": "systemctl list-timers --all\nsystemctl status backup.timer\nsudo systemctl enable --now backup.timer",
+    "tags": ["cron", "timer", "systemd"]
+  },
+  {
+    "symptom": "SSH login fails with Permission denied (publickey)",
+    "rootCause": "Authorized key missing or wrong permissions on .ssh directory",
+    "fix": "Restore authorized_keys and set .ssh to 700 and authorized_keys to 600",
+    "commands": "ls -la ~/.ssh\nchmod 700 ~/.ssh\nchmod 600 ~/.ssh/authorized_keys",
+    "tags": ["ssh", "auth", "permissions"]
+  },
+  {
+    "symptom": "Application OOM killed repeatedly in dmesg",
+    "rootCause": "Process memory limit exceeded under load with no swap configured",
+    "fix": "Tune service MemoryMax, add swap if appropriate, or scale workload",
+    "commands": "dmesg -T | grep -i oom\nfree -m\nsystemctl show app.service -p MemoryMax",
+    "tags": ["memory", "oom", "systemd"]
+  },
+  {
+    "symptom": "DNS resolution failing for internal hostnames",
+    "rootCause": "systemd-resolved misconfigured or wrong nameserver in /etc/resolv.conf",
+    "fix": "Fix resolver config and restart systemd-resolved",
+    "commands": "resolvectl status\ncat /etc/resolv.conf\nsudo systemctl restart systemd-resolved",
+    "tags": ["dns", "network", "resolved"]
+  },
+  {
+    "symptom": "MySQL too many connections error",
+    "rootCause": "Connection pool leak or max_connections too low for traffic",
+    "fix": "Kill idle connections and raise max_connections with monitoring",
+    "commands": "mysqladmin processlist\nSHOW VARIABLES LIKE 'max_connections';",
+    "tags": ["mysql", "database", "connections"]
+  },
+  {
+    "symptom": "Redis out of memory and rejecting writes",
+    "rootCause": "maxmemory reached with no eviction policy or runaway cache keys",
+    "fix": "Set maxmemory-policy and flush stale keys or increase memory limit",
+    "commands": "redis-cli INFO memory\nredis-cli CONFIG GET maxmemory-policy",
+    "tags": ["redis", "cache", "memory"]
+  },
+  {
+    "symptom": "Service fails with address already in use on port 8080",
+    "rootCause": "Stale process holding the port after unclean shutdown",
+    "fix": "Identify and stop the stale process, then restart the managed service",
+    "commands": "ss -ltnp | grep 8080\nsudo fuser -k 8080/tcp\nsudo systemctl restart app.service",
+    "tags": ["port", "systemd", "conflict"]
+  },
+  {
+    "symptom": "AppArmor denying access to application data path",
+    "rootCause": "MAC profile missing rule for new data directory after migration",
+    "fix": "Add targeted AppArmor local override for the specific path",
+    "commands": "aa-status\njournalctl | grep -i apparmor\ndmesg | grep -i denied",
+    "tags": ["apparmor", "permissions", "mac"]
+  },
+  {
+    "symptom": "Inode exhaustion preventing new file creation despite free disk space",
+    "rootCause": "Small filesystem partition ran out of inodes from many tiny cache files",
+    "fix": "Clean cache/temp directories and move workload to partition with more inodes",
+    "commands": "df -i\ndu -xh /var/cache | sort -hr | head",
+    "tags": ["disk", "inodes", "capacity"]
+  },
+  {
+    "symptom": "HTTP redirect loop between load balancer and backend",
+    "rootCause": "Backend force-HTTPS redirect while LB terminates TLS and sends HTTP",
+    "fix": "Configure X-Forwarded-Proto trust on backend or disable redundant redirect",
+    "commands": "curl -I http://127.0.0.1/\ncurl -I -H 'X-Forwarded-Proto: https' http://127.0.0.1/",
+    "tags": ["nginx", "tls", "proxy"]
+  },
+  {
+    "symptom": "systemd unit in failed state after config edit",
+    "rootCause": "Syntax error in unit drop-in or missing ExecStart path",
+    "fix": "Fix unit file syntax, daemon-reload, and restart unit",
+    "commands": "systemctl status app.service\nsystemd-analyze verify app.service\nsudo systemctl daemon-reload",
+    "tags": ["systemd", "config", "unit"]
+  },
+  {
+    "symptom": "Email delivery failing with relay access denied",
+    "rootCause": "Postfix not authorized to relay through upstream SMTP provider",
+    "fix": "Update SASL credentials and permitted relay networks in Postfix config",
+    "commands": "postconf -n\ntail -n 50 /var/log/mail.log",
+    "tags": ["mail", "postfix", "smtp"]
+  },
+  {
+    "symptom": "Kubernetes node NotReady with disk pressure",
+    "rootCause": "Kubelet evicting pods because /var/lib/kubelet exceeded eviction threshold",
+    "fix": "Clean unused images and container logs, increase disk or adjust thresholds",
+    "commands": "df -h /var/lib/kubelet\ncrictl images\njournalctl -u kubelet -n 100",
+    "tags": ["kubernetes", "disk", "kubelet"]
+  },
+  {
+    "symptom": "FTP/SFTP uploads fail with permission denied on target directory",
+    "rootCause": "Upload directory owned by root instead of service account",
+    "fix": "chown upload directory to service user with least-privilege mode",
+    "commands": "ls -ld /srv/uploads\nid appuser\nsudo chown appuser:appgroup /srv/uploads",
+    "tags": ["permissions", "upload", "filesystem"]
+  },
+  {
+    "symptom": "High CPU from runaway log writer filling journal",
+    "rootCause": "Application debug logging left enabled in production",
+    "fix": "Reduce log level in app config and vacuum journal",
+    "commands": "journalctl -u app.service -n 20\njournalctl --disk-usage",
+    "tags": ["cpu", "logging", "journal"]
+  },
+  {
+    "symptom": "Backup job completes but restore test fails checksum mismatch",
+    "rootCause": "Backup taken while database was inconsistent without snapshot lock",
+    "fix": "Use application-consistent backup hooks and verify restore quarterly",
+    "commands": "systemctl status backup.service\ntar -tzf /var/backups/latest.tar.gz | head",
+    "tags": ["backup", "database", "integrity"]
+  }
+]

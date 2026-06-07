@@ -13,6 +13,7 @@ Why:
 Optional:
 
 - Gemma 4 12B: optional Apache-2.0 Google fallback at `google/gemma-4-12B-it`. It is a multimodal image-text-to-text checkpoint, so the sidecar uses an image-text loader for this config while training on text-only `messages` data.
+- MLX Qwen 2.5 7B: recommended Apple Silicon quality target at `mlx-community/Qwen2.5-7B-Instruct-4bit` once the dataset is large enough. Keep the 1.5B MLX model for smoke tests.
 - Code-specialized models: use only if the adapter should focus on code/CI failures rather than MSP endpoint/server troubleshooting.
 
 Loader notes:
@@ -20,3 +21,4 @@ Loader notes:
 - `configs/smoke.yaml` uses `model_loader: causal-lm` for a tiny local smoke run.
 - `configs/ministral3-14b.yaml` and `configs/gemma4-12b.yaml` use `model_loader: image-text` because current Hugging Face cards for these checkpoints recommend `AutoProcessor` with image-text model classes.
 - vLLM serving uses `--enable-lora` and serves the adapter if `ADAPTER_PATH` exists. The sidecar defaults to port `8001` so it does not collide with the main backend on `8000`.
+- MLX serving uses `mlx_lm.server --adapter-path` for Apple Silicon local checks. The backend uses it through the same OpenAI-compatible AI SDK provider with `LLM_BASE_URL=http://127.0.0.1:8011/v1`.

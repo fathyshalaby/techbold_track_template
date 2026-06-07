@@ -14,3 +14,7 @@ data/processed/*
 data/quarantine/*
 outputs/*
 checkpoints/
+*.safetensors
+*.bin
+*.gguf
+*.pt

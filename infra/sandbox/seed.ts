@@ -8,6 +8,8 @@ import type { Scenario } from "./scenarios/types.ts";
 const sandboxDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(sandboxDir, "..");
 const publicKeyPath = resolve(repoRoot, "keys/bench_incident_key.pub");
+const baseDockerfile = resolve(sandboxDir, "Dockerfile.base");
+const baseImageTag = "sda-sandbox-base:latest";
 const labelKey = "techbold.sandbox";
 const labelValue = "service-desk-autopilot";
 
@@ -51,8 +53,31 @@ function imageName(scenario: Scenario): string {
   return `sda-sandbox-${scenario.ticket.id}:latest`;
 }
 
+function ensureBaseImage(publicKey: string) {
+  const inspect = run("docker", ["image", "inspect", baseImageTag], {
+    allowFailure: true,
+    quiet: true,
+  });
+  if (inspect.status === 0) return;
+  run("docker", [
+    "build",
+    "-f",
+    baseDockerfile,
+    "-t",
+    baseImageTag,
+    "--build-arg",
+    `BENCH_PUBLIC_KEY=${publicKey}`,
+    sandboxDir,
+  ]);
+}
+
 function buildArgsForScenario(scenario: Scenario, publicKey: string): string[] {
-  const args = ["--build-arg", `BENCH_PUBLIC_KEY=${publicKey}`];
+  const args = [
+    "--build-arg",
+    `BASE_IMAGE=${baseImageTag}`,
+    "--build-arg",
+    `BENCH_PUBLIC_KEY=${publicKey}`,
+  ];
   const add = (key: string, value: string | number) => {
     args.push("--build-arg", `${key}=${value}`);
   };
@@ -228,6 +253,7 @@ function up() {
   const publicKey = readFileSync(publicKeyPath, "utf8").trim();
   const scenarios = configuredScenarios();
   removeAllScenarioContainers();
+  ensureBaseImage(publicKey);
   for (const scenario of scenarios) {
     buildScenario(scenario, publicKey);
     runScenarioContainer(scenario);

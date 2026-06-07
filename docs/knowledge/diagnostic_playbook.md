@@ -1,4 +1,4 @@
-# Diagnostic Playbook — the agent's procedure
+# Diagnostic Playbook - the agent's procedure
 
 > The master loop the agent follows for any single-host Ubuntu incident over SSH. Methodology from
 > Brendan Gregg (USE method, 60-second checklist), the Google SRE book (Effective Troubleshooting),
@@ -24,17 +24,17 @@ use the result to halve the search space.
 - **Divide and conquer.** Split the request path/stack in half, find the faulty half, recurse.
 - **Simplify and reduce.** Test one component with a known input (`curl localhost:PORT/health` instead of
   going through the proxy).
-- **Triage before root-cause.** If the customer is down it's fine to mitigate first (e.g. restart) — but
+- **Triage before root-cause.** If the customer is down it's fine to mitigate first (e.g. restart) - but
   for a *durable* fix you must still find the technical cause afterward.
-- **What it doesn't find matters** — a clean check rules out a branch and directs the next step.
+- **What it doesn't find matters** - a clean check rules out a branch and directs the next step.
 
-## Step 1 — TRIAGE: the first-60-seconds sweep (Gregg / Netflix)
+## Step 1 - TRIAGE: the first-60-seconds sweep (Gregg / Netflix)
 Run top-to-bottom to get system health before going deep:
 ```bash
-uptime               # load averages (1/5/15m) — trend
+uptime               # load averages (1/5/15m) - trend
 dmesg -T | tail      # OOM kills, I/O errors, remount-ro, segfaults  ← disproportionately valuable
 vmstat 1 5           # r (runqueue vs CPU), si/so (swap), wa (io wait), b (blocked)
-mpstat -P ALL 1 3    # per-CPU balance — one hot CPU = single-threaded bottleneck (if sysstat present)
+mpstat -P ALL 1 3    # per-CPU balance - one hot CPU = single-threaded bottleneck (if sysstat present)
 pidstat 1 3          # per-process CPU over time (if present)
 iostat -xz 1 3       # per-disk %util, await, avgqu-sz (if present)
 free -m              # available memory; tiny "available" = pressure
@@ -49,7 +49,7 @@ ss -ltnp                              # what's actually listening
 journalctl -p err -b --no-pager | tail -40
 ```
 
-## Step 2 — ISOLATE with the USE method
+## Step 2 - ISOLATE with the USE method
 For **every** resource check **U**tilization, **S**aturation, **E**rrors. The first error found is often the
 answer; saturation usually hurts before utilization hits 100%.
 
@@ -66,7 +66,7 @@ Service triage (systemd): `systemctl status NAME -l` · `systemctl is-active/is-
 `journalctl -u NAME -n 100` / `-p err -b` · `ss -tlnp | grep :PORT` · `systemd-analyze verify NAME.service`.
 Then jump to the matching [runbook](runbooks/).
 
-## Step 3 — IDENTIFY ROOT CAUSE (not the symptom)
+## Step 3 - IDENTIFY ROOT CAUSE (not the symptom)
 A **symptom** is the observable failure; a **root cause** is the underlying technical condition that, if
 corrected, prevents recurrence. Test: *"If I fix this and reboot, does the symptom come back?"* If yes, you
 fixed a symptom. Use **5 Whys** to drill to the deepest *technically-fixable* cause:
@@ -86,7 +86,7 @@ nginx upstream down → 502`. The durable fix targets the **head** of the chain 
 `<mechanism>`, observed as `<symptom>`. (Past tense, names component + mechanism + why. Not the symptom,
 not the action you took.)
 
-## Step 4 — FIX (durable) — rules
+## Step 4 - FIX (durable) - rules
 **A runtime change is not a fix.** A durable fix changes config-on-disk and is idempotent.
 
 | Concern | Runtime-only (evaporates) | Durable (on disk) |
@@ -103,34 +103,34 @@ not the action you took.)
 Edit units via drop-in, not in place: `systemctl edit NAME` → `/etc/systemd/system/NAME.service.d/override.conf`
 → `systemctl daemon-reload` → `restart`.
 
-**FIX rules:** (1) no runtime-only fixes — every change lands in a file read on boot. (2) persist state
-explicitly: `enable --now` (boot + now). (3) idempotent edits only — guard appends (`grep -q || >>`),
+**FIX rules:** (1) no runtime-only fixes - every change lands in a file read on boot. (2) persist state
+explicitly: `enable --now` (boot + now). (3) idempotent edits only - guard appends (`grep -q || >>`),
 prefer in-place key replacement / drop-ins; never blind-append config. (4) order: **unmask → enable →
 start**. (5) reload after editing config (`daemon-reload` for units). (6) survive `daemon-reload` + restart,
 not just "looks fine now". (7) pass the **run-it-twice test** (second run = no changes). (8) fix the head
-of the causal chain. (9) minimal blast radius — touch one thing, re-verify. (10) back up before editing
+of the causal chain. (9) minimal blast radius - touch one thing, re-verify. (10) back up before editing
 (`cp file file.bak.$(date +%s)`).
 
-## Step 5 — VALIDATE (prove it works AND persists)
+## Step 5 - VALIDATE (prove it works AND persists)
 Both halves required: benefit restored **and** it will stay restored.
-- **A. Functional** — re-run the customer's test: `curl -sS -o /dev/null -w '%{http_code}\n' http://localhost/health` (or the exact reported symptom, now passing).
-- **B. Service state** — `systemctl is-active NAME` → active **and** `systemctl is-enabled NAME` → enabled (both; active-but-disabled fails on reboot); `ss -tlnp | grep :PORT`.
-- **C. Persistence** — `systemctl restart NAME; sleep 2; systemctl is-active NAME && curl …/health` (still works after a clean restart).
-- **D. Config on disk** — `systemctl cat NAME | grep -E '<changed>'`; `grep -r <key> /etc/sysctl.d/` (value on disk, not just in RAM).
-- **E. (Strongest) reboot** if the window allows — then re-run A+B. (This is what the grader does via `POST /me/reset`.) If no real reboot, `systemd-analyze verify` + C + D are the proxy.
-- **F. Regression** — `systemctl --failed` (no new failed units); `journalctl -p err -b --since "-5 min"` (no fresh errors); `df -h; free -m; uptime` (no new pressure).
+- **A. Functional** - re-run the customer's test: `curl -sS -o /dev/null -w '%{http_code}\n' http://localhost/health` (or the exact reported symptom, now passing).
+- **B. Service state** - `systemctl is-active NAME` → active **and** `systemctl is-enabled NAME` → enabled (both; active-but-disabled fails on reboot); `ss -tlnp | grep :PORT`.
+- **C. Persistence** - `systemctl restart NAME; sleep 2; systemctl is-active NAME && curl …/health` (still works after a clean restart).
+- **D. Config on disk** - `systemctl cat NAME | grep -E '<changed>'`; `grep -r <key> /etc/sysctl.d/` (value on disk, not just in RAM).
+- **E. (Strongest) reboot** if the window allows - then re-run A+B. (This is what the grader does via `POST /me/reset`.) If no real reboot, `systemd-analyze verify` + C + D are the proxy.
+- **F. Regression** - `systemctl --failed` (no new failed units); `journalctl -p err -b --since "-5 min"` (no fresh errors); `df -h; free -m; uptime` (no new pressure).
 
 A fix is "validated" only when **A passes after C**, **B shows active+enabled**, **D confirms on-disk**, and
-**F shows no regressions**. Record the exact commands + outputs — they become the activity's evidence.
+**F shows no regressions**. Record the exact commands + outputs - they become the activity's evidence.
 
-## Step 6 — DOCUMENT (the ERP activity)
+## Step 6 - DOCUMENT (the ERP activity)
 Blameless, system-focused, reusable by the next technician, **no secrets**. Map to the ERP fields:
-- **summary** — 1 sentence: what broke, impact, resolved.
-- **root_cause** — the technical cause from Step 3 (component + mechanism + why), not the symptom; include the causal chain.
-- **actions_taken** — numbered, chronological: each step = what + why; distinguish diagnosis from the fix; name the on-disk file changed (proves durability).
-- **commands_summary** — the literal commands (diagnosis + fix + validation), sanitized, so the next tech can replay them.
-- **validation_result** — the Step-5 proof: benefit test passing, is-active+is-enabled, restart-retest, on-disk confirmation, regression check — with outputs.
-- **description** — narrative tying it together; note anything not verified (e.g. "real reboot not performed; restart-retest used as proxy").
+- **summary** - 1 sentence: what broke, impact, resolved.
+- **root_cause** - the technical cause from Step 3 (component + mechanism + why), not the symptom; include the causal chain.
+- **actions_taken** - numbered, chronological: each step = what + why; distinguish diagnosis from the fix; name the on-disk file changed (proves durability).
+- **commands_summary** - the literal commands (diagnosis + fix + validation), sanitized, so the next tech can replay them.
+- **validation_result** - the Step-5 proof: benefit test passing, is-active+is-enabled, restart-retest, on-disk confirmation, regression check - with outputs.
+- **description** - narrative tying it together; note anything not verified (e.g. "real reboot not performed; restart-retest used as proxy").
 
 **Secrets (hard rules):** never paste passwords, keys, tokens, connection strings, or full auth headers;
 redact (`Authorization: Bearer ***`, `PGPASSWORD=***`); refer to credentials by name/location, not value;
@@ -140,7 +140,7 @@ sanitize pasted logs (URLs/query strings may echo tokens). See [`safety/command-
 Declare desired end-state, not steps. Use native idempotent operations (in-place key replacement / drop-ins
 / guarded appends, not blind `>>`). Gate non-idempotent actions on a marker (`creates`/`removes` analogue).
 Order `enable → (unmask) → set state`. Check first, then mutate only what's wrong. The second run must
-report **no changes** — if it does work, rewrite it.
+report **no changes** - if it does work, rewrite it.
 
 ## Sources
 Gregg: *Linux Performance Analysis in 60,000 ms* (Netflix), *USE Method* + Linux checklist, *Linux Performance*.

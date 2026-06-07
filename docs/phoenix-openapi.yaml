@@ -3,7 +3,7 @@ info:
   title: Phoenix ERP Mock API
   version: "1.0.0"
   description: |
-    REST API for the techbold **AI Service Desk Autopilot** track. Your app uses this
+    REST API for the techbold **AI Sphinx** track. Your app uses this
     mock ERP to load assigned tickets, read the affected customer system, set ticket
     status, and write back an activity log.
 
@@ -242,8 +242,10 @@ components:
       type: object
       properties:
         id: { type: integer, format: int64, example: 7001 }
-        title: { type: string, example: "Status API intermittently unavailable" }
-        description: { type: string, description: "Customer report (symptom only)." }
+        title:
+          { type: string, example: "Status API intermittently unavailable" }
+        description:
+          { type: string, description: "Customer report (symptom only)." }
         priority: { type: string, example: high }
         status: { $ref: "#/components/schemas/TicketStatus" }
         customer_id: { type: integer, format: int64, example: 5001 }
@@ -253,7 +255,8 @@ components:
           items: { type: string }
         sla_due_at: { type: string, format: date-time, nullable: true }
         created_at: { type: string, format: date-time, nullable: true }
-      required: [id, title, description, priority, status, customer_id, customer_name]
+      required:
+        [id, title, description, priority, status, customer_id, customer_name]
 
     SystemInfo:
       type: object
@@ -296,11 +299,22 @@ components:
         start_datetime: { type: string, format: date-time }
         end_datetime: { type: string, format: date-time }
         description: { type: string }
-        summary: { type: string, description: "One-sentence summary of what was restored." }
-        root_cause: { type: string, description: "Technical root cause, not the symptom." }
-        actions_taken: { type: string, description: "Diagnosis and fix steps, in order." }
-        commands_summary: { type: string, description: "Relevant commands; no secrets." }
-        validation_result: { type: string, description: "Concrete proof the service works." }
+        summary:
+          {
+            type: string,
+            description: "One-sentence summary of what was restored.",
+          }
+        root_cause:
+          {
+            type: string,
+            description: "Technical root cause, not the symptom.",
+          }
+        actions_taken:
+          { type: string, description: "Diagnosis and fix steps, in order." }
+        commands_summary:
+          { type: string, description: "Relevant commands; no secrets." }
+        validation_result:
+          { type: string, description: "Concrete proof the service works." }
       required: [ticket_id, start_datetime, end_datetime]
 
     Activity:
@@ -320,7 +334,17 @@ components:
         commands_summary: { type: string }
         validation_result: { type: string }
         created_at: { type: string, format: date-time, nullable: true }
-      required: [id, team_id, team_name, employee_id, ticket_id, start_datetime, end_datetime, description]
+      required:
+        [
+          id,
+          team_id,
+          team_name,
+          employee_id,
+          ticket_id,
+          start_datetime,
+          end_datetime,
+          description,
+        ]
 
     SimpleMessage:
       type: object

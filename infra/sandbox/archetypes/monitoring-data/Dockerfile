@@ -1,8 +1,6 @@
-FROM ubuntu:22.04
+ARG BASE_IMAGE=sda-sandbox-base:latest
+FROM ${BASE_IMAGE}
 
-ENV container=docker
-ENV DEBIAN_FRONTEND=noninteractive
-ARG BENCH_PUBLIC_KEY
 ARG CUSTOMER_APP_SERVICE=customer-app
 ARG CUSTOMER_APP_PORT=8088
 ARG DASHBOARD_SERVICE=ops-dashboard
@@ -13,9 +11,6 @@ ARG AGENT_SERVICE=signal-agent
 ARG CONFIG_FILE=/etc/signal-agent/config.env
 ARG CORRECT_ENDPOINT=http://127.0.0.1:9091/ingest
 ARG BAD_ENDPOINT=http://127.0.0.1:9092/ingest
-
-COPY archetypes/common/setup-base.sh /tmp/setup-base.sh
-RUN chmod +x /tmp/setup-base.sh && /tmp/setup-base.sh "$BENCH_PUBLIC_KEY"
 
 RUN install -d -m 755 /opt/${CUSTOMER_APP_SERVICE} /opt/${DASHBOARD_SERVICE} /opt/${INGEST_SERVICE} /opt/${AGENT_SERVICE} /opt/hackathon "$(dirname "${CONFIG_FILE}")" \
   && install -d -m 755 -o azureuser -g azureuser /var/lib/${INGEST_SERVICE} \

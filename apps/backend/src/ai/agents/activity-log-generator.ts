@@ -5,7 +5,7 @@ import { getModel, isBuiltInMockModel } from "../model.js";
 import { ACTIVITY_LOG_GENERATOR_SYSTEM_PROMPT } from "../prompts.js";
 import { ActivityDraftFieldsSchema } from "../types.js";
 import type { ActivityDraftFields } from "../types.js";
-import { AgentUnavailableError } from "./problem-analyzer.js";
+import { AgentUnavailableError, runAgentObject } from "./resilience.js";
 
 export { AgentUnavailableError };
 export { ActivityDraftFieldsSchema };
@@ -43,26 +43,14 @@ export async function runActivityLogGenerator(
   if (isBuiltInMockModel(resolvedModel)) {
     return MOCK_ACTIVITY_DRAFT;
   }
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    const result = await Promise.race([
-      generateObject({
-        model: resolvedModel,
-        schema: ActivityDraftFieldsSchema,
-        system: ACTIVITY_LOG_GENERATOR_SYSTEM_PROMPT,
-        prompt: guardModelInput(input),
-        maxTokens: 2048,
-      }),
-      new Promise<never>((_, rej) => {
-        timer = setTimeout(() => rej(new Error("timeout")), 30_000);
-      }),
-    ]);
+  return runAgentObject("activity-log-generator", async () => {
+    const result = await generateObject({
+      model: resolvedModel,
+      schema: ActivityDraftFieldsSchema,
+      system: ACTIVITY_LOG_GENERATOR_SYSTEM_PROMPT,
+      prompt: guardModelInput(input),
+      maxTokens: 2048,
+    });
     return result.object;
-  } catch {
-    throw new AgentUnavailableError("agent unavailable: activity-log-generator");
-  } finally {
-    // Cancel the timeout once the race settles. No orphan 30s timer remains pending
-    // after the model resolves (avoids keeping the loop alive / late rejections).
-    if (timer) clearTimeout(timer);
-  }
+  });
 }

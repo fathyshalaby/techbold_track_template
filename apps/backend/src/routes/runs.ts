@@ -1,15 +1,23 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { advance } from "../ai/orchestrator.js";
-import { getEnv, resolveClientMode } from "../env.js";
+import { resolveClientMode } from "../env.js";
+import { runEventBus } from "../events/run-event-bus.js";
 import {
   PhoenixAuthError,
-  PhoenixClient,
   PhoenixNetworkError,
   PhoenixNotFoundError,
+  PhoenixValidationError,
 } from "../phoenix/client.js";
-import MockPhoenixClient from "../phoenix/mock.js";
-import { appendObservation, getActivityDraft, getAuditEvents } from "../store/audit.js";
+import { getOverlayCustomerSystem, getOverlayTicket } from "../phoenix/dynamic-overlay.js";
+import { getPhoenixClient } from "../phoenix/factory.js";
+import {
+  appendAuditEvent,
+  appendObservation,
+  getActivityDraft,
+  getAuditEvents,
+  updateApprovalStatus,
+} from "../store/audit.js";
 import { getDb, makeJsonlAdapter, setDb } from "../store/db.js";
 import { createRun, getRunById, parseSafeTarget, updateRunPhase } from "../store/runs.js";
 import { CommandApprovalSchema } from "../store/schema.js";
@@ -20,21 +28,13 @@ export const CreateRunBodySchema = z.object({
   ticketId: z.number().int().positive(),
 });
 
-export function getPhoenixClient() {
-  if (resolveClientMode("phoenix") === "mock") {
-    return new MockPhoenixClient({ seedScenarios: getEnv().MOCK_SCENARIOS });
-  }
-  const env = getEnv();
-  return new PhoenixClient(env.PHOENIX_API_BASE_URL, env.PHOENIX_API_TOKEN);
-}
+export { getPhoenixClient };
 
 function getPendingApproval(runId: string) {
   const db = getDb();
   const rows = db.all<Record<string, unknown>>("SELECT * FROM command_approvals WHERE run_id = ?", [
     runId,
   ]);
-  // Pick the MOST RECENT pending approval. Normally only one is pending, but if a
-  // stale row ever lingered, ordering avoids surfacing the wrong command to the UI.
   const pending = rows
     .filter((r) => r.status === "PENDING")
     .sort((a, b) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")))
@@ -52,13 +52,20 @@ runsRouter.post("/", async (c) => {
   }
   const { ticketId } = parsed.data;
 
+  const overlayTicket = getOverlayTicket(ticketId);
+  const overlaySystem = getOverlayCustomerSystem(ticketId);
   const client = getPhoenixClient();
   let ticket: Awaited<ReturnType<typeof client.getTicket>>;
   let customerSystemData: Awaited<ReturnType<typeof client.getCustomerSystem>>;
 
   try {
-    ticket = await client.getTicket(ticketId);
-    customerSystemData = await client.getCustomerSystem(ticketId);
+    if (overlayTicket && overlaySystem) {
+      ticket = overlayTicket;
+      customerSystemData = overlaySystem;
+    } else {
+      ticket = await client.getTicket(ticketId);
+      customerSystemData = await client.getCustomerSystem(ticketId);
+    }
   } catch (err) {
     if (err instanceof PhoenixNotFoundError || err instanceof TypeError) {
       return c.json({ error: "ticket or customer system not found" }, 404);
@@ -69,27 +76,24 @@ runsRouter.post("/", async (c) => {
     if (err instanceof PhoenixNetworkError) {
       return c.json({ error: "ERP unavailable" }, 502);
     }
+    if (err instanceof PhoenixValidationError) {
+      return c.json({ error: "ERP response invalid" }, 502);
+    }
     throw err;
   }
 
   const { system } = customerSystemData;
-  // Split on ':' in advance() at orchestrator.ts:576 - no protocol prefix
-  const customerSystemId = `${system.ip}:${system.port}`;
+  const customerSystemId = `${system.username}@${system.ip}:${system.port}`;
 
   const run = createRun(ticketId, customerSystemId);
-  // Seed the customer's reported SYMPTOM as a 'phoenix'-source observation so
-  // every agent (diagnose/fix/validate) and the activity generator reason about
-  // the actual incident, not just an id. Redacted inside appendObservation.
-  appendObservation(
-    run.id,
-    "phoenix",
+  const ticketDescription =
     `Ticket #${ticket.id}: "${ticket.title}" [priority: ${ticket.priority}] for ${ticket.customer_name}. ` +
-      `Reported symptom: ${ticket.description}`,
-  );
-  // Transition CREATED -> LOADED_CONTEXT synchronously without calling advance()
-  // (advance() auto-recurses through LOADED_CONTEXT -> TRIAGING -> LLM agent call,
-  // which violates the PRD §9 201-response contract)
+    `Reported symptom: ${ticket.description}`;
+  appendObservation(run.id, "phoenix", ticketDescription);
   updateRunPhase(run.id, "LOADED_CONTEXT");
+  const startedPayload = { ticketDescription };
+  appendAuditEvent(run.id, "run.started", "system", startedPayload);
+  runEventBus.emit(run.id, "run.started", startedPayload);
 
   return c.json(
     {
@@ -176,9 +180,6 @@ runsRouter.post("/:runId/next", async (c) => {
 
   const state = await advance(runId);
 
-  // An agent (LLM) failure carries a message back on the state without changing
-  // phase. Surface it as a 502 so the technician sees "AI agent unavailable"
-  // instead of a /next call that silently does nothing (a frozen-looking run).
   if (state.errorMessage) {
     return c.json(
       {
@@ -211,6 +212,21 @@ runsRouter.post("/:runId/abort", async (c) => {
   }
 
   const state = await advance(runId, { type: "abort" });
+
+  const decidedAt = new Date().toISOString();
+  const pendingRows = getDb().all<Record<string, unknown>>(
+    "SELECT id FROM command_approvals WHERE run_id = ? AND status = ?",
+    [runId, "PENDING"],
+  );
+  for (const row of pendingRows) {
+    if (typeof row.id === "string") {
+      updateApprovalStatus(row.id, {
+        status: "REJECTED",
+        technicianReason: "Run aborted",
+        decidedAt,
+      });
+    }
+  }
 
   return c.json({
     status: state.status,

@@ -6,7 +6,13 @@ import { Play } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function TicketDetailActions({ ticketId }: { ticketId: number }) {
+export function TicketDetailActions({
+  ticketId,
+  hasRun = false,
+}: {
+  ticketId: number;
+  hasRun?: boolean;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -15,8 +21,9 @@ export function TicketDetailActions({ ticketId }: { ticketId: number }) {
     setBusy(true);
     setError(null);
     try {
-      const created = await createRun(ticketId);
-      router.push(`/dashboard/runs/${created.runId}`);
+      await createRun(ticketId);
+      // Re-render the server component so the new run's conversation appears in place.
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -33,7 +40,7 @@ export function TicketDetailActions({ ticketId }: { ticketId: number }) {
       )}
       <Button type="button" onClick={() => void startRun()} disabled={busy}>
         <Play className="h-4 w-4" aria-hidden="true" />
-        Start run
+        {hasRun ? "Start new run" : "Start run"}
       </Button>
     </div>
   );

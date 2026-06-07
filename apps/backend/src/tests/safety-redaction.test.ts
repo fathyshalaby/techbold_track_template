@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import { REDACTION_CAP_BYTES, redactSecrets } from "../safety/redaction.js";
 
 describe("safety - redaction", () => {
-  // ─── Private key blocks ──────────────────────────────────────────────────
-
   describe("private key blocks", () => {
     it("redacts RSA private key block spanning multiple lines", () => {
       const input = [
@@ -60,8 +58,6 @@ describe("safety - redaction", () => {
     });
   });
 
-  // ─── password= / passwd= ─────────────────────────────────────────────────
-
   describe("password= / passwd=", () => {
     it("redacts password=hunter2", () => {
       expect(redactSecrets("password=hunter2")).toBe("password=«redacted»");
@@ -76,8 +72,6 @@ describe("safety - redaction", () => {
     });
   });
 
-  // ─── token= ──────────────────────────────────────────────────────────────
-
   describe("token=", () => {
     it("redacts token=abc123xyz", () => {
       expect(redactSecrets("token=abc123xyz")).toBe("token=«redacted»");
@@ -90,15 +84,11 @@ describe("safety - redaction", () => {
     });
   });
 
-  // ─── secret= ─────────────────────────────────────────────────────────────
-
   describe("secret=", () => {
     it("redacts secret=mysecretvalue", () => {
       expect(redactSecrets("secret=mysecretvalue")).toBe("secret=«redacted»");
     });
   });
-
-  // ─── api_key= / api-key= ─────────────────────────────────────────────────
 
   describe("api_key= / api-key=", () => {
     it("redacts api_key=abc", () => {
@@ -109,8 +99,6 @@ describe("safety - redaction", () => {
       expect(redactSecrets("api-key=abc")).toBe("api-key=«redacted»");
     });
   });
-
-  // ─── Authorization header ─────────────────────────────────────────────────
 
   describe("Authorization header", () => {
     it("redacts Authorization: Bearer token", () => {
@@ -128,8 +116,6 @@ describe("safety - redaction", () => {
     });
   });
 
-  // ─── JWT standalone (gitleaks-style) ──────────────────────────────────────
-
   describe("JWT standalone", () => {
     it("redacts a bare JWT not prefixed by Bearer", () => {
       const jwt =
@@ -144,8 +130,6 @@ describe("safety - redaction", () => {
     });
   });
 
-  // ─── Bearer token standalone ─────────────────────────────────────────────
-
   describe("Bearer token standalone", () => {
     it("redacts standalone Bearer token", () => {
       const result = redactSecrets("Bearer eyJhbGciOiJIUzI1...");
@@ -154,8 +138,6 @@ describe("safety - redaction", () => {
       expect(result).toContain("«redacted»");
     });
   });
-
-  // ─── DB connection strings ───────────────────────────────────────────────
 
   describe("DB connection strings", () => {
     it("redacts postgres:// connection string", () => {
@@ -180,8 +162,6 @@ describe("safety - redaction", () => {
     });
   });
 
-  // ─── AWS / Azure key patterns ─────────────────────────────────────────────
-
   describe("AWS / Azure key patterns", () => {
     it("redacts AWS access key (AKIA* 20-char)", () => {
       const result = redactSecrets("key: AKIAIOSFODNN7EXAMPLE");
@@ -195,8 +175,6 @@ describe("safety - redaction", () => {
       expect(result).toContain("sig=«redacted»");
     });
   });
-
-  // ─── ENV-style secret KEY=VALUE ──────────────────────────────────────────
 
   describe("ENV-style secret key=value", () => {
     it("redacts SOME_SECRET_KEY=actualvalue", () => {
@@ -212,8 +190,6 @@ describe("safety - redaction", () => {
     });
   });
 
-  // ─── Context preservation ─────────────────────────────────────────────────
-
   describe("context preservation", () => {
     it("preserves key name after redacting token=abc123", () => {
       const result = redactSecrets("token=abc123");
@@ -226,8 +202,6 @@ describe("safety - redaction", () => {
     });
   });
 
-  // ─── Clean pass-through ───────────────────────────────────────────────────
-
   describe("clean pass-through", () => {
     it('does not alter "systemctl status nginx"', () => {
       expect(redactSecrets("systemctl status nginx")).toBe("systemctl status nginx");
@@ -237,8 +211,6 @@ describe("safety - redaction", () => {
       expect(redactSecrets("exit code: 0")).toBe("exit code: 0");
     });
   });
-
-  // ─── 16 KB cap ───────────────────────────────────────────────────────────
 
   describe("16 KB input cap", () => {
     it("REDACTION_CAP_BYTES equals 16384", () => {
@@ -251,8 +223,6 @@ describe("safety - redaction", () => {
       expect(result.length).toBeLessThanOrEqual(REDACTION_CAP_BYTES);
     });
   });
-
-  // ─── Pure function ────────────────────────────────────────────────────────
 
   describe("pure function", () => {
     it("produces identical output on repeated calls with same input", () => {

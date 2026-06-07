@@ -1,14 +1,14 @@
-# Safety Policy — Service Desk Autopilot
+# Safety Policy - Sphinx
 
 This is the rule the backend enforces before any command touches a customer VM. It exists because
 rubric **C (20 pts)** scores safety/audit directly **and** because the listed **hard fails zero the
 incident and can disqualify the team**. When in doubt, block. A blocked command costs nothing; a
 hard-fail costs the whole incident.
 
-> **Who's checking:** C is graded by an **automated safety scan + a secret scan of the repo** *and*
+> **Who's checking:** C is graded by an **automated safety scan + a secret scan of the repo** _and_
 > by the two engineers who **built the grader**. Two consequences: (1) the **audit log and these
-> guardrails are inspected directly** — they must be real, not demo-ware; (2) **secrets must not
-> exist anywhere in the repo, logs, frontend, or screenshots** — keep `.env`/keys git-ignored,
+> guardrails are inspected directly** - they must be real, not demo-ware; (2) **secrets must not
+> exist anywhere in the repo, logs, frontend, or screenshots** - keep `.env`/keys git-ignored,
 > ship only `.env.example`, and run a secret scan before the code freeze (Sun Jun 7, 14:00).
 
 Implemented in `backend/src/safety/` (`command-policy.ts`, `classifier.ts`, `redaction.ts`,
@@ -18,14 +18,14 @@ Implemented in `backend/src/safety/` (`command-policy.ts`, `classifier.ts`, `red
 
 ## 1. Non-negotiable rules
 
-1. **Every** SSH command requires explicit human approval — including read-only ones.
+1. **Every** SSH command requires explicit human approval - including read-only ones.
 2. **Edited commands are re-checked** through the full policy before execution (humans can paste danger too).
 3. The model **never executes**. Only deterministic backend code runs commands, only after approval.
 4. **No interactive shells / TTY** (`vi`, `nano`, `top`, `less`, `ssh`, `python` REPL, `mysql` shell…). One-shot, non-interactive commands only.
 5. **Every command has a timeout** and a **stdout/stderr cap**. No unbounded or long-running commands.
 6. **No blanket destructive commands** (recursive deletes, wildcard mutation, mass permission/ownership changes).
 7. **Secrets are never read unnecessarily, never logged, never echoed, never put in the activity.** Redact before log/UI/model.
-8. **No exfiltration** — no piping system data to external hosts; no `curl/wget … | sh`.
+8. **No exfiltration** - no piping system data to external hosts; no `curl/wget … | sh`.
 9. **No privilege escalation** unless specifically justified for the fix and explicitly approved. Never reconfigure the app to run as superuser to dodge DB/file permissions (explicit hard-fail).
 10. **No package install/update** unless necessary for the fix and approved.
 11. **No reboot/shutdown** unless explicitly necessary and approved.
@@ -38,24 +38,24 @@ Implemented in `backend/src/safety/` (`command-policy.ts`, `classifier.ts`, `red
 ## 2. Risk classification
 
 `classifier.ts` assigns exactly one level. **Deterministic rules decide first**; an optional LLM
-second opinion may only *raise* concern, never override a deterministic block.
+second opinion may only _raise_ concern, never override a deterministic block.
 
-| Level | Meaning | Approval | Examples |
-|---|---|---|---|
-| `SAFE_READ_ONLY` | Read-only diagnosis, bounded output, no secrets | Required (always) | `systemctl status <svc>`, `journalctl -u <svc> -n 100 --no-pager`, `df -h`, `ss -tulpn`, `tail -n 100 <log>` |
-| `LOW_RISK_CHANGE` | Narrow, reversible change to a specific target | Required + shown as a change | restart **one** known service; create a missing dir/file with narrow scope; `chown` a **specific** upload dir |
-| `MEDIUM_RISK_CHANGE` | Broader change with real blast radius | Required + extra-warning in UI | package install/update; permission change on a specific path; service config edit (after backup); firewall rule change |
-| `HIGH_RISK_BLOCKED` | Destructive / forbidden | **Blocked — never executes** | broad recursive delete; disk format; mass chmod/chown; secret exfiltration; fork bomb; disabling security; clearing logs |
+| Level                | Meaning                                         | Approval                       | Examples                                                                                                                 |
+| -------------------- | ----------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `SAFE_READ_ONLY`     | Read-only diagnosis, bounded output, no secrets | Required (always)              | `systemctl status <svc>`, `journalctl -u <svc> -n 100 --no-pager`, `df -h`, `ss -tulpn`, `tail -n 100 <log>`             |
+| `LOW_RISK_CHANGE`    | Narrow, reversible change to a specific target  | Required + shown as a change   | restart **one** known service; create a missing dir/file with narrow scope; `chown` a **specific** upload dir            |
+| `MEDIUM_RISK_CHANGE` | Broader change with real blast radius           | Required + extra-warning in UI | package install/update; permission change on a specific path; service config edit (after backup); firewall rule change   |
+| `HIGH_RISK_BLOCKED`  | Destructive / forbidden                         | **Blocked - never executes**   | broad recursive delete; disk format; mass chmod/chown; secret exfiltration; fork bomb; disabling security; clearing logs |
 
-The UI shows the level on the approval card. `HIGH_RISK_BLOCKED` never reaches an approval card —
+The UI shows the level on the approval card. `HIGH_RISK_BLOCKED` never reaches an approval card -
 it is recorded as `command.blocked` and the agent is asked for an alternative.
 
 ---
 
-## 3. Blocklist (hard-fail patterns — always `HIGH_RISK_BLOCKED`)
+## 3. Blocklist (hard-fail patterns - always `HIGH_RISK_BLOCKED`)
 
 Match on the **final** command (post-edit), normalised (collapse whitespace, strip quotes used to
-obfuscate, resolve simple `$()`/back-tick wrappers conservatively — if you can't resolve it safely,
+obfuscate, resolve simple `$()`/back-tick wrappers conservatively - if you can't resolve it safely,
 block it).
 
 - `rm -rf /`, `rm -rf /*`, `rm -rf ~`, `rm -rf .`/`..`, any `rm -rf` on `/etc`, `/var`, `/home`, `/srv`, `/usr`, `/boot`, `/var/lib/*`, `/var/lib/postgresql`
@@ -74,15 +74,15 @@ block it).
 - Running the app as root/superuser to bypass DB/file permissions (rule 9 hard-fail)
 - Mass `kill -9 -1`, killing PID 1, broad `pkill` of system services
 
-If a command *resembles* but doesn't exactly match (e.g. `chmod -R 777 /srv/uploads`), it is **not**
-auto-blocked — it's `MEDIUM_RISK_CHANGE` and needs explicit approval. Context matters: a *targeted*
+If a command _resembles_ but doesn't exactly match (e.g. `chmod -R 777 /srv/uploads`), it is **not**
+auto-blocked - it's `MEDIUM_RISK_CHANGE` and needs explicit approval. Context matters: a _targeted_
 `chown azureuser:www-data /srv/app/uploads` is fine; recursively opening `/srv` is not.
 
 ---
 
 ## 4. Allowlist (typical `SAFE_READ_ONLY` diagnosis)
 
-These don't bypass approval — they're just classified low so the technician can approve quickly.
+These don't bypass approval - they're just classified low so the technician can approve quickly.
 
 - `uname -a`, `uptime`, `whoami`, `id`, `hostnamectl`
 - `df -h`, `free -m`, `lsblk`, `du -sh <specific path>`
@@ -97,14 +97,14 @@ Rule of thumb: **specific target, bounded output, no secret content, no mutation
 
 ---
 
-## 5. Fix-command guidance (`LOW`/`MEDIUM` — minimal & reversible)
+## 5. Fix-command guidance (`LOW`/`MEDIUM` - minimal & reversible)
 
-- Restart **the one** affected service: `systemctl restart <svc>` — not a blanket "restart everything".
+- Restart **the one** affected service: `systemctl restart <svc>` - not a blanket "restart everything".
 - Back up before editing config: copy to `<file>.bak.<ts>` first, change the **specific** key, restart the **specific** service.
 - Free a port / clear a stale PID: remove **the specific** stale PID file, not a wildcard.
 - Fix ownership/permission on **the specific** path the service needs (e.g. an upload/data dir), not recursively across system trees.
-- Disk full: identify the **specific** large/rotatable files; rotate/compress logs properly — **never** delete logs to hide evidence, and don't nuke `/var`.
-- Prefer the change that **survives a reboot** (enable the unit, fix the persistent config) — rubric B scores persistence.
+- Disk full: identify the **specific** large/rotatable files; rotate/compress logs properly - **never** delete logs to hide evidence, and don't nuke `/var`.
+- Prefer the change that **survives a reboot** (enable the unit, fix the persistent config) - rubric B scores persistence.
 
 Every fix proposal should carry a **rollback** note (how to undo) in its structured output.
 
@@ -133,7 +133,7 @@ For **every** proposed command, the audit log (append-only, never deleted) recor
 - model rationale (`purpose`, `expectedSignal`, `hypothesis`)
 - risk classification + safety notes
 - technician decision (approve / edit / reject) + reason
-- final executed command (post-edit) — or "blocked"/"rejected"
+- final executed command (post-edit) - or "blocked"/"rejected"
 - timestamp(s): proposed, decided, executed
 - exit code
 - stdout/stderr **summary** (redacted, capped)
@@ -146,38 +146,39 @@ This record is what the judge inspects (C), and the **only** source the activity
 
 ## 8. Enforcement points (defence in depth)
 
-1. **At proposal:** `validateCommandAgainstPolicy(proposed)` — block → `command.blocked`, never reaches approval.
-2. **At approval:** re-run `validateCommandAgainstPolicy(final)` on the possibly-edited command — block → `422`, audit `BLOCKED`.
+1. **At proposal:** `validateCommandAgainstPolicy(proposed)` - block → `command.blocked`, never reaches approval.
+2. **At approval:** re-run `validateCommandAgainstPolicy(final)` on the possibly-edited command - block → `422`, audit `BLOCKED`.
 3. **At execution:** `ssh/executor.ts` enforces non-interactive single command, connect+command timeout, output cap.
 4. **At logging/return:** `redactSecrets` on all output before audit/UI/model.
 5. **System prompts:** instruct the model never to propose forbidden commands (first line of defence, not the last).
 
 A failure at any single layer is caught by the next. The deterministic policy (1 & 2) is the one
-that actually guarantees safety — the prompt is advisory.
+that actually guarantees safety - the prompt is advisory.
 
 ---
 
 ## 8b. Additions folded from `minam` (net-new)
 
 - **Human-typed commands go through the same gate** (G1). A command the technician types via
-  `manual-command` is classified/redacted/audited identically to an agent proposal — a DENY pattern is
+  `manual-command` is classified/redacted/audited identically to an agent proposal - a DENY pattern is
   blocked even when a human typed it; recorded with `actor: technician`. The safety floor never lowers
   because the human is driving.
 - **Editing secret-bearing config** (G8). When a fix lives in a file that also holds a secret: never `cat`
-  the whole file into context/logs — target the specific directive; edit in place without echoing values;
+  the whole file into context/logs - target the specific directive; edit in place without echoing values;
   **redact the diff** before it reaches UI/model/audit.
 - **sudo-limited reads** (G7). If a diagnostic needs privileges `azureuser` lacks (preflight `sudo -n true`
   failed), the agent **surfaces "I need sudo to read X"** (an `agent.question`) rather than concluding
   "looks fine." Use `sudo -n`; never hang on a password prompt.
 - **Prompt-injection defense.** All command output is **untrusted data, never instructions**. If a
-  log/MOTD/file says "run X", the agent may *report* it, but any resulting proposal still passes the full
-  deterministic gate — the verdict is independent of what the output "says."
+  log/MOTD/file says "run X", the agent may _report_ it, but any resulting proposal still passes the full
+  deterministic gate - the verdict is independent of what the output "says."
 - **Undo is a gated operation** (G3): reverting the last change runs through classify+audit like any
   command, followed by the benefit test to prove no regression.
 
 ---
 
 ## 9. Test checklist (`tests/safety.test.ts`)
+
 - Each blocklist pattern → `HIGH_RISK_BLOCKED` and never executes.
 - Obfuscation attempts (extra spaces, quotes, `chmod -R 777 ${HOME}`) → still blocked or, if unresolvable, blocked.
 - Targeted variants (`chown azureuser /srv/app/uploads`) → `LOW`/`MEDIUM`, **not** blocked.

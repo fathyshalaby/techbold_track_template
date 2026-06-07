@@ -1,9 +1,14 @@
 # Secrets & keys
 .env
+.env.*
+!.env.example
 keys/*
 !keys/.gitkeep
 *.pem
 *.key
+PROVIDED.md
+CASE_IMPORTANT.md
+HACKATHON_DEMO.md
 
 # Python
 __pycache__/
@@ -15,16 +20,27 @@ venv/
 
 # Node / Bun
 node_modules/
-apps/frontend/dist/
+apps/dashboard/.next/
+apps/dashboard/out/
+apps/dashboard/dist/
 apps/backend/dist/
 apps/backend/data/
+**/.next/
 *.tsbuildinfo
 
 # Model sidecar artifacts
+apps/model/.env
+apps/model/.env.*
+!apps/model/.env.example
+apps/model/.cache/
+apps/model/.ruff_cache/
 apps/model/outputs/
+apps/model/data/source/*
+!apps/model/data/source/.gitkeep
 apps/model/data/processed/
 apps/model/data/quarantine/
 apps/model/.venv/
+apps/model/checkpoints/
 
 # Planning (local reference, not shipped)
 .planning/
@@ -34,6 +50,11 @@ apps/model/.venv/
 docs/AUDIT_LOG.md
 graphify-out/
 .planning/graphs/
+logs/
+*.log
+
+# Local run state (scripts/start.sh --model)
+.model-server.pid
 
 # OS / editor
 .DS_Store

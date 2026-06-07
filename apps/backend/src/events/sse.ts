@@ -8,11 +8,26 @@ import { redactSecrets } from "../safety/redaction.js";
 import { getAuditEvents } from "../store/audit.js";
 import { runEventBus } from "./run-event-bus.js";
 
+type SseWriter = {
+  writeSSE: (payload: { data: string; event?: string; id?: string }) => Promise<void>;
+};
+
+async function safeWriteSse(
+  stream: SseWriter,
+  payload: { data: string; event?: string; id?: string },
+): Promise<void> {
+  try {
+    await stream.writeSSE(payload);
+  } catch (err) {
+    console.error("[sse] write failed:", (err as Error).message);
+  }
+}
+
 export function createSseStream(c: Context, runId: string) {
   return streamSSE(c, async (stream) => {
     const backfill = getAuditEvents(runId);
     for (const event of backfill) {
-      await stream.writeSSE({
+      await safeWriteSse(stream, {
         event: event.type,
         data: JSON.stringify({
           type: event.type,
@@ -25,7 +40,7 @@ export function createSseStream(c: Context, runId: string) {
     }
 
     const anyListener = (eventType: string, payload: unknown) => {
-      void stream.writeSSE({
+      void safeWriteSse(stream, {
         event: eventType,
         data: redactSecrets(
           JSON.stringify({
@@ -47,7 +62,7 @@ export function createSseStream(c: Context, runId: string) {
     while (!stream.aborted) {
       await stream.sleep(15000);
       if (!stream.aborted) {
-        await stream.writeSSE({ data: "", event: "keepalive", id: "" });
+        await safeWriteSse(stream, { data: "", event: "keepalive", id: "" });
       }
     }
   });

@@ -76,7 +76,7 @@ export const ActivitySchema = z.object({
   ticket_id: z.number(),
   start_datetime: z.string(),
   end_datetime: z.string(),
-  description: z.string(),
+  description: z.string().optional(),
   summary: z.string().optional(),
   root_cause: z.string().optional(),
   actions_taken: z.string().optional(),
@@ -110,6 +110,8 @@ export type CustomerSystem = z.infer<typeof CustomerSystemSchema>;
 export type Employee = z.infer<typeof EmployeeSchema>;
 export type Customer = z.infer<typeof CustomerSchema>;
 export type ActivityCreate = z.infer<typeof ActivityCreateSchema>;
-export type Activity = z.infer<typeof ActivitySchema>;
+export type Activity = Omit<z.infer<typeof ActivitySchema>, "description"> & {
+  description: string;
+};
 export type PhoenixError = z.infer<typeof PhoenixErrorSchema>;
 export type PhoenixValidationError = z.infer<typeof PhoenixValidationErrorSchema>;

@@ -1,4 +1,4 @@
-# Runbook — systemd & service lifecycle
+# Runbook - systemd & service lifecycle
 
 > Single-host Ubuntu over SSH · stock tooling only (no installs). Replace `UNIT` with the real unit
 > name incl. suffix (`.service`/`.timer`/`.socket`). `sudo` for writes; reads often work unprivileged.
@@ -21,7 +21,7 @@ rate-limited (cause is upstream; limiter is just the brake) · `Result=oom-kill`
 ## 1. Service won't start / crash-loops
 **Diagnose:** `systemctl status UNIT -l`; `journalctl -xeu UNIT`; `systemctl show UNIT -p Result,ExecMainStatus,ExecMainCode,Restart,RestartSec,StartLimitIntervalSec,StartLimitBurst`; `systemctl cat UNIT` (verify ExecStart path); `test -x <binary>`. Distinguish crash-loop (repeated Started/Failed) vs `start-limit-hit` (the brake, not the cause).
 **Root causes:** ExecStart binary missing/not-executable/wrong absolute path (systemd needs absolute paths, no `$PATH`); app exits non-zero (bad config, missing env var, port already bound, missing data dir, perm denied); `Type=` mismatch (`forking` w/o fork or `PIDFile=`; `notify` that never calls `sd_notify`→timeout); OOM kill; `User=`/`Group=`/`WorkingDirectory=` invalid; restart limiter tripped after the real fault.
-**Durable fix:** edit via drop-in, never vendor file — `sudo systemctl edit UNIT` → `/etc/systemd/system/UNIT.d/override.conf` → `sudo systemctl daemon-reload`. For races add ordering (`Wants=network-online.target`+`After=network-online.target`), not `sleep`. For crash recovery: `Restart=on-failure`, sane `RestartSec=2s`, widen `StartLimitIntervalSec`/`StartLimitBurst` only if legitimately slow. Clear sticky state: `sudo systemctl reset-failed UNIT` (also resets the start-limit counter).
+**Durable fix:** edit via drop-in, never vendor file - `sudo systemctl edit UNIT` → `/etc/systemd/system/UNIT.d/override.conf` → `sudo systemctl daemon-reload`. For races add ordering (`Wants=network-online.target`+`After=network-online.target`), not `sleep`. For crash recovery: `Restart=on-failure`, sane `RestartSec=2s`, widen `StartLimitIntervalSec`/`StartLimitBurst` only if legitimately slow. Clear sticky state: `sudo systemctl reset-failed UNIT` (also resets the start-limit counter).
 **Validate:** `daemon-reload`; `reset-failed`; `restart`; `systemctl is-active UNIT`→active; watch `NRestarts` not climb; `journalctl -u UNIT -f`; persistence: `stop`→`start`→`is-active`; throwaway host: `reboot` then `is-active`+`is-enabled`.
 **Avoid:** looping `restart` into the limiter (fix cause then `reset-failed`); `Restart=always` to paper over a crash; running the daemon by hand as root (bypasses User=/cgroups, proves nothing).
 
@@ -34,7 +34,7 @@ rate-limited (cause is upstream; limiter is just the brake) · `Result=oom-kill`
 
 ## 3. Dependency / ordering failures
 **Diagnose:** `journalctl -u UNIT -b | grep -iE 'depend|order|required|not found|failed to'`; `systemctl show UNIT -p Requires,Wants,BindsTo,After,Before,Conflicts,WantedBy`; `systemctl list-dependencies UNIT [--reverse]`; `systemd-analyze verify /etc/systemd/system/UNIT`. Classic tell: starts before network/DB ready, or a `Requires=` target is itself failed/masked.
-**Root causes:** ordering (`After=`/`Before=`) confused with pulling-in (`Requires=`/`Wants=`) — ordering alone doesn't pull a unit; requirement alone doesn't order it; depending on `network.target` (link up) when you need `network-online.target` (routable) and forgetting `Wants=` it; hard `Requires=`/`BindsTo=` on a failing unit tears yours down; typo'd dep name (implicit failing dep); missing `WantedBy=` in `[Install]`→enable is a no-op.
+**Root causes:** ordering (`After=`/`Before=`) confused with pulling-in (`Requires=`/`Wants=`) - ordering alone doesn't pull a unit; requirement alone doesn't order it; depending on `network.target` (link up) when you need `network-online.target` (routable) and forgetting `Wants=` it; hard `Requires=`/`BindsTo=` on a failing unit tears yours down; typo'd dep name (implicit failing dep); missing `WantedBy=` in `[Install]`→enable is a no-op.
 **Durable fix (drop-in):**
 ```ini
 [Unit]
@@ -54,10 +54,10 @@ Codes: `ExecMainCode=exited`+`status=N`→app exit N (`203/EXEC` binary not foun
 **Avoid:** blindly bumping timeouts to hide a hang; confirm the app actually reaches ready.
 
 ## 5. Config reload vs restart
-- `systemctl reload UNIT` — re-reads app config without dropping the process; use when `CanReload=yes` and you changed only the app's own config files.
-- `systemctl restart UNIT` — required when you changed the **unit** (`ExecStart`, `Environment=`, deps) or the app has no reload.
+- `systemctl reload UNIT` - re-reads app config without dropping the process; use when `CanReload=yes` and you changed only the app's own config files.
+- `systemctl restart UNIT` - required when you changed the **unit** (`ExecStart`, `Environment=`, deps) or the app has no reload.
 - `reload-or-restart` picks automatically.
-- **Editing a unit/drop-in requires `systemctl daemon-reload`** to reparse — a plain reload/restart of the service does NOT pick up unit-file changes by itself.
+- **Editing a unit/drop-in requires `systemctl daemon-reload`** to reparse - a plain reload/restart of the service does NOT pick up unit-file changes by itself.
 - Persist app config to its on-disk file then `reload`; don't rely on live `systemctl set-environment` (lost on reboot).
 **Validate:** `daemon-reload` (if unit edited) → `reload` → `is-active` → `journalctl -u UNIT -n 20` shows "Reloaded".
 
@@ -73,21 +73,21 @@ journalctl --list-boots; journalctl -b -1 -u UNIT   # previous boot (post-crash)
 journalctl -k                          # kernel ring (OOM, segfault, hardware)
 journalctl --disk-usage
 ```
-Surfaces: stack traces, `Permission denied`, `Address already in use` (pair with `ss -ltnp | grep :PORT`), `Out of memory: Killed process`. If logs vanish after reboot the journal is volatile: persist durably via `/var/log/journal` + `[Journal] Storage=persistent` in `/etc/systemd/journald.conf` → `systemctl restart systemd-journald`. **Avoid `journalctl --vacuum-*`/`--rotate` during an active incident — may delete needed evidence.**
+Surfaces: stack traces, `Permission denied`, `Address already in use` (pair with `ss -ltnp | grep :PORT`), `Out of memory: Killed process`. If logs vanish after reboot the journal is volatile: persist durably via `/var/log/journal` + `[Journal] Storage=persistent` in `/etc/systemd/journald.conf` → `systemctl restart systemd-journald`. **Avoid `journalctl --vacuum-*`/`--rotate` during an active incident - may delete needed evidence.**
 
 ## 7. Enabling at boot
 **Diagnose:** `systemctl is-enabled UNIT`; `systemctl list-unit-files --state=enabled | grep UNIT`; `systemctl get-default`; `systemctl cat UNIT | grep -A3 '\[Install\]'` (needs `WantedBy=` to be enableable). Symptom: runs after manual `start` but dead after reboot → not enabled / no `[Install]`.
 **Root causes:** never `enable`d (start is runtime-only); `static` unit (no `[Install]`); enabled but masked elsewhere; socket-activated unit needs the `.socket` enabled, not the `.service`.
 **Durable fix:** `sudo systemctl enable UNIT` (writes WantedBy symlink on disk) or `sudo systemctl enable --now UNIT`. For a `static` unit add `[Install] WantedBy=multi-user.target` via `systemctl edit --full UNIT`, then enable.
 **Validate:** `is-enabled UNIT`→enabled; `ls -l /etc/systemd/system/multi-user.target.wants/UNIT`; throwaway host `reboot`→`is-active`+`is-enabled`.
-**Avoid:** editing `*.target.wants/` symlinks by hand; assuming `start` persists (it doesn't — only `enable` writes the boot symlink).
+**Avoid:** editing `*.target.wants/` symlinks by hand; assuming `start` persists (it doesn't - only `enable` writes the boot symlink).
 
-## 8. Drop-ins / overrides — precedence
+## 8. Drop-ins / overrides - precedence
 **Inspect:** `systemctl cat UNIT` (vendor then drop-ins, in load order); `systemd-delta [--type=extended]`; `ls -l /etc/systemd/system/UNIT.d/ /run/systemd/system/UNIT.d/`; `systemctl show UNIT -p <Property>` (effective value).
-**Precedence (dir, highest wins):** `/etc/systemd/system/UNIT.d/` (admin) > `/run/systemd/system/UNIT.d/` (runtime, volatile) > `/usr/lib|/lib/systemd/system/UNIT.d/` (vendor). Across dirs, files merge in **lexicographic filename order** (`10-`,`20-`…). Most settings last-wins; **list settings** (`After=`,`Environment=`,`ExecStartPre=`) *append* — to clear, assign empty once then re-add; `ExecStart=` must be cleared before re-setting.
+**Precedence (dir, highest wins):** `/etc/systemd/system/UNIT.d/` (admin) > `/run/systemd/system/UNIT.d/` (runtime, volatile) > `/usr/lib|/lib/systemd/system/UNIT.d/` (vendor). Across dirs, files merge in **lexicographic filename order** (`10-`,`20-`…). Most settings last-wins; **list settings** (`After=`,`Environment=`,`ExecStartPre=`) *append* - to clear, assign empty once then re-add; `ExecStart=` must be cleared before re-setting.
 **Durable fix:** `sudo systemctl edit UNIT` (admin drop-in in `/etc`, survives reboot + pkg upgrade) → `daemon-reload`. Anti-patterns: `/run/...` drop-ins are runtime-only; editing the vendor file in `/lib` is clobbered on upgrade.
 **Validate:** `systemctl cat UNIT` (override appears last); `systemctl show UNIT -p <ChangedProperty>`; `restart`+`is-active`.
-**Avoid:** forgetting `daemon-reload` after on-disk edits; duplicate-named drop-ins across dirs (silent shadowing — `systemd-delta` reveals it).
+**Avoid:** forgetting `daemon-reload` after on-disk edits; duplicate-named drop-ins across dirs (silent shadowing - `systemd-delta` reveals it).
 
 ## 9. Timers (cron replacement)
 **Diagnose:** `systemctl list-timers --all`; `systemctl status UNIT.timer`; `systemctl cat UNIT.timer` (OnCalendar=/OnBootSec=/Persistent=); `journalctl -u UNIT.service -b`; `is-enabled`/`is-active UNIT.timer`; `systemd-analyze calendar "<expr>"` (validate & show next elapse). Symptom: job never runs → timer not enabled, bad `OnCalendar=`, paired `.service` failing, or missed-while-off with `Persistent=` unset.
@@ -108,7 +108,7 @@ WantedBy=timers.target
 **Avoid:** testing by changing the system clock (use `systemd-analyze calendar` / manual `start`); a leftover crontab doing the same job.
 
 ## Cross-cutting "do not"
-- Never edit `/lib|/usr/lib/systemd/system/` (clobbered on upgrade) — use `/etc` drop-ins.
+- Never edit `/lib|/usr/lib/systemd/system/` (clobbered on upgrade) - use `/etc` drop-ins.
 - Always `daemon-reload` after on-disk unit changes.
 - Runtime (`start`/`set-environment`/`/run`/`systemd-run`) = gone on reboot; durable (`enable`/`/etc`/on-disk) = survives.
 - `reset-failed` after fixing clears failed state + start-limit counter.

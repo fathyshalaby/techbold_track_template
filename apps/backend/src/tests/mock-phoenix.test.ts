@@ -131,12 +131,12 @@ describe("MockPhoenixClient", () => {
   });
 
   describe("getMe", () => {
-    it("returns demo employee", async () => {
+    it("returns technician employee", async () => {
       const result = await client.getMe();
       expect(result.id).toBe(1);
-      expect(result.firstname).toBe("Demo");
-      expect(result.lastname).toBe("Tech");
-      expect(result.username).toBe("demo.tech");
+      expect(result.firstname).toBe("Julian");
+      expect(result.lastname).toBe("Schmidt");
+      expect(result.username).toBe("j.schmidt");
       expect(result.teamname).toBe("Support");
     });
   });

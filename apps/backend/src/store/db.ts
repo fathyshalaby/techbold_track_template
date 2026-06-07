@@ -93,6 +93,11 @@ const CREATE_TABLES = `
     submitted_at TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS settings (
+    id TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+
   CREATE TRIGGER IF NOT EXISTS audit_events_no_update
   BEFORE UPDATE ON audit_events
   BEGIN

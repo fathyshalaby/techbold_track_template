@@ -205,9 +205,10 @@ describe("ActivitySchema", () => {
     expect(() => ActivitySchema.parse({ ...minimal, created_at: null })).not.toThrow();
   });
 
-  it("rejects missing description", () => {
+  it("accepts missing description on parse and normalizes on create", () => {
     const { description: _, ...withoutDesc } = minimal;
-    expect(ActivitySchema.safeParse(withoutDesc).success).toBe(false);
+    const parsed = ActivitySchema.parse(withoutDesc);
+    expect(parsed.description).toBeUndefined();
   });
 });
 

@@ -4,8 +4,6 @@ import { validateCommandAgainstPolicy } from "../safety/command-policy.js";
 import { RiskLevel } from "../safety/risk-levels.js";
 
 describe("safety - policy and classifier", () => {
-  // ─── Blocklist: core destructive commands ────────────────────────────────
-
   describe("blocklist - rm -rf variants", () => {
     it.each(["rm -rf /", "rm -rf /etc", "rm -rf /*", "rm -rf ~"])('blocks "%s"', (cmd) => {
       const result = validateCommandAgainstPolicy(cmd);
@@ -122,8 +120,6 @@ describe("safety - policy and classifier", () => {
     expect(result.matchedRule).toBeTruthy();
   });
 
-  // ─── Chained commands ────────────────────────────────────────────────────
-
   describe("chained commands - dangerous segment blocked", () => {
     it('blocks "echo hi; rm -rf /etc"', () => {
       const result = validateCommandAgainstPolicy("echo hi; rm -rf /etc");
@@ -146,8 +142,6 @@ describe("safety - policy and classifier", () => {
       expect(result.matchedRule).toBeTruthy();
     });
   });
-
-  // ─── Obfuscation ─────────────────────────────────────────────────────────
 
   describe("obfuscation - still blocked", () => {
     it('blocks extra whitespace: "rm  -rf  /etc"', () => {
@@ -172,8 +166,6 @@ describe("safety - policy and classifier", () => {
     });
   });
 
-  // ─── Targeted safe variants - must NOT be blocked ────────────────────────
-
   describe("targeted variants - not HIGH_RISK_BLOCKED", () => {
     it("chown azureuser /srv/app/uploads is not blocked", () => {
       const result = validateCommandAgainstPolicy("chown azureuser /srv/app/uploads");
@@ -191,8 +183,6 @@ describe("safety - policy and classifier", () => {
     });
   });
 
-  // ─── Classifier - SAFE_READ_ONLY allowlist ───────────────────────────────
-
   describe("classifier - SAFE_READ_ONLY allowlist", () => {
     it.each([
       "systemctl status nginx --no-pager",
@@ -206,15 +196,11 @@ describe("safety - policy and classifier", () => {
     });
   });
 
-  // ─── Classifier - unknown command ────────────────────────────────────────
-
   it("classifies unknown command as MEDIUM_RISK_CHANGE (never SAFE_READ_ONLY)", () => {
     const level = classifyCommand("someobscurecommand --flag");
     expect(level).toBe(RiskLevel.MEDIUM_RISK_CHANGE);
     expect(level).not.toBe(RiskLevel.SAFE_READ_ONLY);
   });
-
-  // ─── SAFE-05: recheck on edited command ──────────────────────────────────
 
   it("SAFE-05: safe command passes, then dangerous edit is blocked", () => {
     const safeResult = validateCommandAgainstPolicy("systemctl status nginx");
@@ -226,7 +212,6 @@ describe("safety - policy and classifier", () => {
     expect(dangerousEditResult.matchedRule).toBeTruthy();
   });
 
-  // ─── Regression: bypasses found in the Phase-3 adversarial audit ──────────
   // These all ALLOWED before the fix (quote-obfuscation defeated the literal
   // blocklist; secret-file rules only matched `cat`). Must stay blocked.
   describe("audit regression - obfuscation & secret-file bypasses", () => {
@@ -281,7 +266,6 @@ describe("safety - policy and classifier", () => {
     });
   });
 
-  // ─── Guard against over-blocking from the broadened rules above ────────────
   describe("integration-audit fixes do not over-block legitimate commands", () => {
     it.each([
       "sudo apt install bash-completion", // "bash" appears but not as a sudo shell
@@ -293,7 +277,6 @@ describe("safety - policy and classifier", () => {
     });
   });
 
-  // ─── Regression: classifyCommand must fail safe when called standalone ─────
   // classifyCommand is exported and may be used WITHOUT the policy gate (e.g. a
   // UI risk badge or an auto-approve tier). Quote-obfuscation and unresolved
   // shell expansion must never be classified SAFE_READ_ONLY / LOW_RISK_CHANGE,
@@ -316,7 +299,6 @@ describe("safety - policy and classifier", () => {
     });
   });
 
-  // ─── Ops-audit regression: recursive chmod/chown on APP paths is a legit ───
   // repair, not a hard-fail. Only 777, root, bare system dirs, and critical
   // system trees are blocked. Previously ALL recursive chmod/chown under
   // /var|/home|/srv|/usr was hard-blocked, which broke permission-fix incidents.
@@ -361,7 +343,6 @@ describe("safety - policy and classifier", () => {
     });
   });
 
-  // ─── Research regression: GTFOBins / LOLBin escapes ───────────────────────
   // Borrowed from the GTFOBins corpus + MITRE ATT&CK T1059. These hide an
   // arbitrary command inside a "harmless" tool or open a network shell, and
   // previously slipped through to MEDIUM unless the inner payload happened to

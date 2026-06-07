@@ -1,16 +1,11 @@
-FROM ubuntu:22.04
+ARG BASE_IMAGE=sda-sandbox-base:latest
+FROM ${BASE_IMAGE}
 
-ENV container=docker
-ENV DEBIAN_FRONTEND=noninteractive
-ARG BENCH_PUBLIC_KEY
 ARG DATABASE_NAME=deskorders
 ARG APP_ROLE=order_writer
 ARG APP_PASSWORD=local_order_writer_password
 ARG TABLE_NAME=orders
 ARG SEQUENCE_NAME=orders_id_seq
-
-COPY archetypes/common/setup-base.sh /tmp/setup-base.sh
-RUN chmod +x /tmp/setup-base.sh && /tmp/setup-base.sh "$BENCH_PUBLIC_KEY"
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends postgresql postgresql-client \

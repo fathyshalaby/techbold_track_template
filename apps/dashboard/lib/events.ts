@@ -13,10 +13,28 @@ export type RunEventHandlers = {
 
 export function subscribeToRunEvents(runId: string, handlers: RunEventHandlers) {
   const eventSource = new EventSource(getRunEventsUrl(runId));
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const scheduleEvent = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = undefined;
+      handlers.onEvent?.({
+        type: "observation.added",
+        runId,
+        ts: new Date().toISOString(),
+        payload: null,
+      });
+    }, 250);
+  };
 
   const handleEvent = (message: MessageEvent<string>) => {
-    const parsed = JSON.parse(message.data) as SseEvent;
-    handlers.onEvent?.(parsed);
+    try {
+      JSON.parse(message.data) as SseEvent;
+      scheduleEvent();
+    } catch {
+      // Ignore malformed SSE payloads; pump/refresh still drives the UI.
+    }
   };
 
   for (const eventType of SSE_EVENT_TYPES) {
@@ -26,5 +44,8 @@ export function subscribeToRunEvents(runId: string, handlers: RunEventHandlers) 
   eventSource.onopen = () => handlers.onOpen?.();
   eventSource.onerror = () => handlers.onError?.();
 
-  return () => eventSource.close();
+  return () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    eventSource.close();
+  };
 }

@@ -1,13 +1,15 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
+  outputFileTracingRoot: path.join(import.meta.dirname, "..", ".."),
   transpilePackages: ["@techbold/contracts"],
-  webpack: (config) => {
-    config.resolve.extensionAlias = {
-      ...config.resolve.extensionAlias,
-      ".js": [".ts", ".tsx", ".js"],
-    };
-    return config;
+  turbopack: {
+    root: path.join(import.meta.dirname, "..", ".."),
+    rules: {
+      "*.ts": { loaders: ["./turbopack-strip-js-ext.cjs"] },
+    },
   },
 };
 

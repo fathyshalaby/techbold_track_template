@@ -5,7 +5,7 @@ import { getModel, isBuiltInMockModel } from "../model.js";
 import { VALIDATOR_SYSTEM_PROMPT } from "../prompts.js";
 import { ValidationResultSchema } from "../types.js";
 import type { ValidationResult } from "../types.js";
-import { AgentUnavailableError } from "./problem-analyzer.js";
+import { AgentUnavailableError, runAgentObject } from "./resilience.js";
 
 export { AgentUnavailableError };
 export { ValidationResultSchema };
@@ -32,23 +32,18 @@ export async function runValidator(
   if (isBuiltInMockModel(resolvedModel)) {
     return MOCK_VALIDATION_RESULT_LIKELY;
   }
-  try {
-    const result = await Promise.race([
-      generateObject({
-        model: resolvedModel,
-        schema: ValidationResultSchema,
-        system: VALIDATOR_SYSTEM_PROMPT,
-        prompt: guardModelInput({
-          ticketDescription: input.ticketDescription,
-          observations: input.observations,
-          fixApplied: input.fixApplied,
-        }),
-        maxTokens: 1024,
+  return runAgentObject("validator", async () => {
+    const result = await generateObject({
+      model: resolvedModel,
+      schema: ValidationResultSchema,
+      system: VALIDATOR_SYSTEM_PROMPT,
+      prompt: guardModelInput({
+        ticketDescription: input.ticketDescription,
+        observations: input.observations,
+        fixApplied: input.fixApplied,
       }),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 30_000)),
-    ]);
+      maxTokens: 1024,
+    });
     return result.object;
-  } catch {
-    throw new AgentUnavailableError("agent unavailable: validator");
-  }
+  });
 }

@@ -1,5 +1,6 @@
 export const SSE_EVENT_TYPES = [
   "run.started",
+  "memory.recalled",
   "agent.thought_summary",
   "command.proposed",
   "command.blocked",

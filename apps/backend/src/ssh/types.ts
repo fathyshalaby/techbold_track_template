@@ -2,7 +2,11 @@ export interface SshTarget {
   host: string;
   port: number;
   username: string;
-  privateKeyPath: string;
+  // Candidate private keys, tried in order until one authenticates. Each VM in
+  // the fleet has its own keypair, and at execution time we only know the host
+  // (from the ticket), not which key matches - so we offer all of them and let
+  // the server accept the right one. A single-element list is the common case.
+  privateKeyPaths: string[];
 }
 
 export interface CommandResult {

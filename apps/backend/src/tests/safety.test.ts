@@ -1,4 +1,4 @@
-// Safety layer §9 consolidated gate - rubric-C evidence
+// Safety layer 9 consolidated gate - rubric-C evidence
 // Imports all three public modules and exercises them together.
 import { describe, expect, it } from "vitest";
 import { classifyCommand } from "../safety/classifier.js";
@@ -7,8 +7,6 @@ import { REDACTION_CAP_BYTES, redactSecrets } from "../safety/redaction.js";
 import { RiskLevel } from "../safety/risk-levels.js";
 
 describe("safety", () => {
-  // ─── 1. Blocklist - HIGH_RISK_BLOCKED ───────────────────────────────────────
-
   describe("blocklist - HIGH_RISK_BLOCKED", () => {
     describe("rm-rf-system-paths", () => {
       it.each(["rm -rf /", "rm -rf /*", "rm -rf /etc", "rm -rf /var/lib/postgresql"])(
@@ -131,8 +129,6 @@ describe("safety", () => {
     });
   });
 
-  // ─── 2. Obfuscation variants ─────────────────────────────────────────────────
-
   describe("obfuscation variants", () => {
     it('extra spaces: "rm  -rf  /" still blocked', () => {
       const r = validateCommandAgainstPolicy("rm  -rf  /");
@@ -171,8 +167,6 @@ describe("safety", () => {
     });
   });
 
-  // ─── 3. Targeted variants - not HIGH_RISK_BLOCKED ────────────────────────────
-
   describe("targeted variants - not blocked", () => {
     it("chown azureuser:www-data /srv/app/uploads is allowed", () => {
       const r = validateCommandAgainstPolicy("chown azureuser:www-data /srv/app/uploads");
@@ -197,8 +191,6 @@ describe("safety", () => {
     });
   });
 
-  // ─── 4. Edited-command recheck - SAFE-05 ────────────────────────────────────
-
   describe("edited-command recheck - SAFE-05", () => {
     it("safe proposal passes, then dangerous edit is blocked by same function", () => {
       const safe = validateCommandAgainstPolicy("systemctl status nginx");
@@ -209,8 +201,6 @@ describe("safety", () => {
       expect(dangerous.riskLevel).toBe(RiskLevel.HIGH_RISK_BLOCKED);
     });
   });
-
-  // ─── 5. Redaction ────────────────────────────────────────────────────────────
 
   describe("redaction", () => {
     it("redacts password= value, keeps key name", () => {
@@ -288,8 +278,6 @@ describe("safety", () => {
     });
   });
 
-  // ─── 6. Allowlist - SAFE_READ_ONLY ──────────────────────────────────────────
-
   describe("allowlist - SAFE_READ_ONLY", () => {
     it.each([
       "systemctl status nginx --no-pager",
@@ -303,8 +291,6 @@ describe("safety", () => {
       expect(classifyCommand(cmd)).toBe(RiskLevel.SAFE_READ_ONLY);
     });
   });
-
-  // ─── 7. Unknown commands - default MEDIUM ────────────────────────────────────
 
   describe("unknown commands - default MEDIUM", () => {
     it.each(["some-unknown-tool --flag value", "frobnicator start"])(

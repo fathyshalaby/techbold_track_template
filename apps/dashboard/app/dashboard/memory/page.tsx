@@ -1,23 +1,39 @@
 import { DashboardError, DashboardShell } from "@/components/dashboard-shell";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getDashboard } from "@/lib/api";
-import { sourceLabel } from "@/lib/source-labels";
+import { MemoryVectorMap } from "@/components/memory-vector-map";
+import { getDashboard, getMemory, getMemoryVectors } from "@/lib/api";
 
-export default async function MemoryPage() {
+type MemoryPageProps = {
+  searchParams: Promise<{ q?: string }>;
+};
+
+export default async function MemoryPage({ searchParams }: MemoryPageProps) {
   try {
-    const dashboard = await getDashboard();
+    const params = await searchParams;
+    const query = params.q?.trim() ?? "";
+    const [dashboard, memory, vectors] = await Promise.all([
+      getDashboard(),
+      getMemory(),
+      getMemoryVectors(query),
+    ]);
+
+    const stats = memory.stats ?? dashboard.memory.stats;
+
     return (
-      <DashboardShell sourceLabel={dashboard.source.label} healthLabel={dashboard.health.status}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Memory</CardTitle>
-            <Badge tone="warning">{sourceLabel(dashboard.memory.source)}</Badge>
-          </CardHeader>
-          <CardContent>
-            <p>{dashboard.memory.message}</p>
-          </CardContent>
-        </Card>
+      <DashboardShell title="Memory" sourceLabel={undefined} healthLabel={dashboard.health.status}>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Memory</h1>
+          <p className="text-sm text-muted-foreground">
+            Vector recall of past incidents, runbooks, and public troubleshooting knowledge.
+          </p>
+        </div>
+
+        <MemoryVectorMap
+          points={vectors.points}
+          stats={stats ?? null}
+          available={memory.available}
+          message={dashboard.memory.message}
+          initialQuery={query}
+        />
       </DashboardShell>
     );
   } catch {

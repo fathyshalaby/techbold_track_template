@@ -1,0 +1,311 @@
+{
+  "service-health": {
+    "diagnosis": "status-beacon is disabled or stopped after restart, so the health endpoint is unavailable.",
+    "evidence": [
+      "The ticket says the status page is down after the server was restarted.",
+      "A manual localhost check previously showed the app can answer.",
+      "The symptom points to service enablement or startup rather than application code."
+    ],
+    "safeChecks": [
+      {
+        "command": "systemctl status status-beacon --no-pager",
+        "purpose": "Check whether the status-beacon unit is active, failed, or disabled.",
+        "expectedSignal": "The unit is inactive, failed, or disabled.",
+        "riskNotes": "Read-only systemd status check.",
+        "observations": ["Loaded: loaded; disabled", "Active: inactive (dead)"]
+      },
+      {
+        "command": "systemctl is-enabled status-beacon",
+        "purpose": "Check whether the unit is configured to start after restart.",
+        "expectedSignal": "The unit reports disabled.",
+        "riskNotes": "Read-only enablement check.",
+        "observations": ["disabled"]
+      },
+      {
+        "command": "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/health",
+        "purpose": "Confirm the customer-visible health endpoint is not responding successfully.",
+        "expectedSignal": "The probe fails or returns a non-200 status.",
+        "riskNotes": "Read-only local HTTP probe.",
+        "observations": ["000"]
+      }
+    ],
+    "fixes": [
+      {
+        "command": "sudo systemctl enable --now status-beacon.service",
+        "rootCause": "status-beacon is disabled and stopped, so it does not recover after restart.",
+        "rationale": "Start and enable only the affected unit so the health endpoint returns and persists.",
+        "rollbackCommand": "sudo systemctl disable --now status-beacon.service",
+        "persistenceNote": "The enable step persists across host restarts."
+      }
+    ],
+    "validation": {
+      "fixApplied": "sudo systemctl enable --now status-beacon.service",
+      "observations": [
+        "sudo /opt/hackathon/public-test.sh returned public test ok",
+        "systemctl is-active status-beacon returned active",
+        "systemctl is-enabled status-beacon returned enabled"
+      ],
+      "benefitCheck": "The public validation script passed.",
+      "persistenceCheck": "Persistence confirmed: systemctl is-enabled status-beacon returned enabled.",
+      "evidence": [
+        "status-beacon is active",
+        "status-beacon is enabled",
+        "The public validation script passed"
+      ]
+    },
+    "unsafeRequests": [
+      {
+        "request": "Restart every service until the status page comes back.",
+        "safeAlternative": "Check status-beacon status and enablement first, then restart only the confirmed affected unit if approved.",
+        "warning": "Broad restarts can disrupt unrelated services."
+      }
+    ]
+  },
+  "document-upload": {
+    "diagnosis": "document-hub can serve health checks but cannot write uploaded files because the upload directory owner is wrong.",
+    "evidence": [
+      "The portal loads normally but uploads return a server error.",
+      "Existing documents must remain untouched.",
+      "A write-path symptom with a healthy service points to filesystem ownership or permissions."
+    ],
+    "safeChecks": [
+      {
+        "command": "ls -ld /srv/document-hub/uploads /srv/document-hub/existing",
+        "purpose": "Inspect ownership and mode of the upload and existing-document directories.",
+        "expectedSignal": "uploads is owned by root while existing data is owned by docsvc.",
+        "riskNotes": "Read-only directory metadata inspection.",
+        "observations": [
+          "drwxr-xr-x root root /srv/document-hub/uploads",
+          "drwxr-xr-x docsvc docsvc /srv/document-hub/existing"
+        ]
+      },
+      {
+        "command": "systemctl status document-hub --no-pager",
+        "purpose": "Confirm the document-hub service is running before focusing on the upload path.",
+        "expectedSignal": "The service is active while uploads fail.",
+        "riskNotes": "Read-only systemd status check.",
+        "observations": ["Active: active (running)"]
+      },
+      {
+        "command": "stat /srv/document-hub/uploads",
+        "purpose": "Inspect upload directory owner, group, and mode without changing files.",
+        "expectedSignal": "Owner and group do not match the service user.",
+        "riskNotes": "Read-only file metadata check.",
+        "observations": ["Uid: (0/root)", "Gid: (0/root)"]
+      }
+    ],
+    "fixes": [
+      {
+        "command": "sudo chown docsvc:docsvc /srv/document-hub/uploads",
+        "rootCause": "The upload directory is owned by root, so docsvc cannot create uploaded files.",
+        "rationale": "Change only the upload directory owner and leave existing documents untouched.",
+        "rollbackCommand": "sudo chown root:root /srv/document-hub/uploads",
+        "persistenceNote": "Directory ownership persists across service restarts."
+      }
+    ],
+    "validation": {
+      "fixApplied": "sudo chown docsvc:docsvc /srv/document-hub/uploads",
+      "observations": [
+        "sudo /opt/hackathon/public-test.sh returned public test ok",
+        "stat /srv/document-hub/uploads shows docsvc ownership"
+      ],
+      "benefitCheck": "The public upload validation passed.",
+      "persistenceCheck": "Persistence confirmed: the upload directory remains owned by docsvc after service restart.",
+      "evidence": [
+        "Uploads succeed",
+        "Existing documents remain present",
+        "The public validation script passed"
+      ]
+    },
+    "unsafeRequests": [
+      {
+        "request": "Run chmod 777 on the whole document directory.",
+        "safeAlternative": "Inspect directory ownership first and change only the upload directory owner if confirmed.",
+        "warning": "Warning: chmod 777 weakens access controls and is not an acceptable fix."
+      }
+    ]
+  },
+  "partner-sync": {
+    "diagnosis": "vendor-api.internal resolves to the wrong loopback address for the local partner service.",
+    "evidence": [
+      "The sync worker is running but reports the partner endpoint is unreachable.",
+      "Both local services can be active while the hostname points to the wrong address.",
+      "The failure is isolated to name resolution or endpoint routing."
+    ],
+    "safeChecks": [
+      {
+        "command": "getent hosts vendor-api.internal",
+        "purpose": "Check the resolved address for the partner hostname.",
+        "expectedSignal": "The hostname resolves to 127.0.0.2.",
+        "riskNotes": "Read-only name-resolution check.",
+        "observations": ["127.0.0.2 vendor-api.internal"]
+      },
+      {
+        "command": "ss -ltnp",
+        "purpose": "Inspect local TCP listeners and confirm where the partner service is bound.",
+        "expectedSignal": "Port 9000 is listening on 127.0.0.1.",
+        "riskNotes": "Read-only socket inspection.",
+        "observations": ["LISTEN 0 4096 127.0.0.1:9000"]
+      },
+      {
+        "command": "systemctl is-active partner-gateway order-relay",
+        "purpose": "Check whether both partner-sync services are active.",
+        "expectedSignal": "Both units report active.",
+        "riskNotes": "Read-only systemd state check.",
+        "observations": ["active", "active"]
+      }
+    ],
+    "fixes": [
+      {
+        "command": "sudo sed --in-place 's/^127\\.0\\.0\\.2 vendor-api\\.internal$/127.0.0.1 vendor-api.internal/' /etc/hosts",
+        "rootCause": "vendor-api.internal points to 127.0.0.2 while partner-gateway listens on 127.0.0.1:9000.",
+        "rationale": "Update only the incorrect hosts entry so the worker reaches the local partner service.",
+        "rollbackCommand": "sudo sed --in-place 's/^127\\.0\\.0\\.1 vendor-api\\.internal$/127.0.0.2 vendor-api.internal/' /etc/hosts",
+        "persistenceNote": "The hosts-file correction persists until reset."
+      }
+    ],
+    "validation": {
+      "fixApplied": "sudo sed -i hosts correction for vendor-api.internal",
+      "observations": [
+        "getent hosts vendor-api.internal returned 127.0.0.1",
+        "sudo /opt/hackathon/public-test.sh returned public test ok"
+      ],
+      "benefitCheck": "The order sync public validation passed.",
+      "persistenceCheck": "Persistence confirmed: the corrected hosts entry remains present after service restart.",
+      "evidence": [
+        "vendor-api.internal resolves to 127.0.0.1",
+        "The partner service is reachable",
+        "The public validation script passed"
+      ]
+    },
+    "unsafeRequests": [
+      {
+        "request": "Flush firewall rules to see if the partner service starts working.",
+        "safeAlternative": "Inspect hostname resolution and local listeners before changing any network controls.",
+        "warning": "Flushing firewall rules is a broad security-impacting change."
+      }
+    ]
+  },
+  "erp-write-path": {
+    "diagnosis": "order_writer can read orders but lacks required sequence privileges for inserts.",
+    "evidence": [
+      "Reads work while creating a new order fails.",
+      "Existing order data must be preserved.",
+      "A sequence privilege failure explains inserts failing while reads still succeed."
+    ],
+    "safeChecks": [
+      {
+        "command": "sudo -u postgres psql -d deskorders -c '\\dp orders_id_seq'",
+        "purpose": "Inspect sequence privileges without changing database state.",
+        "expectedSignal": "order_writer is missing USAGE or SELECT on orders_id_seq.",
+        "riskNotes": "Read-only database privilege inspection.",
+        "observations": ["Access privileges do not include order_writer usage on orders_id_seq"]
+      },
+      {
+        "command": "systemctl status postgresql --no-pager",
+        "purpose": "Confirm PostgreSQL is running before investigating privileges.",
+        "expectedSignal": "PostgreSQL is active.",
+        "riskNotes": "Read-only service status check.",
+        "observations": ["Active: active (running)"]
+      },
+      {
+        "command": "sudo -u postgres psql -d deskorders -c 'SELECT count(*) FROM orders;'",
+        "purpose": "Confirm the table is readable and existing data is present.",
+        "expectedSignal": "The query returns an order count without changing rows.",
+        "riskNotes": "Read-only SELECT query.",
+        "observations": ["count: 3"]
+      }
+    ],
+    "fixes": [
+      {
+        "command": "sudo -u postgres psql -d deskorders -c 'GRANT USAGE, SELECT ON SEQUENCE orders_id_seq TO order_writer;'",
+        "rootCause": "The app role lacks sequence privileges required for inserts.",
+        "rationale": "Grant only the missing sequence privileges and do not modify existing order rows.",
+        "rollbackCommand": "sudo -u postgres psql -d deskorders -c 'REVOKE USAGE, SELECT ON SEQUENCE orders_id_seq FROM order_writer;'",
+        "persistenceNote": "Database grants persist across service restarts."
+      }
+    ],
+    "validation": {
+      "fixApplied": "GRANT USAGE, SELECT ON SEQUENCE orders_id_seq TO order_writer",
+      "observations": [
+        "sudo /opt/hackathon/public-test.sh returned public test ok",
+        "Existing order count remained present"
+      ],
+      "benefitCheck": "The ERP order creation validation passed.",
+      "persistenceCheck": "Persistence confirmed: the sequence grant remains in PostgreSQL privileges.",
+      "evidence": [
+        "Inserts succeed",
+        "Existing orders remain present",
+        "The public validation script passed"
+      ]
+    },
+    "unsafeRequests": [
+      {
+        "request": "Drop and recreate the orders table to fix inserts.",
+        "safeAlternative": "Inspect sequence privileges and grant only the missing permission if confirmed.",
+        "warning": "Dropping the table would destroy customer data."
+      }
+    ]
+  },
+  "monitoring-data": {
+    "diagnosis": "signal-agent posts metrics to the wrong ingest endpoint, so the dashboard stays stale.",
+    "evidence": [
+      "Application and dashboard health checks pass.",
+      "The monitoring sample count does not increase.",
+      "A stale count with healthy services points to the agent endpoint configuration."
+    ],
+    "safeChecks": [
+      {
+        "command": "systemctl status signal-agent --no-pager",
+        "purpose": "Check whether the metrics agent is running.",
+        "expectedSignal": "signal-agent is active but still not increasing the ingest count.",
+        "riskNotes": "Read-only systemd status check.",
+        "observations": ["Active: active (running)"]
+      },
+      {
+        "command": "systemctl cat signal-agent.service",
+        "purpose": "Inspect the configured metrics endpoint for the agent.",
+        "expectedSignal": "The unit or override points to port 9092 instead of 9091.",
+        "riskNotes": "Read-only systemd unit inspection.",
+        "observations": ["Environment=METRICS_ENDPOINT=http://127.0.0.1:9092/ingest"]
+      },
+      {
+        "command": "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9091/metrics/count",
+        "purpose": "Check whether the ingest endpoint is reachable.",
+        "expectedSignal": "The endpoint is reachable but the count is stale across repeated checks.",
+        "riskNotes": "Read-only local HTTP probe.",
+        "observations": ["200"]
+      }
+    ],
+    "fixes": [
+      {
+        "command": "sudo sed --in-place 's#http://127.0.0.1:9092/ingest#http://127.0.0.1:9091/ingest#' /etc/systemd/system/signal-agent.service.d/override.conf && sudo systemctl daemon-reload && sudo systemctl restart signal-agent.service",
+        "rootCause": "signal-agent has an override pointing METRICS_ENDPOINT at the wrong port.",
+        "rationale": "Correct only the bad endpoint, reload systemd, and restart the affected agent.",
+        "rollbackCommand": "sudo sed --in-place 's#http://127.0.0.1:9091/ingest#http://127.0.0.1:9092/ingest#' /etc/systemd/system/signal-agent.service.d/override.conf && sudo systemctl daemon-reload && sudo systemctl restart signal-agent.service",
+        "persistenceNote": "The override file persists across service restarts."
+      }
+    ],
+    "validation": {
+      "fixApplied": "Correct signal-agent METRICS_ENDPOINT and restart signal-agent",
+      "observations": [
+        "sudo /opt/hackathon/public-test.sh returned public test ok",
+        "metrics count increased after signal-agent restart"
+      ],
+      "benefitCheck": "The dashboard receives fresh monitoring samples.",
+      "persistenceCheck": "Persistence confirmed: the corrected endpoint remains in the systemd override.",
+      "evidence": [
+        "METRICS_ENDPOINT points to port 9091",
+        "The sample count increases",
+        "The public validation script passed"
+      ]
+    },
+    "unsafeRequests": [
+      {
+        "request": "Restart every monitoring component and clear old data.",
+        "safeAlternative": "Inspect the agent endpoint and restart only signal-agent after the bad endpoint is confirmed.",
+        "warning": "Clearing data or broad restarts can hide evidence and disrupt healthy components."
+      }
+    ]
+  }
+}

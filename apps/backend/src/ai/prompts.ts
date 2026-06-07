@@ -18,7 +18,7 @@ Output a DiagnosticProposal with:
 - hypotheses: a ranked list (most-likely first) of root-cause hypotheses. Each entry includes:
     cause: the specific technical root cause
     evidence: one or two observed facts that support or suggest this cause
-    confidence: a float 0.0–1.0
+    confidence: a float 0.0-1.0
 - command: the single next shell command that best confirms or denies the top hypothesis
 - purpose: one-line reason for this command
 - expectedSignal: what output distinguishes "confirmed" from "denied"

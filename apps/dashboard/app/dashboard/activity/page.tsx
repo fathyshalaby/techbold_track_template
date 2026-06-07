@@ -1,62 +1,74 @@
 import { DashboardError, DashboardShell } from "@/components/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { getDashboard } from "@/lib/api";
-import { sourceLabel } from "@/lib/source-labels";
+import { IconActivity } from "@tabler/icons-react";
 import Link from "next/link";
 
 export default async function ActivityPage() {
   try {
     const dashboard = await getDashboard();
+    const states = dashboard.activityStates;
     return (
-      <DashboardShell sourceLabel={dashboard.source.label} healthLabel={dashboard.health.status}>
+      <DashboardShell
+        title="Activity"
+        sourceLabel={undefined}
+        healthLabel={dashboard.health.status}
+      >
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Activity</h1>
+          <p className="text-sm text-muted-foreground">
+            Drafted and submitted activity write-ups generated from runs.
+          </p>
+        </div>
         <Card>
-          <CardHeader>
-            <CardTitle>Activity</CardTitle>
-            <Badge tone="live">{dashboard.source.label}</Badge>
+          <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+            <CardTitle className="text-base">Activity states</CardTitle>
+            <Badge variant="outline">{states.length}</Badge>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {dashboard.activityStates.length === 0 ? (
-              <div>
-                <h2 className="text-lg font-semibold">No activity states</h2>
-                <p className="text-sm text-muted-foreground">
-                  Activity drafts and submissions appear after run progress.
-                </p>
-              </div>
+          <CardContent>
+            {states.length === 0 ? (
+              <Empty className="border-0 py-10">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <IconActivity />
+                  </EmptyMedia>
+                  <EmptyTitle>Nothing here yet</EmptyTitle>
+                  <EmptyDescription>
+                    Activity drafts and submissions appear after run progress.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
-              dashboard.activityStates.map((state) => (
-                <Link
-                  key={state.runId}
-                  href={`/dashboard/runs/${state.runId}`}
-                  className="grid gap-2 rounded-md border p-3 md:grid-cols-[1fr_auto]"
-                >
-                  <div>
-                    <div className="font-semibold">Ticket #{state.ticketId}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {state.summary ?? "No activity summary yet"}
+              <div className="flex flex-col gap-2">
+                {states.map((state) => (
+                  <Link
+                    key={state.runId}
+                    href={`/dashboard/runs/${state.runId}`}
+                    className="grid gap-2 rounded-lg border p-3 transition-colors hover:bg-muted/50 md:grid-cols-[1fr_auto] md:items-start"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium">Ticket #{state.ticketId}</div>
+                      <div className="mt-0.5 text-sm text-muted-foreground">
+                        {state.summary ?? "No activity summary yet"}
+                      </div>
+                      {state.validationResult && (
+                        <p className="mt-1.5 text-sm">{state.validationResult}</p>
+                      )}
                     </div>
-                    {state.validationResult && (
-                      <p className="mt-2 text-sm">{state.validationResult}</p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      tone={
-                        state.state === "submitted"
-                          ? "success"
-                          : state.state === "drafted"
-                            ? "warning"
-                            : "neutral"
-                      }
-                    >
+                    <Badge variant={state.state === "submitted" ? "default" : "secondary"}>
                       {state.state}
                     </Badge>
-                    <Badge tone={state.source === "deferred" ? "warning" : "live"}>
-                      {sourceLabel(state.source)}
-                    </Badge>
-                  </div>
-                </Link>
-              ))
+                  </Link>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>

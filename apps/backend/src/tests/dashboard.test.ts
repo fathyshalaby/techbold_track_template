@@ -5,10 +5,15 @@ import { app } from "../app.js";
 import { PhoenixNetworkError } from "../phoenix/client.js";
 import { appendAuditEvent, createPendingApproval, saveActivityDraft } from "../store/audit.js";
 import { makeJsonlAdapter, resetDb, setDb } from "../store/db.js";
-import { createRun, updateRunPhase } from "../store/runs.js";
+import { createRun, markRunCompleted, updateRunPhase } from "../store/runs.js";
 
 let mockMode = true;
 let phoenixMode: "mock" | "real" = "mock";
+
+vi.mock("../memory/store.js", () => ({
+  getMemoryStatus: vi.fn(async () => ({ available: false, count: 0, stats: null })),
+  listRecent: vi.fn(async () => []),
+}));
 
 vi.mock("../env.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../env.js")>();
@@ -138,29 +143,69 @@ describe("GET /api/dashboard", () => {
     expect(text).not.toContain("/keys");
   });
 
-  it("returns deferred memory and observability statuses without live claims", async () => {
+  it("returns live memory and observability data from the store", async () => {
+    const run = createRun(1, "10.0.0.1:22");
+    markRunCompleted(run.id);
+    saveActivityDraft(run.id, {
+      summary: "Resolved nginx outage",
+      rootCause: "Service stopped after reboot",
+      actionsTaken: "Enabled and started nginx",
+      commandsSummary: "systemctl enable nginx",
+      validationResult: "HTTP 200 on health check",
+    });
+
     const res = await app.request("/api/dashboard");
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as DashboardResponse;
-    expect(body.memory).toEqual({
-      status: "deferred",
-      label: "Deferred",
-      message: "Memory evidence is deferred to Phase 3 and Phase 4.",
-      source: "deferred",
-    });
-    expect(body.observability).toEqual({
-      status: "deferred",
-      label: "Deferred",
-      message: "Operational signals are deferred to Phase 5.",
-      source: "deferred",
-    });
+    expect(body.memory).toEqual(
+      expect.objectContaining({
+        status: "unavailable",
+        label: "Unavailable",
+        source: "mock-backend",
+        incidents: [
+          expect.objectContaining({
+            runId: run.id,
+            ticketId: 1,
+            ticketTitle: "Service unavailable",
+            customerName: "Acme Corp",
+            rootCause: "Service stopped after reboot",
+            durableFix: "Enabled and started nginx",
+            validationResult: "HTTP 200 on health check",
+            state: "drafted",
+          }),
+        ],
+      }),
+    );
+    expect(body.observability).toEqual(
+      expect.objectContaining({
+        status: "available",
+        label: "Live backend",
+        source: "mock-backend",
+        metrics: expect.objectContaining({
+          runs: expect.objectContaining({
+            total: expect.any(Number),
+            active: expect.any(Number),
+            completed: expect.any(Number),
+            successRate: expect.any(Number),
+          }),
+          approvals: expect.objectContaining({
+            total: expect.any(Number),
+            byRisk: expect.objectContaining({
+              SAFE_READ_ONLY: expect.any(Number),
+            }),
+          }),
+          commands: expect.objectContaining({
+            executed: expect.any(Number),
+            failed: expect.any(Number),
+            timedOut: expect.any(Number),
+          }),
+          auditByActor: expect.any(Object),
+        }),
+      }),
+    );
     const serialized = JSON.stringify(body);
-    expect(serialized).not.toContain("pgvector");
-    expect(serialized).not.toContain("RAG");
-    expect(serialized).not.toContain("traces");
-    expect(serialized).not.toContain("metrics");
-    expect(serialized).not.toContain("live observability");
+    expect(serialized).toContain("Vector memory requires DATABASE_URL");
   });
 
   it("does not expose secret-looking fields in serialized output", async () => {

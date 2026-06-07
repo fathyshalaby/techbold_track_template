@@ -1,3 +1,10 @@
+import {
+  dynamicCustomerSystems,
+  dynamicTickets,
+  getDynamicScenarioByTicketId,
+  isDynamicTicketId,
+  updateDynamicTicketStatus,
+} from "../sandbox/dynamic-store.js";
 import { scenarioCustomerSystems, scenarioTickets } from "../sandbox/registry.js";
 import { PhoenixNotFoundError } from "./client.js";
 import type {
@@ -101,12 +108,27 @@ export default class MockPhoenixClient {
     this.customerSystems = opts?.seedScenarios ? SCENARIO_CUSTOMER_SYSTEMS : MOCK_CUSTOMER_SYSTEMS;
   }
 
+  private allTickets(): Ticket[] {
+    const byId = new Map<number, Ticket>();
+    for (const ticket of this.tickets) byId.set(ticket.id, ticket);
+    for (const ticket of dynamicTickets()) byId.set(ticket.id, ticket as Ticket);
+    return [...byId.values()];
+  }
+
+  private allCustomerSystems(): Record<number, CustomerSystem> {
+    return { ...this.customerSystems, ...dynamicCustomerSystems() };
+  }
+
+  private get usesScenarios(): boolean {
+    return this.tickets === SCENARIO_TICKETS;
+  }
+
   async listTickets(query?: {
     status?: TicketStatus;
     priority?: string;
     sort?: "date" | "priority" | "status";
   }): Promise<Ticket[]> {
-    let result = [...this.tickets];
+    let result = this.allTickets();
 
     if (query?.status !== undefined) {
       result = result.filter((t) => t.status === query.status);
@@ -130,14 +152,14 @@ export default class MockPhoenixClient {
 
   async getTicket(ticketId: number): Promise<Ticket> {
     this.validateTicketId(ticketId);
-    const ticket = this.tickets.find((t) => t.id === ticketId);
+    const ticket = this.allTickets().find((t) => t.id === ticketId);
     if (!ticket) throw new PhoenixNotFoundError(`Ticket ${ticketId} not found`);
     return Promise.resolve(ticket);
   }
 
   async getCustomerSystem(ticketId: number): Promise<CustomerSystem> {
     this.validateTicketId(ticketId);
-    const cs = this.customerSystems[ticketId];
+    const cs = this.allCustomerSystems()[ticketId];
     if (!cs) throw new PhoenixNotFoundError(`CustomerSystem for ticket ${ticketId} not found`);
     return Promise.resolve(cs);
   }
@@ -145,9 +167,9 @@ export default class MockPhoenixClient {
   async getMe(): Promise<Employee> {
     return Promise.resolve({
       id: 1,
-      firstname: "Demo",
-      lastname: "Tech",
-      username: "demo.tech",
+      firstname: "Julian",
+      lastname: "Schmidt",
+      username: "j.schmidt",
       teamname: "Support",
     });
   }
@@ -172,6 +194,12 @@ export default class MockPhoenixClient {
 
   async setStatus(ticketId: number, status: TicketStatus): Promise<Ticket> {
     this.validateTicketId(ticketId);
+    if (isDynamicTicketId(ticketId)) {
+      updateDynamicTicketStatus(ticketId, status);
+      const dynamic = getDynamicScenarioByTicketId(ticketId);
+      if (!dynamic) throw new PhoenixNotFoundError(`Ticket ${ticketId} not found`);
+      return Promise.resolve({ ...dynamic.ticket } as Ticket);
+    }
     const idx = this.tickets.findIndex((t) => t.id === ticketId);
     if (idx === -1) throw new PhoenixNotFoundError(`Ticket ${ticketId} not found`);
     this.tickets[idx] = { ...this.tickets[idx], status };

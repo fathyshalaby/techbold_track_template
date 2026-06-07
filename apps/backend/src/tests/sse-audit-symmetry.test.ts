@@ -1,5 +1,5 @@
 import { SSE_EVENT_TYPES as CONTRACT_SSE_EVENT_TYPES } from "@techbold/contracts";
-// Audit↔runEventBus symmetry test for PRD §9 SSE event set.
+// Audit and runEventBus symmetry test for PRD section 9 SSE event set.
 // Drives a run to WAITING_FOR_APPROVAL and asserts that emitEvent-based events
 // appear in both the audit log (getAuditEvents) and the runEventBus.
 import { type MockInstance, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,7 +25,7 @@ const MOCK_DIAGNOSTIC = {
   isReadOnly: true,
 };
 
-describe("SSE audit↔bus symmetry", () => {
+describe("SSE audit and bus symmetry", () => {
   let analyzerSpy: MockInstance;
 
   beforeEach(async () => {
@@ -40,7 +40,7 @@ describe("SSE audit↔bus symmetry", () => {
     analyzerSpy.mockRestore();
   });
 
-  it("audit↔bus symmetry: approval.required appears in both audit log and runEventBus emissions", async () => {
+  it("audit and bus symmetry: approval.required appears in both audit log and runEventBus emissions", async () => {
     const { advance } = await import("../ai/orchestrator.js");
     const { createRun } = await import("../store/runs.js");
     const { getAuditEvents } = await import("../store/audit.js");
@@ -51,7 +51,7 @@ describe("SSE audit↔bus symmetry", () => {
 
     const emitted = new Map<string, unknown[]>();
 
-    // approval.required is emitted via runEventBus.emit inside performSideEffects.
+    // approval.required is emitted via runEventBus.emit inside applySideEffects.
     // run.started is written directly via appendAuditEvent (not via the event bus),
     // so it is present in the audit log but not emitted on the bus - excluded from
     // the bus assertion below.

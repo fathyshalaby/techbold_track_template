@@ -13,8 +13,7 @@
 | Command | Purpose |
 |---|---|
 | `bun run dev:backend` | Start the Hono backend on port 8000. |
-| `bun run dev:frontend` | Start the primary Next.js dashboard on port 3000. |
-| `bun run dev:vite` | Start the temporary Vite fallback on port 5173. |
+| `bun run dev:frontend` | Start the Next.js dashboard on port 3000. |
 
 ## Core docs
 

@@ -41,10 +41,14 @@ export class PhoenixNetworkError extends Error {
 }
 
 export class PhoenixClient {
+  private readonly baseUrl: string;
+
   constructor(
-    private readonly baseUrl: string,
+    baseUrl: string,
     private readonly token: string,
-  ) {}
+  ) {
+    this.baseUrl = baseUrl.replace(/\/+$/, "");
+  }
 
   async listTickets(query?: {
     status?: TicketStatus;
@@ -73,7 +77,8 @@ export class PhoenixClient {
   }
 
   async createActivity(body: ActivityCreate): Promise<Activity> {
-    return this.request(ActivitySchema, "POST", "/api/v1/activities/create", body);
+    const activity = await this.request(ActivitySchema, "POST", "/api/v1/activities/create", body);
+    return { ...activity, description: activity.description ?? "" };
   }
 
   async setStatus(ticketId: number, status: TicketStatus): Promise<Ticket> {

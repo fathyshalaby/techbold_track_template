@@ -24,6 +24,12 @@ describe("GET /health", () => {
     expect(body.status).toBe("ok");
     expect(body.mode).toBe("mock");
     expect(body.store).toEqual({ mode: "jsonl", durable: false });
+    expect(body.memory).toEqual(
+      expect.objectContaining({
+        available: true,
+        count: 0,
+      }),
+    );
   });
 });
 

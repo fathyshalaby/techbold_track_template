@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isMockMode, parseEnv, resolveClientMode } from "../env.js";
+import { isLocalOpenAiCompatibleBaseUrl, isMockMode, parseEnv, resolveClientMode } from "../env.js";
 
 const BASE_ENV = {
   PHOENIX_API_BASE_URL: "https://phoenix.example.com",
@@ -56,6 +56,32 @@ describe("parseEnv", () => {
         MOCK_LLM: "true",
       }),
     ).not.toThrow();
+  });
+
+  it("does not require OPENAI_API_KEY for localhost OpenAI-compatible adapters", () => {
+    expect(() =>
+      parseEnv({
+        PHOENIX_API_BASE_URL: "u",
+        PHOENIX_API_TOKEN: "t",
+        SSH_PRIVATE_KEY_PATH: "k",
+        LLM_PROVIDER: "openai-compatible",
+        LLM_BASE_URL: "http://127.0.0.1:8011/v1",
+        LLM_MODEL: "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+      }),
+    ).not.toThrow();
+  });
+
+  it("still requires OPENAI_API_KEY for remote OpenAI-compatible providers", () => {
+    expect(() =>
+      parseEnv({
+        PHOENIX_API_BASE_URL: "u",
+        PHOENIX_API_TOKEN: "t",
+        SSH_PRIVATE_KEY_PATH: "k",
+        LLM_PROVIDER: "openai-compatible",
+        LLM_BASE_URL: "https://openrouter.ai/api/v1",
+        LLM_MODEL: "anthropic/claude",
+      }),
+    ).toThrow(/OPENAI_API_KEY/);
   });
 
   it("requires SSH_PRIVATE_KEY_PATH in real SSH mode, but not under MOCK_SSH", () => {
@@ -134,6 +160,13 @@ describe("resolveClientMode", () => {
     expect(resolveClientMode("phoenix", cfg)).toBe("real");
     expect(resolveClientMode("ssh", cfg)).toBe("real");
     expect(resolveClientMode("llm", cfg)).toBe("real");
+  });
+});
+
+describe("isLocalOpenAiCompatibleBaseUrl", () => {
+  it("accepts compose internal model hostnames", () => {
+    expect(isLocalOpenAiCompatibleBaseUrl("http://model:8001/v1")).toBe(true);
+    expect(isLocalOpenAiCompatibleBaseUrl("http://host.docker.internal:8011/v1")).toBe(true);
   });
 });
 

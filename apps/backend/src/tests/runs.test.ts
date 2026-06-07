@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../app.js";
 import { createPendingApproval } from "../store/audit.js";
-import { makeJsonlAdapter, resetDb, setDb } from "../store/db.js";
+import { getDb, makeJsonlAdapter, resetDb, setDb } from "../store/db.js";
 
 // Force mock mode - no real env or Phoenix needed
 vi.mock("../env.js", async (importOriginal) => {
@@ -76,6 +76,18 @@ describe("POST /api/runs", () => {
     expect(body.customerSystem.username).toBe("azureuser");
   });
 
+  it("writes run.started to the audit log during POST /", async () => {
+    const res = await app.request("/api/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticketId: 1 }),
+    });
+    const body = (await res.json()) as { runId: string };
+    const { getAuditEvents } = await import("../store/audit.js");
+    const timeline = getAuditEvents(body.runId);
+    expect(timeline.some((event) => event.type === "run.started")).toBe(true);
+  });
+
   it("does NOT call advance() during POST /", async () => {
     const orchestratorModule = await import("../ai/orchestrator.js");
     const advanceSpy = vi.spyOn(orchestratorModule, "advance");
@@ -89,8 +101,7 @@ describe("POST /api/runs", () => {
     expect(advanceSpy).not.toHaveBeenCalled();
   });
 
-  it("stores customerSystemId as ip:port (colon-separated, no protocol prefix)", async () => {
-    const { createRun } = await import("../store/runs.js");
+  it("stores customerSystemId as username@ip:port (no protocol prefix)", async () => {
     const createRunSpy = vi.spyOn(await import("../store/runs.js"), "createRun");
 
     await app.request("/api/runs", {
@@ -101,7 +112,7 @@ describe("POST /api/runs", () => {
 
     expect(createRunSpy).toHaveBeenCalledOnce();
     const [, customerSystemId] = createRunSpy.mock.calls[0] as [number, string];
-    expect(customerSystemId).toBe("10.0.0.1:22");
+    expect(customerSystemId).toBe("azureuser@10.0.0.1:22");
     expect(customerSystemId).not.toMatch(/^https?:\/\//);
   });
 
@@ -179,8 +190,10 @@ describe("GET /api/runs/:runId", () => {
     expect("pendingApproval" in body).toBe(true);
     expect("activityDraft" in body).toBe(true);
     expect(body.ticketId).toBe(1);
-    expect(body.customerSystemId).toBe("10.0.0.1:22");
-    expect(body.target).toEqual(expect.objectContaining({ ip: "10.0.0.1", port: 22 }));
+    expect(body.customerSystemId).toBe("azureuser@10.0.0.1:22");
+    expect(body.target).toEqual(
+      expect.objectContaining({ ip: "10.0.0.1", port: 22, username: "azureuser" }),
+    );
     expect(body.ticket).toEqual(
       expect.objectContaining({
         id: 1,
@@ -217,7 +230,7 @@ describe("GET /api/runs/:runId", () => {
     expect(body.runId).toBe(runId);
     expect(body.ticket).toBeNull();
     expect(body.ticketId).toBe(1);
-    expect(body.customerSystemId).toBe("10.0.0.1:22");
+    expect(body.customerSystemId).toBe("azureuser@10.0.0.1:22");
     expect(JSON.stringify(body)).not.toContain("PHOENIX_API_TOKEN");
   });
 
@@ -340,5 +353,37 @@ describe("POST /api/runs/:runId/abort", () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("run not found");
+  });
+
+  it("marks pending approvals as rejected when aborting", async () => {
+    const orchestratorModule = await import("../ai/orchestrator.js");
+    vi.spyOn(orchestratorModule, "advance").mockResolvedValueOnce({
+      runId: "run_abort_pending",
+      phase: "ABORTED",
+      status: "ABORTED",
+      stepCount: 1,
+      ticketId: 1,
+      customerSystemId: "10.0.0.1:22",
+    });
+
+    const runId = await createRun();
+    const approval = createPendingApproval(runId, {
+      proposedCommand: "systemctl status nginx",
+      purpose: "Check nginx",
+      expectedSignal: "active",
+      riskLevel: "SAFE_READ_ONLY",
+      safetyNotes: "",
+    });
+
+    const res = await app.request(`/api/runs/${runId}/abort`, { method: "POST" });
+    expect(res.status).toBe(200);
+
+    const row = getDb().get<Record<string, unknown>>(
+      "SELECT * FROM command_approvals WHERE id = ?",
+      [approval.id],
+    );
+    expect(row?.status).toBe("REJECTED");
+    expect(row?.technician_reason).toBe("Run aborted");
+    expect(row?.decided_at).toBeTruthy();
   });
 });

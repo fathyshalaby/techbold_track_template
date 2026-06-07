@@ -1,6 +1,7 @@
 import type {
   ActivityStateSummary,
   AuditEvidenceSummary,
+  MemoryIncidentSummary,
   PendingApprovalSummary,
   SourceLabel,
 } from "@techbold/contracts";
@@ -169,6 +170,52 @@ export function listActivityStateSummaries(
         summary: draft ? redactSecrets(draft.summary) : null,
         validationResult: draft ? redactSecrets(draft.validation_result) : null,
         updatedAt: draft?.submitted_at ?? draft?.created_at ?? null,
+        source,
+      };
+    });
+}
+
+const TERMINAL_RUN_STATUS = new Set(["COMPLETED", "FAILED", "ABORTED"]);
+
+export function listResolvedIncidents(
+  limit?: number,
+  source: SourceLabel = "live-backend",
+): MemoryIncidentSummary[] {
+  const max = normalizeLimit(limit);
+  const latestDraftByRun = new Map<string, ActivityDraft>();
+  for (const row of getDb().all<unknown>(
+    "SELECT * FROM activity_drafts ORDER BY created_at DESC",
+  )) {
+    const draft = ActivityDraftSchema.parse(row);
+    if (!latestDraftByRun.has(draft.run_id)) {
+      latestDraftByRun.set(draft.run_id, draft);
+    }
+  }
+
+  return getDb()
+    .all<unknown>("SELECT * FROM runs ORDER BY updated_at DESC")
+    .map((row) => RunSchema.parse(row))
+    .filter((run) => TERMINAL_RUN_STATUS.has(run.status))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    .slice(0, max)
+    .map((run) => {
+      const draft = latestDraftByRun.get(run.id);
+      const state: MemoryIncidentSummary["state"] = draft
+        ? draft.submitted === 1
+          ? "submitted"
+          : "drafted"
+        : "not-drafted";
+      return {
+        runId: run.id,
+        ticketId: run.ticket_id,
+        ticketTitle: null,
+        customerName: null,
+        status: run.status,
+        rootCause: draft ? redactSecrets(draft.root_cause) : null,
+        durableFix: draft ? redactSecrets(draft.actions_taken) : null,
+        validationResult: draft ? redactSecrets(draft.validation_result) : null,
+        resolvedAt: run.completed_at ?? draft?.submitted_at ?? draft?.created_at ?? run.updated_at,
+        state,
         source,
       };
     });

@@ -105,7 +105,7 @@ describe("Agent Zod schemas", () => {
     ).toThrow(z.ZodError);
   });
 
-  it("DiagnosticProposalSchema rejects confidence outside 0–1", async () => {
+  it("DiagnosticProposalSchema rejects confidence outside 0-1", async () => {
     const { DiagnosticProposalSchema } = await import("../ai/types.js");
     expect(() =>
       DiagnosticProposalSchema.parse({
@@ -679,8 +679,6 @@ describe("agent mock output", () => {
   });
 });
 
-// ─── Integration tests - async driver ────────────────────────────────────────
-
 const MOCK_DIAGNOSTIC = {
   hypotheses: [{ cause: "service crashed", evidence: "systemctl output", confidence: 0.85 }],
   command: "systemctl status status-api --no-pager",
@@ -708,6 +706,7 @@ const MOCK_VALIDATION: import("../ai/types.js").ValidationResult = {
 
 describe("orchestrator driver - integration", () => {
   let analyzerSpy: MockInstance;
+  let observeSpy: MockInstance;
   let solverSpy: MockInstance;
   let validatorSpy: MockInstance;
 
@@ -717,6 +716,9 @@ describe("orchestrator driver - integration", () => {
     const validatorMod = await import("../ai/agents/validator.js");
 
     analyzerSpy = vi.spyOn(analyzerMod, "runProblemAnalyzer").mockResolvedValue(MOCK_DIAGNOSTIC);
+    observeSpy = vi
+      .spyOn(analyzerMod, "runProblemAnalyzerObserve")
+      .mockResolvedValue({ hypotheses: MOCK_DIAGNOSTIC.hypotheses });
     solverSpy = vi.spyOn(solverMod, "runProblemSolver").mockResolvedValue(MOCK_FIX);
     validatorSpy = vi.spyOn(validatorMod, "runValidator").mockResolvedValue(MOCK_VALIDATION);
 
@@ -726,6 +728,7 @@ describe("orchestrator driver - integration", () => {
 
   afterEach(() => {
     analyzerSpy.mockRestore();
+    observeSpy.mockRestore();
     solverSpy.mockRestore();
     validatorSpy.mockRestore();
   });
@@ -1072,9 +1075,8 @@ describe("orchestrator driver - integration", () => {
 
   it("Test 10 - OBSERVING + high-confidence hypothesis -> PLANNING_FIX", async () => {
     const { run, advance } = await driveToObserving();
-    const { runProblemAnalyzer } = await import("../ai/agents/problem-analyzer.js");
-    (runProblemAnalyzer as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ...MOCK_DIAGNOSTIC,
+    const { runProblemAnalyzerObserve } = await import("../ai/agents/problem-analyzer.js");
+    (runProblemAnalyzerObserve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       hypotheses: [{ cause: "port 8080 already in use", evidence: "EADDRINUSE", confidence: 0.95 }],
     });
     const state = await advance(run.id);
@@ -1085,9 +1087,8 @@ describe("orchestrator driver - integration", () => {
 
   it("Test 11 - OBSERVING + low-confidence hypothesis -> TRIAGING (keep diagnosing)", async () => {
     const { run, advance } = await driveToObserving();
-    const { runProblemAnalyzer } = await import("../ai/agents/problem-analyzer.js");
-    (runProblemAnalyzer as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ...MOCK_DIAGNOSTIC,
+    const { runProblemAnalyzerObserve } = await import("../ai/agents/problem-analyzer.js");
+    (runProblemAnalyzerObserve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       hypotheses: [{ cause: "maybe disk?", evidence: "inconclusive", confidence: 0.3 }],
     });
     const state = await advance(run.id);
@@ -1100,9 +1101,8 @@ describe("orchestrator driver - integration", () => {
   // evidence must NOT be treated as root cause - require corroborating evidence.
   it("Test 11b - OBSERVING + high confidence but EMPTY evidence -> keep diagnosing", async () => {
     const { run, advance } = await driveToObserving();
-    const { runProblemAnalyzer } = await import("../ai/agents/problem-analyzer.js");
-    (runProblemAnalyzer as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ...MOCK_DIAGNOSTIC,
+    const { runProblemAnalyzerObserve } = await import("../ai/agents/problem-analyzer.js");
+    (runProblemAnalyzerObserve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       hypotheses: [{ cause: "definitely the database", evidence: "   ", confidence: 0.99 }],
     });
     const state = await advance(run.id);

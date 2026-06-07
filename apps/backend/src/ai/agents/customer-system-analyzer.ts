@@ -4,7 +4,7 @@ import { z } from "zod";
 import { guardModelInput } from "../input-guard.js";
 import { getModel } from "../model.js";
 import { CUSTOMER_SYSTEM_ANALYZER_SYSTEM_PROMPT } from "../prompts.js";
-import { AgentUnavailableError } from "./problem-analyzer.js";
+import { AgentUnavailableError, runAgentObject } from "./resilience.js";
 
 export { AgentUnavailableError };
 
@@ -24,22 +24,17 @@ export async function runCustomerSystemAnalyzer(
   model?: LanguageModelV1,
 ): Promise<CustomerSystemContext> {
   const resolvedModel = model ?? getModel();
-  try {
-    const result = await Promise.race([
-      generateObject({
-        model: resolvedModel,
-        schema: CustomerSystemContextSchema,
-        system: CUSTOMER_SYSTEM_ANALYZER_SYSTEM_PROMPT,
-        prompt: guardModelInput({
-          ticketDescription: input.ticketDescription,
-          observations: input.observations,
-        }),
-        maxTokens: 1024,
+  return runAgentObject("customer_system_analyzer", async () => {
+    const result = await generateObject({
+      model: resolvedModel,
+      schema: CustomerSystemContextSchema,
+      system: CUSTOMER_SYSTEM_ANALYZER_SYSTEM_PROMPT,
+      prompt: guardModelInput({
+        ticketDescription: input.ticketDescription,
+        observations: input.observations,
       }),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 30_000)),
-    ]);
+      maxTokens: 1024,
+    });
     return result.object;
-  } catch {
-    throw new AgentUnavailableError("agent unavailable: customer_system_analyzer");
-  }
+  });
 }

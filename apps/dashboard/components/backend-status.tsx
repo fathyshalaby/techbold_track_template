@@ -20,7 +20,7 @@ export function BackendStatus({
     <Card>
       <CardHeader>
         <CardTitle>Backend status</CardTitle>
-        <Badge tone={health.status === "ok" ? "success" : "destructive"}>{health.status}</Badge>
+        <Badge variant={health.status === "ok" ? "outline" : "destructive"}>{health.status}</Badge>
       </CardHeader>
       <CardContent className="grid gap-3 text-sm md:grid-cols-2">
         <StatusLine label="Mode" value={health.mode} source={sourceLabel(health.source)} />
@@ -42,12 +42,12 @@ export function BackendStatus({
 
 function StatusLine({ label, value, source }: { label: string; value: string; source: string }) {
   return (
-    <div className="rounded-md border bg-white p-3">
+    <div className="rounded-lg border bg-muted/40 p-3">
       <div className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
         {label}
       </div>
       <div className="mt-1 text-sm">{value}</div>
-      <Badge className="mt-2" tone={source === "Deferred" ? "warning" : "live"}>
+      <Badge className="mt-2" variant={source === "Deferred" ? "secondary" : "outline"}>
         {source}
       </Badge>
     </div>

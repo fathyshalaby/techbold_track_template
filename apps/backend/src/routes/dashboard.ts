@@ -7,20 +7,23 @@ import type {
 import { Hono } from "hono";
 import { z } from "zod";
 import { isMockMode, resolveClientMode } from "../env.js";
+import { getMemoryStatus, listRecent } from "../memory/store.js";
 import {
   PhoenixAuthError,
   PhoenixNetworkError,
   PhoenixNotFoundError,
   PhoenixValidationError,
 } from "../phoenix/client.js";
+import { mergeDynamicTickets } from "../phoenix/dynamic-overlay.js";
+import { getPhoenixClient } from "../phoenix/factory.js";
 import {
   listActivityStateSummaries,
   listAuditEvidenceSummaries,
   listPendingApprovalSummaries,
+  listResolvedIncidents,
 } from "../store/audit.js";
 import { getStoreStatus } from "../store/db.js";
-import { listRunSummaries } from "../store/runs.js";
-import { getPhoenixClient } from "./runs.js";
+import { getObservabilityMetrics, listRunSummaries } from "../store/runs.js";
 
 export const dashboardRouter = new Hono();
 
@@ -38,7 +41,7 @@ function sourceLabel(): SourceLabel {
 function dataSource(source: SourceLabel): DashboardDataSource {
   return {
     type: source,
-    label: source === "mock-backend" ? "Mock backend" : "Live backend",
+    label: "Live backend",
   };
 }
 
@@ -70,7 +73,7 @@ dashboardRouter.get("/", async (c) => {
   let tickets: TicketSummary[] = [];
 
   try {
-    tickets = (await getPhoenixClient().listTickets({})).map(summarizeTicket);
+    tickets = mergeDynamicTickets(await getPhoenixClient().listTickets({})).map(summarizeTicket);
   } catch (err) {
     if (err instanceof PhoenixAuthError) {
       return c.json({ error: "upstream authentication failed" }, 502);
@@ -89,6 +92,16 @@ dashboardRouter.get("/", async (c) => {
   const pendingApprovals = listPendingApprovalSummaries(limit, source);
   const auditEvidence = listAuditEvidenceSummaries(limit, source);
   const activityStates = listActivityStateSummaries(limit, source);
+  const observabilityMetrics = getObservabilityMetrics();
+  const memoryStatus = await getMemoryStatus();
+  const memoryIncidents = listResolvedIncidents(limit, source).map((incident) => {
+    const ticket = ticketsById.get(incident.ticketId);
+    return {
+      ...incident,
+      ticketTitle: ticket?.title ?? incident.ticketTitle,
+      customerName: ticket?.customer_name ?? incident.customerName,
+    };
+  });
   const runs = listRunSummaries(limit, source).map((run) => {
     const ticket = ticketsById.get(run.ticketId);
     const latestAuditAt =
@@ -101,6 +114,8 @@ dashboardRouter.get("/", async (c) => {
       hasPendingApproval: pendingApprovals.some((approval) => approval.runId === run.runId),
     };
   });
+
+  const pgRecent = memoryStatus.available ? await listRecent(limit) : [];
 
   const response: DashboardResponse = {
     generatedAt: new Date().toISOString(),
@@ -127,17 +142,43 @@ dashboardRouter.get("/", async (c) => {
     pendingApprovals,
     auditEvidence,
     activityStates,
-    memory: {
-      status: "deferred",
-      label: "Deferred",
-      message: "Memory evidence is deferred to Phase 3 and Phase 4.",
-      source: "deferred",
-    },
+    memory: memoryStatus.available
+      ? {
+          status: "available",
+          label: "Live backend",
+          message:
+            memoryStatus.count > 0
+              ? `${memoryStatus.count} solution${memoryStatus.count === 1 ? "" : "s"} in vector memory.`
+              : "Vector memory is ready but empty. Seed or complete validated runs to populate it.",
+          source,
+          incidents: memoryIncidents,
+          stats: memoryStatus.stats ?? undefined,
+          entries: pgRecent.map((entry) => ({
+            id: entry.id,
+            source: entry.source,
+            symptom: entry.symptom,
+            rootCause: entry.rootCause,
+            fix: entry.fix,
+            score: entry.score,
+          })),
+        }
+      : {
+          status: "unavailable",
+          label: "Unavailable",
+          message:
+            "Vector memory requires DATABASE_URL and a reachable Postgres/pgvector instance.",
+          source,
+          incidents: memoryIncidents,
+        },
     observability: {
-      status: "deferred",
-      label: "Deferred",
-      message: "Operational signals are deferred to Phase 5.",
-      source: "deferred",
+      status: "available",
+      label: "Live backend",
+      message:
+        observabilityMetrics.runs.total > 0
+          ? `${observabilityMetrics.runs.total} run${observabilityMetrics.runs.total === 1 ? "" : "s"} tracked.`
+          : "Operational signals appear after the first run.",
+      source,
+      metrics: observabilityMetrics,
     },
   };
 

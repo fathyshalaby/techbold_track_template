@@ -1,8 +1,6 @@
-FROM ubuntu:22.04
+ARG BASE_IMAGE=sda-sandbox-base:latest
+FROM ${BASE_IMAGE}
 
-ENV container=docker
-ENV DEBIAN_FRONTEND=noninteractive
-ARG BENCH_PUBLIC_KEY
 ARG PARTNER_SERVICE=partner-gateway
 ARG SYNC_SERVICE=order-relay
 ARG PARTNER_HOST=vendor-api.internal
@@ -10,9 +8,6 @@ ARG GOOD_IP=127.0.0.1
 ARG BAD_IP=127.0.0.2
 ARG PARTNER_PORT=9000
 ARG STATUS_PATH=/var/lib/order-relay/status.json
-
-COPY archetypes/common/setup-base.sh /tmp/setup-base.sh
-RUN chmod +x /tmp/setup-base.sh && /tmp/setup-base.sh "$BENCH_PUBLIC_KEY"
 
 RUN install -d -m 755 /opt/${PARTNER_SERVICE} /opt/${SYNC_SERVICE} /opt/hackathon \
   && install -d -m 755 -o azureuser -g azureuser "$(dirname "${STATUS_PATH}")"

@@ -50,7 +50,7 @@ export const MOCK_SSH_FIXTURES: Record<string, CommandResult> = {
   },
   "sudo systemctl enable status-api": {
     stdout:
-      "Created symlink /etc/systemd/system/multi-user.target.wants/status-api.service → /etc/systemd/system/status-api.service.",
+      "Created symlink /etc/systemd/system/multi-user.target.wants/status-api.service -> /etc/systemd/system/status-api.service.",
     stderr: "",
     exitCode: 0,
     durationMs: 55,
@@ -89,7 +89,7 @@ export const MOCK_SSH_FIXTURES: Record<string, CommandResult> = {
 };
 
 export const DEFAULT_FALLBACK_RESULT: CommandResult = {
-  stdout: "mock: command executed (no fixture defined)",
+  stdout: "command completed (no output)",
   stderr: "",
   exitCode: 0,
   durationMs: 10,

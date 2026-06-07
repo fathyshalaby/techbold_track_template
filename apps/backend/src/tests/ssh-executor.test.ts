@@ -11,6 +11,7 @@ import {
   wrapCommand,
 } from "../ssh/executor.js";
 import { MockSshExecutor } from "../ssh/mock.js";
+import { closeAllConnections } from "../ssh/pool.js";
 import { SshConnectionError, type SshTarget } from "../ssh/types.js";
 
 // Cross-platform recursive scan for a substring in non-comment lines of a dir.
@@ -40,12 +41,10 @@ function grepDir(dir: string, needle: string): string[] {
   return hits;
 }
 
-// ---------------------------------------------------------------------------
 // ssh2 mock
 // The factory must be self-contained - vi.mock is hoisted before all imports,
 // so referencing any module-level variable (including EventEmitter) inside the
 // factory would cause a TDZ error. We use require() inside the factory instead.
-// ---------------------------------------------------------------------------
 
 type ChannelOpts = {
   stdout: Buffer | null;
@@ -78,7 +77,7 @@ function makeSshChannel(opts: ChannelOpts) {
     if (opts.stderr !== null) channel.stderr.emit("data", opts.stderr);
     if (!opts.hang) {
       if (opts.signal)
-        channel.emit("exit", null, opts.signal); // exit-signal (RFC 4254 §6.10)
+        channel.emit("exit", null, opts.signal); // exit-signal (RFC 4254 section 6.10)
       else channel.emit("exit", opts.exitCode ?? 0);
       channel.emit("close");
     }
@@ -119,22 +118,24 @@ vi.mock("ssh2", () => {
   return { Client: MockClient };
 });
 
-// ---------------------------------------------------------------------------
 // Shared SSH target - no real credentials needed; the mock intercepts ssh2.
-// ---------------------------------------------------------------------------
 
 const TARGET: SshTarget = {
   host: "127.0.0.1",
   port: 22,
   username: "testuser",
-  privateKeyPath: "/dev/null",
+  privateKeyPaths: ["/dev/null"],
 };
 
-// ---------------------------------------------------------------------------
 // Test groups
-// ---------------------------------------------------------------------------
 
 describe("ssh-executor", () => {
+  // The executor pools connections per host, so a client opened by one test
+  // would otherwise be reused by the next. Clear the pool between tests to keep
+  // each case isolated (notably the connection-failure case, which must trigger
+  // a fresh connect()).
+  beforeEach(() => closeAllConnections());
+
   // Ops regression: a non-interactive command that reads stdin (grep/cat/sort
   // with no file) must NOT block on input - the executor closes the write half.
   describe("stdin is closed (no hang on stdin-reading commands)", () => {
@@ -288,7 +289,7 @@ describe("ssh-executor", () => {
     it("is not imported or referenced in any ai/tools/ file", () => {
       const thisFile = fileURLToPath(import.meta.url);
       const aiToolsDir = path.resolve(path.dirname(thisFile), "..", "ai", "tools");
-      // Comment-only lines are excluded by grepDir (the §A1 note in ssh-tools.ts
+      // Comment-only lines are excluded by grepDir (the A1 note in ssh-tools.ts
       // is an architect's warning, not an import or call).
       expect(grepDir(aiToolsDir, "executeApprovedCommand")).toEqual([]);
     });
@@ -349,7 +350,6 @@ describe("ssh-executor", () => {
     });
   });
 
-  // ─── Regression: wrapCommand quoting (pure fn, high-impact) ───────────────
   // A broken wrap silently corrupts EVERY remote command. Real ssh2 runs the
   // wrapped string via the remote shell, so the inner command must survive as a
   // single bash -lc argument - including embedded single quotes (awk/sed/grep).
@@ -380,7 +380,6 @@ describe("ssh-executor", () => {
     });
   });
 
-  // ─── Regression: nonzero exit code propagates ─────────────────────────────
   describe("exit code propagation", () => {
     it("surfaces a nonzero exit code (e.g. 3 from systemctl status)", async () => {
       channelFactory = () =>
@@ -399,7 +398,7 @@ describe("ssh-executor", () => {
     });
 
     // Research/reuse: ssh2 reports signal deaths as ('exit', null, signalName)
-    // (RFC 4254 §6.10). Encode them the bash way (128 + signum) so an OOM kill
+    // (RFC 4254 section 6.10). Encode them the bash way (128 + signum) so an OOM kill
     // (SIGKILL -> 137) or segfault (SIGSEGV -> 139) is visible, not a bare -1.
     it("encodes a signal kill as 128 + signum (SIGKILL -> 137, OOM kill)", async () => {
       channelFactory = () =>
@@ -417,7 +416,6 @@ describe("ssh-executor", () => {
     });
   });
 
-  // ─── Regression: output cap preserves CONTENT (head), not just length ──────
   describe("output cap content", () => {
     it("keeps the first REDACTION_CAP_BYTES bytes intact (not garbage/empty)", async () => {
       const big = Buffer.alloc(REDACTION_CAP_BYTES + 500, 0x41); // 'A' * (cap+500)
@@ -435,7 +433,6 @@ describe("ssh-executor", () => {
     });
   });
 
-  // ─── Contract: mock and real executors must stay shape-compatible ──────────
   // CONTEXT invariant: "the mock mirrors the real executor exactly" so the
   // orchestrator can swap them via resolveClientMode with no other change.
   // This guards against the two implementations drifting apart.

@@ -1,14 +1,9 @@
-FROM ubuntu:22.04
+ARG BASE_IMAGE=sda-sandbox-base:latest
+FROM ${BASE_IMAGE}
 
-ENV container=docker
-ENV DEBIAN_FRONTEND=noninteractive
-ARG BENCH_PUBLIC_KEY
 ARG SERVICE_NAME=status-beacon
 ARG SERVICE_PORT=8080
 ARG HEALTH_PATH=/health
-
-COPY archetypes/common/setup-base.sh /tmp/setup-base.sh
-RUN chmod +x /tmp/setup-base.sh && /tmp/setup-base.sh "$BENCH_PUBLIC_KEY"
 
 RUN install -d -m 755 /opt/${SERVICE_NAME} /opt/hackathon
 COPY archetypes/service-health/status_service.py /opt/${SERVICE_NAME}/service.py

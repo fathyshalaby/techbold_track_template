@@ -1,0 +1,14 @@
+model: mlx-community/Qwen2.5-7B-Instruct-4bit
+data_dir: outputs/mlx-data
+adapter_path: outputs/mlx-qwen2.5-7b-adapter
+fine_tune_type: lora
+mask_prompt: true
+num_layers: 16
+batch_size: 1
+iters: 100
+val_batches: 1
+learning_rate: 5e-6
+steps_per_report: 5
+steps_per_eval: 25
+max_seq_length: 1536
+grad_checkpoint: true

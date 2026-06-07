@@ -1,7 +1,10 @@
 import { runEventBus } from "../events/run-event-bus.js";
+import { retrieveSimilarStructured } from "../memory/retrieve.js";
+import { formatSimilarSolutions } from "../memory/store.js";
 import { validateCommandAgainstPolicy } from "../safety/command-policy.js";
 import { redactSecrets } from "../safety/redaction.js";
 import { createSshExecutor } from "../ssh/factory.js";
+import { resolveSshKeyPaths } from "../ssh/keys.js";
 import type { SshExecutor } from "../ssh/types.js";
 import {
   appendAuditEvent,
@@ -12,10 +15,21 @@ import {
 } from "../store/audit.js";
 import type { DbAdapter } from "../store/db.js";
 import { getDb, setDb } from "../store/db.js";
-import { getRunById, updateRunPhase, updateRunStatus } from "../store/runs.js";
-import type { AuditEvent, Observation, RunPhaseValue, RunStatusValue } from "../store/schema.js";
-import type { Run } from "../store/schema.js";
-import { runProblemAnalyzer } from "./agents/problem-analyzer.js";
+import {
+  getRunById,
+  resolveSshTargetFromCustomerSystemId,
+  updateRunPhase,
+  updateRunStatus,
+} from "../store/runs.js";
+import type {
+  AuditEvent,
+  CommandResult,
+  Observation,
+  Run,
+  RunPhaseValue,
+  RunStatusValue,
+} from "../store/schema.js";
+import { runProblemAnalyzer, runProblemAnalyzerObserve } from "./agents/problem-analyzer.js";
 import { runProblemSolver } from "./agents/problem-solver.js";
 import { runValidator } from "./agents/validator.js";
 import type { DiagnosticProposal, FixProposal, ValidationResult } from "./types.js";
@@ -24,16 +38,15 @@ export type { DiagnosticProposal, FixProposal, ValidationResult };
 
 export const MAX_STEPS = 12;
 
-// A technician stops diagnosing and moves to a fix once confident enough in the
-// cause. We use the problem-analyzer's top-hypothesis confidence as that signal.
 export const ROOT_CAUSE_CONFIDENCE_THRESHOLD = 0.8;
 
-// Build the observation text an agent reads from a command result. A diagnosing
-// technician needs the EXIT CODE and STDERR, not just stdout - many failures
-// (nginx -t, OOM=137, "No such file") show only there. Empty streams omitted.
-function formatObservation(r: import("../store/schema.js").CommandResult): string {
-  // The command itself can carry a secret (e.g. `mysql -pHUNTER2`), so redact it
-  // too - stdout/stderr are already redacted upstream, redact again (idempotent).
+type ObservationRow = { source: string; content: string };
+
+function queryObservations(runId: string, db: DbAdapter): ObservationRow[] {
+  return db.all<ObservationRow>("SELECT * FROM observations WHERE run_id = ?", [runId]);
+}
+
+function formatObservation(r: CommandResult): string {
   const parts = [
     `$ ${redactSecrets(r.command)}`,
     `exit_code: ${r.exit_code}${r.timed_out ? " (timed out)" : ""}`,
@@ -43,16 +56,8 @@ function formatObservation(r: import("../store/schema.js").CommandResult): strin
   return parts.join("\n");
 }
 
-// The diagnostic agents must see the customer's reported SYMPTOM, not just an id.
-// The run route seeds it as a 'phoenix'-source observation at creation; read it
-// back here so every agent call (and the run.started payload) carries it. Falls
-// back to the bare id+system string if no context was seeded.
 function readTicketContext(state: OrchestratorState, db: DbAdapter): string {
-  const rows = db.all<{ source: string; content: string }>(
-    "SELECT * FROM observations WHERE run_id = ?",
-    [state.runId],
-  );
-  const ctx = rows.find((r) => r.source === "phoenix");
+  const ctx = queryObservations(state.runId, db).find((r) => r.source === "phoenix");
   if (ctx?.content.trim()) return ctx.content;
   return `Ticket #${state.ticketId} - system: ${state.customerSystemId}`;
 }
@@ -75,7 +80,7 @@ export type OrchestratorEvent =
   | {
       type: "command_result";
       approvalId: string;
-      result: import("../store/schema.js").CommandResult;
+      result: CommandResult;
       wasFix?: boolean;
     }
   | { type: "root_cause_found"; hypothesis: string }
@@ -234,9 +239,6 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
           ],
         };
       }
-      // Re-gate failure: the technician approved an EDITED command that the safety
-      // policy now blocks. Execution is refused (the driver never calls the
-      // executor) - audit it and stay in WAITING_FOR_APPROVAL so they can retry.
       if (event.type === "command_blocked") {
         return {
           nextState: state,
@@ -253,9 +255,6 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
 
     case "EXECUTING_COMMAND": {
       if (event.type === "command_result") {
-        // A FIX command must be VALIDATED (verify it worked); a DIAGNOSTIC
-        // command goes to OBSERVING (decide root cause). Without this split the
-        // validator was unreachable and fixes were never verified.
         const nextPhase: RunPhaseValue = event.wasFix ? "VALIDATING" : "OBSERVING";
         const nextState = buildState(state, { phase: nextPhase });
         return {
@@ -324,9 +323,6 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
           ],
         };
       }
-      // A blocked fix command must be audited (C-score) AND must move the run back
-      // to TRIAGING in the PERSISTED phase - emitting phaseEffect here is what
-      // calls updateRunPhase; without it the DB stayed on PLANNING_FIX (desync).
       if (event.type === "command_blocked") {
         const nextState = buildState(state, { phase: "TRIAGING" });
         return {
@@ -345,13 +341,14 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
 
     case "VALIDATING": {
       if (event.type === "validation_complete") {
-        const { status } = event.result;
+        const { status, benefitCheck, persistenceCheck, evidence } = event.result;
+        const validationPayload = { status, benefitCheck, persistenceCheck, evidence };
         if (status === "VERIFIED_FIXED" || status === "LIKELY_FIXED") {
           const nextState = buildState(state, { phase: "DRAFTING_ACTIVITY" });
           return {
             nextState,
             sideEffects: [
-              auditEffect(state, "validation.completed", "agent", { status }),
+              auditEffect(state, "validation.completed", "agent", validationPayload),
               phaseEffect(state, "DRAFTING_ACTIVITY"),
             ],
           };
@@ -361,7 +358,7 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
           return {
             nextState,
             sideEffects: [
-              auditEffect(state, "validation.completed", "agent", { status }),
+              auditEffect(state, "validation.completed", "agent", validationPayload),
               phaseEffect(state, "TRIAGING"),
             ],
           };
@@ -377,76 +374,51 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
   return { nextState: state, sideEffects: [] };
 }
 
-const STEP_COUNT_SOURCE = "system" as const;
+const METADATA_SOURCE = "system" as const;
 const STEP_COUNT_TYPE = "stepCount";
-
-function readStepCount(runId: string, db: DbAdapter): number {
-  const rows = db.all<{ source: string; content: string }>(
-    "SELECT * FROM observations WHERE run_id = ?",
-    [runId],
-  );
-  for (let i = rows.length - 1; i >= 0; i--) {
-    const row = rows[i];
-    if (row.source !== STEP_COUNT_SOURCE) continue;
-    try {
-      const parsed = JSON.parse(row.content) as { type?: string; value?: number };
-      if (parsed.type === STEP_COUNT_TYPE) return parsed.value ?? 0;
-    } catch {
-      // ignore malformed
-    }
-  }
-  return 0;
-}
-
-function writeStepCount(runId: string, count: number, db: DbAdapter): void {
-  const id = `obs_sc_${runId}_${count}_${Date.now()}`;
-  const now = new Date().toISOString();
-  db.run(
-    "INSERT INTO observations (id, run_id, source, content, created_at) VALUES (?, ?, ?, ?, ?)",
-    [id, runId, STEP_COUNT_SOURCE, JSON.stringify({ type: STEP_COUNT_TYPE, value: count }), now],
-  );
-}
-
-export function setStepCountForTest(runId: string, count: number, db: DbAdapter): void {
-  writeStepCount(runId, count, db);
-}
-
-// Recorded when a proposal is created so the post-execution router knows whether
-// to OBSERVE (diagnostic -> decide root cause) or VALIDATE (fix -> verify it
-// worked). Persisted as a system observation (same mechanism as stepCount) -
-// the command_approvals row has no kind column (and is .strict()).
 const PENDING_KIND_TYPE = "pendingKind";
 type PendingKind = "diagnostic" | "fix";
 
-function writePendingKind(runId: string, kind: PendingKind, db: DbAdapter): void {
-  const id = `obs_pk_${runId}_${kind}_${Date.now()}`;
+function writeMetadata(runId: string, type: string, value: number | string, db: DbAdapter): void {
+  const id = `obs_meta_${type}_${runId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   db.run(
     "INSERT INTO observations (id, run_id, source, content, created_at) VALUES (?, ?, ?, ?, ?)",
-    [
-      id,
-      runId,
-      STEP_COUNT_SOURCE,
-      JSON.stringify({ type: PENDING_KIND_TYPE, value: kind }),
-      new Date().toISOString(),
-    ],
+    [id, runId, METADATA_SOURCE, JSON.stringify({ type, value }), new Date().toISOString()],
   );
 }
 
-function readPendingKind(runId: string, db: DbAdapter): PendingKind {
-  const rows = db.all<{ source: string; content: string }>(
-    "SELECT * FROM observations WHERE run_id = ?",
-    [runId],
-  );
+function readMetadata<T extends number | string>(
+  runId: string,
+  type: string,
+  db: DbAdapter,
+): T | undefined {
+  const rows = queryObservations(runId, db);
   for (let i = rows.length - 1; i >= 0; i--) {
-    if (rows[i].source !== STEP_COUNT_SOURCE) continue;
+    if (rows[i].source !== METADATA_SOURCE) continue;
     try {
-      const parsed = JSON.parse(rows[i].content) as { type?: string; value?: string };
-      if (parsed.type === PENDING_KIND_TYPE) return parsed.value === "fix" ? "fix" : "diagnostic";
-    } catch {
-      /* ignore malformed */
-    }
+      const parsed = JSON.parse(rows[i].content) as { type?: string; value?: T };
+      if (parsed.type === type) return parsed.value;
+    } catch {}
   }
-  return "diagnostic";
+  return undefined;
+}
+
+function readStepCount(runId: string, db: DbAdapter): number {
+  return readMetadata<number>(runId, STEP_COUNT_TYPE, db) ?? 0;
+}
+
+function readPendingKind(runId: string, db: DbAdapter): PendingKind {
+  return readMetadata<string>(runId, PENDING_KIND_TYPE, db) === "fix" ? "fix" : "diagnostic";
+}
+
+function readAgentObservations(runId: string, db: DbAdapter): string[] {
+  return queryObservations(runId, db)
+    .filter((o) => o.source !== METADATA_SOURCE)
+    .map((o) => o.content);
+}
+
+export function setStepCountForTest(runId: string, count: number, db: DbAdapter): void {
+  writeMetadata(runId, STEP_COUNT_TYPE, count, db);
 }
 
 export function createInitialState(run: Run): OrchestratorState {
@@ -460,13 +432,9 @@ export function createInitialState(run: Run): OrchestratorState {
   };
 }
 
-async function performSideEffects(effects: SideEffect[], db: DbAdapter): Promise<void> {
-  applySideEffects(effects, db);
-}
+function applySideEffects(effects: SideEffect[]): void {
+  let lastCreatedApprovalId: string | null = null;
 
-// Synchronous core - so it can run inside a db.transaction() (which requires a
-// sync fn). All operations here are synchronous DB writes + event emits.
-function applySideEffects(effects: SideEffect[], _db: DbAdapter): void {
   for (const effect of effects) {
     switch (effect.type) {
       case "updateRunPhase":
@@ -477,255 +445,214 @@ function applySideEffects(effects: SideEffect[], _db: DbAdapter): void {
         break;
       case "appendAuditEvent":
         appendAuditEvent(effect.runId, effect.auditType, effect.actor, effect.payload);
-        // Also push to the live SSE bus so run progress (command.completed,
-        // run.started/failed, command.blocked, …) streams in real time, not only
-        // on reconnect-via-backfill. Emit with no listener is a harmless no-op,
-        // so unsubscribed event types cost nothing. (approval.required already
-        // emits via the emitEvent case below - not double-emitted here.)
         runEventBus.emit(effect.runId, effect.auditType, effect.payload);
         break;
       case "appendObservation":
-        // content is already redacted by the driver before passing to the effect
         appendObservation(effect.runId, effect.source, effect.content);
         break;
       case "createPendingApproval": {
         const proposal = effect.proposal;
         const policyResult = validateCommandAgainstPolicy(proposal.command);
         const isDiagnostic = "hypotheses" in proposal;
-        createPendingApproval(effect.runId, {
+        const approval = createPendingApproval(effect.runId, {
           proposedCommand: proposal.command,
           purpose: isDiagnostic ? proposal.purpose : proposal.rationale,
           expectedSignal: isDiagnostic ? proposal.expectedSignal : "Fix applied successfully",
           riskLevel: policyResult.riskLevel,
           safetyNotes: policyResult.reason ?? policyResult.matchedRule ?? "",
         });
+        lastCreatedApprovalId = approval.id;
         break;
       }
-      case "emitEvent":
-        runEventBus.emit(effect.runId, effect.eventType, effect.payload);
-        // Mirror to audit log so the event is queryable alongside other audit events
-        appendAuditEvent(effect.runId, effect.eventType, "system", effect.payload);
+      case "emitEvent": {
+        const payload =
+          effect.eventType === "approval.required" &&
+          lastCreatedApprovalId &&
+          effect.payload &&
+          typeof effect.payload === "object"
+            ? { ...(effect.payload as Record<string, unknown>), approvalId: lastCreatedApprovalId }
+            : effect.payload;
+        runEventBus.emit(effect.runId, effect.eventType, payload);
+        appendAuditEvent(effect.runId, effect.eventType, "system", payload);
         break;
+      }
     }
   }
 }
 
+function applyReduce(state: OrchestratorState, event: OrchestratorEvent): OrchestratorState {
+  const { nextState, sideEffects } = reduce(state, event);
+  applySideEffects(sideEffects);
+  return nextState;
+}
+
+function blockedEvent(
+  policyResult: ReturnType<typeof validateCommandAgainstPolicy>,
+  command: string,
+): OrchestratorEvent {
+  return {
+    type: "command_blocked",
+    reason: policyResult.reason ?? policyResult.matchedRule ?? "blocked",
+    command,
+  };
+}
+
+const CAPPED_DIAGNOSTIC: DiagnosticProposal = {
+  hypotheses: [{ cause: "", evidence: "", confidence: 0 }],
+  command: "",
+  purpose: "",
+  expectedSignal: "",
+  riskNotes: "",
+  isReadOnly: true,
+};
+const CAPPED_FIX: FixProposal = {
+  rootCause: "",
+  command: "",
+  rationale: "",
+  rollbackCommand: "",
+  isReversible: true,
+  persistenceNote: "",
+};
+
+function proposeCommand(
+  state: OrchestratorState,
+  kind: PendingKind,
+  proposal: DiagnosticProposal | FixProposal,
+  db: DbAdapter,
+): OrchestratorState {
+  const policyResult = validateCommandAgainstPolicy(proposal.command);
+  if (!policyResult.allowed) {
+    return applyReduce(state, blockedEvent(policyResult, proposal.command));
+  }
+  const event: OrchestratorEvent =
+    kind === "fix"
+      ? { type: "fix_proposal_ready", proposal: proposal as FixProposal }
+      : { type: "diagnostic_proposal_ready", proposal: proposal as DiagnosticProposal };
+  const nextState = applyReduce(state, event);
+  writeMetadata(state.runId, STEP_COUNT_TYPE, nextState.stepCount, db);
+  writeMetadata(state.runId, PENDING_KIND_TYPE, kind, db);
+  return nextState;
+}
+
+function handleAgentUnavailable(state: OrchestratorState, err: unknown): OrchestratorState {
+  const baseMessage = err instanceof Error ? err.message : String(err);
+  const cause =
+    err instanceof Error && err.cause
+      ? err.cause instanceof Error
+        ? err.cause.message
+        : String(err.cause)
+      : undefined;
+  const message = cause ? `${baseMessage} (${cause})` : baseMessage;
+  appendAuditEvent(state.runId, "agent.unavailable", "system", { message });
+  runEventBus.emit(state.runId, "agent.unavailable", { message });
+  return { ...state, errorMessage: message };
+}
+
 async function agentDispatch(state: OrchestratorState, db: DbAdapter): Promise<OrchestratorState> {
-  const stepCount = readStepCount(state.runId, db);
-  const currentState = { ...state, stepCount };
+  const currentState = { ...state, stepCount: readStepCount(state.runId, db) };
 
   switch (currentState.phase) {
-    case "CREATED": {
-      appendAuditEvent(currentState.runId, "run.started", "system", {
-        ticketDescription: readTicketContext(currentState, db),
-      });
-      updateRunPhase(currentState.runId, "LOADED_CONTEXT");
+    case "CREATED":
+    case "LOADED_CONTEXT": {
+      const ticketDescription = readTicketContext(currentState, db);
+      const hasStarted = db
+        .all<{ type: string }>("SELECT type FROM audit_events WHERE run_id = ?", [
+          currentState.runId,
+        ])
+        .some((row) => row.type === "run.started");
+      if (!hasStarted) {
+        const startedPayload = { ticketDescription };
+        appendAuditEvent(currentState.runId, "run.started", "system", startedPayload);
+        runEventBus.emit(currentState.runId, "run.started", startedPayload);
+      }
       updateRunStatus(currentState.runId, "RUNNING");
       updateRunPhase(currentState.runId, "TRIAGING");
-      const triagedState: OrchestratorState = {
-        ...currentState,
-        phase: "TRIAGING",
-        status: "RUNNING",
-      };
-      return agentDispatch(triagedState, db);
-    }
-
-    case "LOADED_CONTEXT": {
-      updateRunPhase(currentState.runId, "TRIAGING");
-      return agentDispatch({ ...currentState, phase: "TRIAGING" }, db);
+      return agentDispatch({ ...currentState, phase: "TRIAGING", status: "RUNNING" }, db);
     }
 
     case "TRIAGING": {
-      // Max-steps guard fires before calling the agent
       if (currentState.stepCount >= MAX_STEPS) {
-        const { nextState, sideEffects } = reduce(currentState, {
+        return applyReduce(currentState, {
           type: "diagnostic_proposal_ready",
-          // Dummy proposal - reducer will short-circuit to WAITING_FOR_ACTIVITY_REVIEW
-          proposal: {
-            hypotheses: [{ cause: "", evidence: "", confidence: 0 }],
-            command: "",
-            purpose: "",
-            expectedSignal: "",
-            riskNotes: "",
-            isReadOnly: true,
-          },
+          proposal: CAPPED_DIAGNOSTIC,
         });
-        await performSideEffects(sideEffects, db);
-        return nextState;
       }
-
       try {
-        const observations = db
-          .all<{ content: string; source: string }>("SELECT * FROM observations WHERE run_id = ?", [
-            currentState.runId,
-          ])
-          .filter((o) => o.source !== STEP_COUNT_SOURCE)
-          .map((o) => o.content);
-
-        const proposal = await runProblemAnalyzer({
-          ticketDescription: readTicketContext(currentState, db),
-          observations,
-        });
-
-        const policyResult = validateCommandAgainstPolicy(proposal.command);
-
-        if (!policyResult.allowed) {
-          const { nextState, sideEffects } = reduce(currentState, {
-            type: "command_blocked",
-            reason: policyResult.reason ?? policyResult.matchedRule ?? "blocked",
-            command: proposal.command,
-          });
-          await performSideEffects(sideEffects, db);
-          return nextState;
+        const ticketDescription = readTicketContext(currentState, db);
+        const observations = readAgentObservations(currentState.runId, db);
+        const recalled = await retrieveSimilarStructured(ticketDescription, observations);
+        if (recalled.length > 0) {
+          const memoryPayload = {
+            count: recalled.length,
+            results: recalled.map((item) => ({
+              id: item.id,
+              source: item.source,
+              symptom: item.symptom,
+              rootCause: item.rootCause,
+              fix: item.fix,
+              score: item.score,
+            })),
+          };
+          appendAuditEvent(currentState.runId, "memory.recalled", "system", memoryPayload);
+          runEventBus.emit(currentState.runId, "memory.recalled", memoryPayload);
         }
-
-        const { nextState, sideEffects } = reduce(currentState, {
-          type: "diagnostic_proposal_ready",
-          proposal,
+        const proposal = await runProblemAnalyzer({
+          ticketDescription,
+          observations,
+          similarSolutions: formatSimilarSolutions(recalled),
         });
-        writeStepCount(currentState.runId, nextState.stepCount, db);
-        writePendingKind(currentState.runId, "diagnostic", db);
-        await performSideEffects(sideEffects, db);
-        return nextState;
+        return proposeCommand(currentState, "diagnostic", proposal, db);
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        appendAuditEvent(currentState.runId, "agent.unavailable", "system", { message });
-        return currentState;
+        return handleAgentUnavailable(currentState, err);
       }
     }
 
     case "PLANNING_FIX": {
       if (currentState.stepCount >= MAX_STEPS) {
-        const { nextState, sideEffects } = reduce(currentState, {
-          type: "fix_proposal_ready",
-          proposal: {
-            rootCause: "",
-            command: "",
-            rationale: "",
-            rollbackCommand: "",
-            isReversible: true,
-            persistenceNote: "",
-          },
-        });
-        await performSideEffects(sideEffects, db);
-        return nextState;
+        return applyReduce(currentState, { type: "fix_proposal_ready", proposal: CAPPED_FIX });
       }
-
       try {
-        const observations = db
-          .all<{ content: string; source: string }>("SELECT * FROM observations WHERE run_id = ?", [
-            currentState.runId,
-          ])
-          .filter((o) => o.source !== STEP_COUNT_SOURCE)
-          .map((o) => o.content);
-
         const proposal = await runProblemSolver({
           ticketDescription: readTicketContext(currentState, db),
-          observations,
+          observations: readAgentObservations(currentState.runId, db),
         });
-
-        const policyResult = validateCommandAgainstPolicy(proposal.command);
-
-        if (!policyResult.allowed) {
-          // reduce() now audits the block AND emits phaseEffect(TRIAGING), so the
-          // persisted phase is updated - just apply its effects and return.
-          const { nextState, sideEffects } = reduce(currentState, {
-            type: "command_blocked",
-            reason: policyResult.reason ?? policyResult.matchedRule ?? "blocked",
-            command: proposal.command,
-          });
-          await performSideEffects(sideEffects, db);
-          return nextState;
-        }
-
-        const { nextState, sideEffects } = reduce(currentState, {
-          type: "fix_proposal_ready",
-          proposal,
-        });
-        writeStepCount(currentState.runId, nextState.stepCount, db);
-        writePendingKind(currentState.runId, "fix", db);
-        await performSideEffects(sideEffects, db);
-        return nextState;
+        return proposeCommand(currentState, "fix", proposal, db);
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        appendAuditEvent(currentState.runId, "agent.unavailable", "system", { message });
-        return currentState;
+        return handleAgentUnavailable(currentState, err);
       }
     }
 
     case "VALIDATING": {
       try {
-        const observations = db
-          .all<{ content: string; source: string }>("SELECT * FROM observations WHERE run_id = ?", [
-            currentState.runId,
-          ])
-          .filter((o) => o.source !== STEP_COUNT_SOURCE)
-          .map((o) => o.content);
-
+        const observations = readAgentObservations(currentState.runId, db);
         const result = await runValidator({
           ticketDescription: readTicketContext(currentState, db),
           observations,
           fixApplied: observations[observations.length - 1] ?? "",
         });
-
-        const { nextState, sideEffects } = reduce(currentState, {
-          type: "validation_complete",
-          result,
-        });
-        await performSideEffects(sideEffects, db);
-        return nextState;
+        return applyReduce(currentState, { type: "validation_complete", result });
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        appendAuditEvent(currentState.runId, "agent.unavailable", "system", { message });
-        return currentState;
+        return handleAgentUnavailable(currentState, err);
       }
     }
 
     case "OBSERVING": {
-      // Decide whether the accumulated evidence pins the root cause or more
-      // diagnosis is needed. Reuses the problem-analyzer (no separate decision
-      // agent): if its top hypothesis confidence >= threshold -> root cause found
-      // -> PLANNING_FIX; otherwise -> TRIAGING to propose the next probe. Mirrors
-      // a technician deciding "I'm sure enough - fix it" vs "keep looking".
       try {
-        const observations = db
-          .all<{ content: string; source: string }>("SELECT * FROM observations WHERE run_id = ?", [
-            currentState.runId,
-          ])
-          .filter((o) => o.source !== STEP_COUNT_SOURCE)
-          .map((o) => o.content);
-
-        const proposal = await runProblemAnalyzer({
+        const observation = await runProblemAnalyzerObserve({
           ticketDescription: readTicketContext(currentState, db),
-          observations,
+          observations: readAgentObservations(currentState.runId, db),
         });
-
-        const top = proposal.hypotheses.reduce((a, b) => (b.confidence > a.confidence ? b : a));
-
-        // Verbalized LLM confidence is systematically miscalibrated/overconfident
-        // (well-documented; RLHF/reasoning models worse), so we DON'T trust the
-        // number alone: a root-cause decision that drives to a fix must also cite
-        // concrete evidence. A high-confidence hypothesis with empty evidence is a
-        // hallucination red flag -> keep diagnosing. The human still approves the
-        // fix command, which remains the real backstop.
+        const top = observation.hypotheses.reduce((a, b) => (b.confidence > a.confidence ? b : a));
         const hasEvidence = typeof top.evidence === "string" && top.evidence.trim().length > 0;
-
-        if (top.confidence >= ROOT_CAUSE_CONFIDENCE_THRESHOLD && hasEvidence) {
-          const { nextState, sideEffects } = reduce(currentState, {
-            type: "root_cause_found",
-            hypothesis: top.cause,
-          });
-          await performSideEffects(sideEffects, db);
-          return nextState; // -> PLANNING_FIX
-        }
-
-        const { nextState, sideEffects } = reduce(currentState, { type: "more_diagnosis_needed" });
-        await performSideEffects(sideEffects, db);
-        return nextState; // -> TRIAGING (re-propose next diagnostic command)
+        const confident = top.confidence >= ROOT_CAUSE_CONFIDENCE_THRESHOLD && hasEvidence;
+        return applyReduce(
+          currentState,
+          confident
+            ? { type: "root_cause_found", hypothesis: top.cause }
+            : { type: "more_diagnosis_needed" },
+        );
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        appendAuditEvent(currentState.runId, "agent.unavailable", "system", { message });
-        return currentState;
+        return handleAgentUnavailable(currentState, err);
       }
     }
 
@@ -744,9 +671,6 @@ export async function advance(
   runId: string,
   incomingEvent?: OrchestratorEvent,
   db?: DbAdapter,
-  // Injected for tests; in production defaults to the env-selected (mock|real)
-  // executor - constructed lazily below ONLY when a command actually executes,
-  // so non-executing transitions never touch env/config.
   sshExecutor?: SshExecutor,
 ): Promise<OrchestratorState> {
   if (db) setDb(db);
@@ -769,49 +693,35 @@ export async function advance(
 
   if (incomingEvent) {
     if (incomingEvent.type === "command_approved") {
-      // T-05-13: re-validate finalCommand before any execution (defence-in-depth)
       const policyResult = validateCommandAgainstPolicy(incomingEvent.finalCommand);
       if (!policyResult.allowed) {
-        const { nextState, sideEffects } = reduce(state, {
-          type: "command_blocked",
-          reason: policyResult.reason ?? policyResult.matchedRule ?? "blocked",
-          command: incomingEvent.finalCommand,
-        });
-        await performSideEffects(sideEffects, activeDb);
-        return nextState;
+        return applyReduce(state, blockedEvent(policyResult, incomingEvent.finalCommand));
       }
 
-      // Was the approved command a FIX? Determines post-execution routing
-      // (fix -> VALIDATING, diagnostic -> OBSERVING). Read before the transition.
       const wasFix = readPendingKind(runId, activeDb) === "fix";
 
-      // Transition WAITING_FOR_APPROVAL -> EXECUTING_COMMAND
       const { nextState: executingState, sideEffects: approvalEffects } = reduce(
         state,
         incomingEvent,
       );
-      await performSideEffects(approvalEffects, activeDb);
+      applySideEffects(approvalEffects);
 
-      // The reducer is the single authority on whether execution may proceed. If
-      // it did NOT enter EXECUTING_COMMAND (run aborted/terminal, or not actually
-      // awaiting approval), we must NOT run anything over SSH - a stale/duplicate
-      // /approve after an abort previously still executed the command.
       if (executingState.phase !== "EXECUTING_COMMAND") {
         return executingState;
       }
 
-      // Env-selected executor (mock|real via resolveClientMode), unless a test
-      // injected one. Target host:port comes from the ticket's customer system;
-      // SSH user/key come from env (never hardcoded), validated at startup.
       const exec = sshExecutor ?? createSshExecutor();
-      const [host, portStr] = run.customer_system_id.split(":");
+      const sshTarget = resolveSshTargetFromCustomerSystemId(run.customer_system_id);
+      if (!sshTarget) {
+        return applyReduce(state, {
+          type: "command_blocked",
+          command: incomingEvent.finalCommand,
+          reason: "Customer system target is malformed",
+        });
+      }
       const target = {
-        host: host ?? run.customer_system_id,
-        port: Number.parseInt(portStr ?? "22", 10),
-        username: process.env.SSH_USERNAME ?? "azureuser",
-        // No placeholder default: env.ts requires SSH_PRIVATE_KEY_PATH in real
-        // SSH mode, so a missing key fails loudly at startup, not silently here.
-        privateKeyPath: process.env.SSH_PRIVATE_KEY_PATH ?? "",
+        ...sshTarget,
+        privateKeyPaths: resolveSshKeyPaths(),
       };
 
       const cmdResult = await exec.executeApprovedCommand(
@@ -823,8 +733,6 @@ export async function advance(
       const stdoutRedacted = redactSecrets(cmdResult.stdout);
       const stderrRedacted = redactSecrets(cmdResult.stderr);
 
-      // Persist the EDITED command + its recomputed risk on the approval row so
-      // the audit reflects what actually ran, not the original proposal.
       const approvalRow = activeDb.get<{ proposed_command: string }>(
         "SELECT proposed_command FROM command_approvals WHERE id = ?",
         [incomingEvent.approvalId],
@@ -833,11 +741,8 @@ export async function advance(
         ? approvalRow.proposed_command !== incomingEvent.finalCommand
         : false;
 
-      // A fix command that did not apply (non-zero exit / timeout) must NOT be
-      // routed to the validator as if it worked - re-plan instead.
       const fixFailed = wasFix && (cmdResult.exitCode !== 0 || cmdResult.timedOut);
 
-      // Transition EXECUTING_COMMAND -> OBSERVING | VALIDATING
       const commandResultEvent = {
         type: "command_result" as const,
         approvalId: incomingEvent.approvalId,
@@ -853,7 +758,7 @@ export async function advance(
           timed_out: cmdResult.timedOut ? 1 : 0,
           created_at: new Date().toISOString(),
         },
-        wasFix, // route a fix to VALIDATING, a diagnostic to OBSERVING
+        wasFix,
       };
 
       const { nextState: postState, sideEffects: postEffects } = reduce(
@@ -861,8 +766,6 @@ export async function advance(
         commandResultEvent,
       );
 
-      // Atomic: result row + approval status + observation/audit/phase commit
-      // together (or roll back), so a crash can't leave a half-written trail.
       activeDb.transaction(() => {
         appendCommandResult(runId, incomingEvent.approvalId, {
           command: incomingEvent.finalCommand,
@@ -879,7 +782,7 @@ export async function advance(
           riskLevel: policyResult.riskLevel,
           executedAt: new Date().toISOString(),
         });
-        applySideEffects(postEffects, activeDb);
+        applySideEffects(postEffects);
       });
 
       if (fixFailed && postState.phase === "VALIDATING") {
@@ -895,10 +798,7 @@ export async function advance(
       return postState;
     }
 
-    // All other incoming events
-    const { nextState, sideEffects } = reduce(state, incomingEvent);
-    await performSideEffects(sideEffects, activeDb);
-    return nextState;
+    return applyReduce(state, incomingEvent);
   }
 
   return agentDispatch(state, activeDb);

@@ -2,9 +2,9 @@
 marp: true
 paginate: true
 size: 16:9
-title: "Service Desk Autopilot — techbold START Hack Vienna '26"
-author: "Service Desk Autopilot team"
-description: "A technician-controlled AI that diagnoses, fixes, and documents Linux service incidents — safely, auditably, and never on its own."
+title: "Sphinx - techbold START Hack Vienna '26"
+author: "Sphinx team"
+description: "A technician-controlled AI that diagnoses, fixes, and documents Linux service incidents - safely, auditably, and never on its own."
 math: false
 style: |
   :root {
@@ -86,14 +86,14 @@ style: |
 
 <span class="kicker">techbold START Hack · Vienna '26 · Service Desk track</span>
 
-# Service Desk Autopilot
+# Sphinx
 
-<p class="tagline">A technician-controlled AI that <strong>diagnoses, fixes, and documents</strong> Linux service incidents — safely, auditably, and <strong>never on its own.</strong></p>
+<p class="tagline">A technician-controlled AI that <strong>diagnoses, fixes, and documents</strong> Linux service incidents - safely, auditably, and <strong>never on its own.</strong></p>
 
 <p class="byline">The AI proposes one command at a time. A human approves every action. A deterministic backend executes. The model can't touch the VM.</p>
 
 <!--
-Speaker (0:00–0:25): "Service desk technicians spend their day SSH-ing into customer Linux boxes to fix incidents they've never seen — under time pressure, often without writing it down. We built an AI copilot that makes that fast AND safe, where a human stays in control of every single command. The headline: our AI literally cannot run anything on the VM. It proposes; the human approves; a deterministic backend executes."
+Speaker (0:00-0:25): "Service desk technicians spend their day SSH-ing into customer Linux boxes to fix incidents they've never seen - under time pressure, often without writing it down. We built an AI copilot that makes that fast AND safe, where a human stays in control of every single command. The headline: our AI literally cannot run anything on the VM. It proposes; the human approves; a deterministic backend executes."
 -->
 
 ---
@@ -105,30 +105,30 @@ Speaker (0:00–0:25): "Service desk technicians spend their day SSH-ing into cu
 
 A technician picks up a ticket:
 
-> *"The status API is **sometimes** down."*
+> _"The status API is **sometimes** down."_
 
-They SSH into the customer's Linux VM, poke around, guess, fix something, and — **if they remember** — write it up in the ERP.
+They SSH into the customer's Linux VM, poke around, guess, fix something, and - **if they remember** - write it up in the ERP.
 
 </div>
 <div class="card">
 
 **Four problems, every ticket:**
 
-1. The ticket is a **symptom** — the root cause is hidden on the box.
+1. The ticket is a **symptom** - the root cause is hidden on the box.
 2. Manual SSH under time pressure is **slow and easy to get wrong**.
-3. The write-up is an afterthought — yet it's what the business **keeps**.
+3. The write-up is an afterthought - yet it's what the business **keeps**.
 4. **No audit trail** of what ran on a customer system → a trust & compliance gap.
 
 </div>
 </div>
 
 <!--
-Speaker (0:25–0:55): "Here's the reality. Tickets describe symptoms, not causes. Manual troubleshooting under pressure is where mistakes happen. The documentation — the thing the business actually keeps and bills against — is rushed or missing. And there's usually no record of what a technician ran on a customer's machine. That last one is a real liability."
+Speaker (0:25-0:55): "Here's the reality. Tickets describe symptoms, not causes. Manual troubleshooting under pressure is where mistakes happen. The documentation - the thing the business actually keeps and bills against - is rushed or missing. And there's usually no record of what a technician ran on a customer's machine. That last one is a real liability."
 -->
 
 ---
 
-## Why this is hard — and risky
+## Why this is hard - and risky
 
 <div class="grid3">
 <div class="card">
@@ -146,17 +146,17 @@ An undocumented fix **can't be repeated** the next time the same incident appear
 <div class="card">
 <div class="big">?</div>
 
-A "fix" that passes once but **dies on reboot** isn't a fix — it's a callback.
+A "fix" that passes once but **dies on reboot** isn't a fix - it's a callback.
 
 </div>
 </div>
 
 <br>
 
-> Speed without control is dangerous. Control without speed is the status quo. **We need both — with a paper trail.**
+> Speed without control is dangerous. Control without speed is the status quo. **We need both - with a paper trail.**
 
 <!--
-Speaker (0:55–1:20): "And the stakes are high. One wrong recursive delete and a customer's data is gone. A fix nobody documented gets re-solved from scratch next week. A fix that doesn't survive a reboot just generates another ticket. The challenge isn't 'make the AI smart' — it's make it fast, safe, durable, and accountable, all at once."
+Speaker (0:55-1:20): "And the stakes are high. One wrong recursive delete and a customer's data is gone. A fix nobody documented gets re-solved from scratch next week. A fix that doesn't survive a reboot just generates another ticket. The challenge isn't 'make the AI smart' - it's make it fast, safe, durable, and accountable, all at once."
 -->
 
 ---
@@ -170,7 +170,7 @@ Speaker (0:55–1:20): "And the stakes are high. One wrong recursive delete and 
 <span class="kicker">load → propose → approve → execute → observe → fix → validate → document</span>
 
 <!--
-Speaker (1:20–1:30): "So here's what we built — Service Desk Autopilot turns that messy manual process into one controlled loop."
+Speaker (1:20-1:30): "So here's what we built - Sphinx turns that messy manual process into one controlled loop."
 -->
 
 ---
@@ -195,7 +195,7 @@ load ticket + SSH target from <span class="b">Phoenix ERP</span><br>
 </div>
 
 <!--
-Speaker (1:30–2:05): "The loop: we load the ticket and SSH target from the Phoenix ERP. The AI proposes exactly one command — with its purpose, the signal it expects, and a risk level. Our safety layer classifies it before anything runs. The technician approves, edits, or rejects. Only then does the backend execute it over SSH, with timeouts and redaction. We observe, iterate to the root cause, propose a minimal reversible fix, validate it survives a reboot, and finally draft the ERP report — built only from what actually happened — for the technician to submit."
+Speaker (1:30-2:05): "The loop: we load the ticket and SSH target from the Phoenix ERP. The AI proposes exactly one command - with its purpose, the signal it expects, and a risk level. Our safety layer classifies it before anything runs. The technician approves, edits, or rejects. Only then does the backend execute it over SSH, with timeouts and redaction. We observe, iterate to the root cause, propose a minimal reversible fix, validate it survives a reboot, and finally draft the ERP report - built only from what actually happened - for the technician to submit."
 -->
 
 ---
@@ -207,7 +207,7 @@ Speaker (1:30–2:05): "The loop: we load the ticket and SSH target from the Pho
 
 ### AI side (proposes)
 
-`proposeSshCommand` — a tool with **no `execute`**.
+`proposeSshCommand` - a tool with **no `execute`**.
 
 The model emits a structured proposal and stops. It has **no code path to the shell**.
 
@@ -216,7 +216,7 @@ The model emits a structured proposal and stops. It has **no code path to the sh
 
 ### Backend side (executes)
 
-`executeApprovedCommand` — backend-only, **never registered as a model tool**.
+`executeApprovedCommand` - backend-only, **never registered as a model tool**.
 
 Runs only after **human approval** and a **safety re-check**.
 
@@ -225,48 +225,62 @@ Runs only after **human approval** and a **safety re-check**.
 
 <br>
 
-> Every command passes the safety gate **twice** — once when proposed, once again after any human edit (humans can paste danger too). This is stronger than "ask for confirmation": the model is **architecturally** incapable of execution.
+> Every command passes the safety gate **twice** - once when proposed, once again after any human edit (humans can paste danger too). This is stronger than "ask for confirmation": the model is **architecturally** incapable of execution.
 
 <!--
-Speaker (2:05–2:30): "This is the part I want judges to remember. The AI's only shell tool is 'propose'. It has no execute function — there is no line of code that lets the model run a command. Execution lives in the backend and runs only after a human approves and the command passes our safety check a SECOND time, in case the human edited it into something dangerous. This isn't a confirmation dialog you can bypass — the model is architecturally unable to act."
+Speaker (2:05-2:30): "This is the part I want judges to remember. The AI's only shell tool is 'propose'. It has no execute function - there is no line of code that lets the model run a command. Execution lives in the backend and runs only after a human approves and the command passes our safety check a SECOND time, in case the human edited it into something dangerous. This isn't a confirmation dialog you can bypass - the model is architecturally unable to act."
 -->
 
 ---
 
-## Differentiator 1 — Diagnosis-first, with ranked hypotheses
+## Differentiator 1 - Diagnosis-first, with ranked hypotheses
 
-The brief's own *"what great looks like."* The agent doesn't fish — it shows a **ranked list of root-cause hypotheses, each with the evidence**, then runs the single **most discriminating** read-only probe.
+The brief's own _"what great looks like."_ The agent doesn't fish - it shows a **ranked list of root-cause hypotheses, each with the evidence**, then runs the single **most discriminating** read-only probe.
 
 <div class="card">
 
 ```jsonc
-{ "hypotheses": [
-    { "rootCause": "status-api unit failed on a stale PID/port bind", "confidence": 0.6,
-      "evidence": ["ticket: 'intermittently unavailable'", "service-class symptom, not network"] },
-    { "rootCause": "disk full — service can't write",                 "confidence": 0.25,
-      "evidence": ["intermittent failures can signal transient resource exhaustion"] } ],
+{
+  "hypotheses": [
+    {
+      "rootCause": "status-api unit failed on a stale PID/port bind",
+      "confidence": 0.6,
+      "evidence": [
+        "ticket: 'intermittently unavailable'",
+        "service-class symptom, not network",
+      ],
+    },
+    {
+      "rootCause": "disk full - service can't write",
+      "confidence": 0.25,
+      "evidence": [
+        "intermittent failures can signal transient resource exhaustion",
+      ],
+    },
+  ],
   "command": "systemctl status status-api --no-pager",
   "purpose": "Confirm whether the service is active and why it last failed.",
   "expectedSignal": "active(running)=healthy; failed/inactive=down → read its journal next.",
-  "isReadOnly": true }
+  "isReadOnly": true,
+}
 ```
 
 </div>
 
-The technician sees the *reasoning*, not just a command — and picks the path. **Trust + explainability the human jury rewards.**
+The technician sees the _reasoning_, not just a command - and picks the path. **Trust + explainability the human jury rewards.**
 
 <!--
-Speaker (2:30–2:55): "Differentiator one — and this is straight from the brief's 'what great looks like': the agent is diagnosis-first. It doesn't spray commands. It produces ranked root-cause hypotheses, each backed by the evidence it's seen, then picks the single most informative read-only probe to confirm the top one. The technician sees the reasoning and chooses the path. That explainability is exactly what a human jury rewards — and it minimizes commands, which is a tie-breaker."
+Speaker (2:30-2:55): "Differentiator one - and this is straight from the brief's 'what great looks like': the agent is diagnosis-first. It doesn't spray commands. It produces ranked root-cause hypotheses, each backed by the evidence it's seen, then picks the single most informative read-only probe to confirm the top one. The technician sees the reasoning and chooses the path. That explainability is exactly what a human jury rewards - and it minimizes commands, which is a tie-breaker."
 -->
 
 ---
 
-## Differentiator 2 — Safety that hard-fails *by design*
+## Differentiator 2 - Safety that hard-fails _by design_
 
 <div class="grid2">
 <div>
 
-A **deterministic** gate runs before any execution — not a prompt, real code:
+A **deterministic** gate runs before any execution - not a prompt, real code:
 
 - **Blocklist** → `rm -rf /`, `chmod -R 777 /`, `DROP DATABASE`, disabling the firewall, clearing logs, secret exfiltration… → **never reach an approval card.**
 - **4-tier risk classifier** → `SAFE_READ_ONLY` · `LOW` · `MEDIUM` · `HIGH_RISK_BLOCKED`. The LLM may only **raise** risk, never lower it.
@@ -287,17 +301,17 @@ Obfuscation variants (`chmod -R 777 ${HOME}`, padded whitespace, quote tricks) a
 </div>
 
 <!--
-Speaker (2:55–3:20): "Differentiator two — safety. The rubric has 'hard fails' that zero an incident: deleting a database, chmod 777 on root, disabling the firewall, leaking secrets. Our defense is deterministic code, not a polite prompt. A blocklist catches those patterns — including obfuscated variants — before they ever reach a human to approve. A four-tier classifier ranks everything else, and the model can only raise risk, never lower it. Secrets are redacted everywhere. And this isn't a slide promise — the safety layer and audit store are built and green across 254 tests right now."
+Speaker (2:55-3:20): "Differentiator two - safety. The rubric has 'hard fails' that zero an incident: deleting a database, chmod 777 on root, disabling the firewall, leaking secrets. Our defense is deterministic code, not a polite prompt. A blocklist catches those patterns - including obfuscated variants - before they ever reach a human to approve. A four-tier classifier ranks everything else, and the model can only raise risk, never lower it. Secrets are redacted everywhere. And this isn't a slide promise - the safety layer and audit store are built and green across 254 tests right now."
 -->
 
 ---
 
-## Differentiator 3 — The report is built from the audit log, *not hallucinated*
+## Differentiator 3 - The report is built from the audit log, _not hallucinated_
 
 <div class="grid2">
 <div>
 
-Every proposed / approved / rejected / executed command is written to an **append-only audit log** — with rationale, risk level, decision, exit code, redacted output, and timestamps.
+Every proposed / approved / rejected / executed command is written to an **append-only audit log** - with rationale, risk level, decision, exit code, redacted output, and timestamps.
 
 The **activity report is generated from that log only.** Point at any claim in the report and trace it to a real command result.
 
@@ -307,32 +321,33 @@ The **activity report is generated from that log only.** Point at any claim in t
 <div class="card">
 
 ### The 5 graded activity fields
-- `summary` — what was restored
-- `root_cause` — the **technical cause**, not the symptom
-- `actions_taken` — diagnosis + fix, in order
-- `commands_summary` — command classes, **no secrets**
-- `validation_result` — **concrete proof** the benefit is back
 
-<div class="small">Deleting audit history is itself a hard-fail — so the log is append-only, by design.</div>
+- `summary` - what was restored
+- `root_cause` - the **technical cause**, not the symptom
+- `actions_taken` - diagnosis + fix, in order
+- `commands_summary` - command classes, **no secrets**
+- `validation_result` - **concrete proof** the benefit is back
+
+<div class="small">Deleting audit history is itself a hard-fail - so the log is append-only, by design.</div>
 
 </div>
 </div>
 
 <!--
-Speaker (3:20–3:40): "Differentiator three — the documentation. Every command and decision goes into an append-only audit log. The final ERP report is generated only from that log — so every sentence traces back to a real command result. The agent never invents a service name or a fix it didn't actually verify. And because hiding your tracks is a hard-fail, the log is append-only by design."
+Speaker (3:20-3:40): "Differentiator three - the documentation. Every command and decision goes into an append-only audit log. The final ERP report is generated only from that log - so every sentence traces back to a real command result. The agent never invents a service name or a fix it didn't actually verify. And because hiding your tracks is a hard-fail, the log is append-only by design."
 -->
 
 ---
 
-## Differentiator 4 — It generalises (no hardcoding)
+## Differentiator 4 - It generalises (no hardcoding)
 
-Grading runs on **fresh VMs we've never seen.** Hardcoding loses. So when no runbook matches, the agent falls back to a **first-principles method** that works for *any* local Linux service fault:
+Grading runs on **fresh VMs we've never seen.** Hardcoding loses. So when no runbook matches, the agent falls back to a **first-principles method** that works for _any_ local Linux service fault:
 
 <div class="grid2">
 <div class="card">
 
 **1 · Ground-truth sweep** (one read-only batch)
-failed units · recent journal errors · listeners · disk/inode/mem · *what changed* · the broken benefit test.
+failed units · recent journal errors · listeners · disk/inode/mem · _what changed_ · the broken benefit test.
 
 **2 · Localize the failing layer**
 `benefit → port → unit → process → config/deps → resource → recent change`.
@@ -343,23 +358,23 @@ failed units · recent journal errors · listeners · disk/inode/mem · *what ch
 **3 · Follow the chain inward**
 harvest the system's own error channels: `systemctl status` → `journalctl` → config test (`nginx -t`) → config → perms → resource.
 
-**4 · Hypothesize *from* evidence**, confirm, then act. **No fix on an unconfirmed cause.**
+**4 · Hypothesize _from_ evidence**, confirm, then act. **No fix on an unconfirmed cause.**
 
 </div>
 </div>
 
-> Every discovery step is read-only and evidence-gated — so an unknown error can never push the agent into a fabricated or unsafe action. We tuned against our 5 practice VMs via the reset endpoint; **nothing is keyed to them.**
+> Every discovery step is read-only and evidence-gated - so an unknown error can never push the agent into a fabricated or unsafe action. We tuned against our 5 practice VMs via the reset endpoint; **nothing is keyed to them.**
 
 <!--
-Speaker (3:40–4:00): "Differentiator four — generalization. Grading happens on fresh VMs, so anything hardcoded fails. When the agent hits something it doesn't recognize, it runs a first-principles method: a read-only ground-truth sweep, localize the broken layer, follow the causal chain inward using the system's own error channels, and only then form a hypothesis from evidence and confirm it before touching anything. It's safe precisely because discovery is entirely read-only."
+Speaker (3:40-4:00): "Differentiator four - generalization. Grading happens on fresh VMs, so anything hardcoded fails. When the agent hits something it doesn't recognize, it runs a first-principles method: a read-only ground-truth sweep, localize the broken layer, follow the causal chain inward using the system's own error channels, and only then form a hypothesis from evidence and confirm it before touching anything. It's safe precisely because discovery is entirely read-only."
 -->
 
 ---
 
-## Architecture — a deterministic state machine, AI in the seams
+## Architecture - a deterministic state machine, AI in the seams
 
 <div class="flow">
-Frontend (React) ─▶ <span class="b">Hono routes</span> ─▶ <span class="b">Orchestrator</span> (the state machine — owns truth)<br>
+Frontend (React) ─▶ <span class="b">Hono routes</span> ─▶ <span class="b">Orchestrator</span> (the state machine - owns truth)<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
 &nbsp;&nbsp;┌──────────────┬──────────────┼──────────────┬──────────────┐<br>
 &nbsp;&nbsp;▼&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
@@ -370,7 +385,7 @@ Frontend (React) ─▶ <span class="b">Hono routes</span> ─▶ <span class="b
 <div class="grid2" style="margin-top:12px">
 <div>
 
-**The state machine is the skeleton** — it owns transitions, approvals, execution, and audit. **The AI is the muscle** in specific states. The model can be *wrong* without being *dangerous*, because it never holds the execute tool.
+**The state machine is the skeleton** - it owns transitions, approvals, execution, and audit. **The AI is the muscle** in specific states. The model can be _wrong_ without being _dangerous_, because it never holds the execute tool.
 
 </div>
 <div>
@@ -383,12 +398,12 @@ Frontend (React) ─▶ <span class="b">Hono routes</span> ─▶ <span class="b
 </div>
 
 <!--
-Speaker (4:00–4:20 — for the longer cut / leave-behind): "Architecturally: a deterministic state machine owns truth — every transition, approval, execution, and audit write. The AI is invoked only in specific states to propose and interpret. Stack is Node, Hono, the Vercel AI SDK, Zod for shared types end-to-end, ssh2, and SQLite for a durable audit log. The folder structure mirrors the rubric's named modules verbatim — a judge reading src/ sees the rubric."
+Speaker (4:00-4:20 - for the longer cut / leave-behind): "Architecturally: a deterministic state machine owns truth - every transition, approval, execution, and audit write. The AI is invoked only in specific states to propose and interpret. Stack is Node, Hono, the Vercel AI SDK, Zod for shared types end-to-end, ssh2, and SQLite for a durable audit log. The folder structure mirrors the rubric's named modules verbatim - a judge reading src/ sees the rubric."
 -->
 
 ---
 
-## The human leads — the AI assists
+## The human leads - the AI assists
 
 Beyond approve / edit / reject on **every** command:
 
@@ -396,13 +411,13 @@ Beyond approve / edit / reject on **every** command:
 <div class="card">
 
 **Run your own command**
-Type a command directly — same safety, redaction, and audit path. Unstick or override the agent any time.
+Type a command directly - same safety, redaction, and audit path. Unstick or override the agent any time.
 
 </div>
 <div class="card">
 
 **Ask & answer**
-The agent raises targeted questions (*"need sudo?"*, *"OK to restart X — 4 active connections?"*) instead of guessing.
+The agent raises targeted questions (_"need sudo?"_, _"OK to restart X - 4 active connections?"_) instead of guessing.
 
 </div>
 <div class="card">
@@ -415,28 +430,28 @@ One-click revert via the captured rollback. Read-only batches approve as one rev
 
 <br>
 
-> **Blast-radius before a restart:** the approval card shows dependents and active connections. **Idempotency & dry-run:** probe state and `nginx -t` *before* mutating. The technician is the operator — not a button.
+> **Blast-radius before a restart:** the approval card shows dependents and active connections. **Idempotency & dry-run:** probe state and `nginx -t` _before_ mutating. The technician is the operator - not a button.
 
 <!--
-Speaker: "Human control is a first-class surface, not a confirm button. The technician can run their own command through the same safety path, the agent asks rather than guesses, and there's always one-click undo and abort. Before any restart we show blast radius — dependents and active connections — on the approval card."
+Speaker: "Human control is a first-class surface, not a confirm button. The technician can run their own command through the same safety path, the agent asks rather than guesses, and there's always one-click undo and abort. Before any restart we show blast radius - dependents and active connections - on the approval card."
 -->
 
 ---
 
-## How we win the rubric — 55 of 100 points are B + C
+## How we win the rubric - 55 of 100 points are B + C
 
-| Block | Pts | What it checks | Our design response |
-|---|--:|---|---|
-| **A** ERP & MVP | 20 | load tickets, usable list, sort/filter, customer-system, **complete** activity, survive 401/404/empty | Typed Phoenix client + mock; explicit empty/error states; all 5 activity fields always filled |
-| **B** Troubleshooting | 35 | 5 hidden incidents ×7 on fresh VMs: root cause, fix works, **persists**, no regression, summary | Generalising diagnosis-first agent; reboot-safe fixes; minimal-change bias; honest validation |
-| **C** Safety & audit | 20 | full audit trail, no blanket commands, secret protection, minimal change, human control. **Hard-fails zero the incident.** | Deterministic gate **before** execution; mandatory approval; redaction; append-only audit |
-| **D** Technician UX | 10 | overview, detail, visible progress, followable logs, retry/abort | One ticket list + one run page, live SSE timeline, approval card |
-| **E** Engineering | 15 | clean separated modules, real README, runnable tests, error handling/timeouts/retries, sane secrets | Modules mirror the rubric; **254 tests**; mock Phoenix + mock SSH; `.env.example`, keys git-ignored |
+| Block                 | Pts | What it checks                                                                                                             | Our design response                                                                                 |
+| --------------------- | --: | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **A** ERP & MVP       |  20 | load tickets, usable list, sort/filter, customer-system, **complete** activity, survive 401/404/empty                      | Typed Phoenix client + mock; explicit empty/error states; all 5 activity fields always filled       |
+| **B** Troubleshooting |  35 | 5 hidden incidents ×7 on fresh VMs: root cause, fix works, **persists**, no regression, summary                            | Generalising diagnosis-first agent; reboot-safe fixes; minimal-change bias; honest validation       |
+| **C** Safety & audit  |  20 | full audit trail, no blanket commands, secret protection, minimal change, human control. **Hard-fails zero the incident.** | Deterministic gate **before** execution; mandatory approval; redaction; append-only audit           |
+| **D** Technician UX   |  10 | overview, detail, visible progress, followable logs, retry/abort                                                           | One ticket list + one run page, live SSE timeline, approval card                                    |
+| **E** Engineering     |  15 | clean separated modules, real README, runnable tests, error handling/timeouts/retries, sane secrets                        | Modules mirror the rubric; **254 tests**; mock Phoenix + mock SSH; `.env.example`, keys git-ignored |
 
 <div class="center" style="margin-top:6px"><strong>Tie-breakers:</strong> higher B → higher C → most incidents 7/7 → fewer safety flags → <strong>fewer commands</strong> → shorter time. <span class="small">Our loop is built for exactly this order.</span></div>
 
 <!--
-Speaker (4:20–4:45): "And we built to the rubric deliberately. 55 of the 100 points are troubleshooting and safety — so that's where the product's weight is. A polished UI alone doesn't win; solving hidden incidents safely and auditably does. Even the tie-breakers — fewest commands, fewest safety flags — are designed into the loop: diagnosis-first means fewer commands, and the deterministic gate means zero safety flags."
+Speaker (4:20-4:45): "And we built to the rubric deliberately. 55 of the 100 points are troubleshooting and safety - so that's where the product's weight is. A polished UI alone doesn't win; solving hidden incidents safely and auditably does. Even the tie-breakers - fewest commands, fewest safety flags - are designed into the loop: diagnosis-first means fewer commands, and the deterministic gate means zero safety flags."
 -->
 
 ---
@@ -448,11 +463,11 @@ Speaker (4:20–4:45): "And we built to the rubric deliberately. 55 of the 100 p
 
 <span class="pill ok">Built & tested · 254 green</span>
 
-- **Zod-validated env** — fails fast on missing config
-- **Phoenix ERP client** — auth, retry-on-5xx, timeouts, typed errors (401/404/422), + in-memory mock
-- **Safety layer** — blocklist, 4-tier classifier, redaction (the C-category crown jewel)
-- **Append-only audit store** — SQLite + JSONL fallback
-- **Ticket routes** — list, detail, customer-system, sort/filter
+- **Zod-validated env** - fails fast on missing config
+- **Phoenix ERP client** - auth, retry-on-5xx, timeouts, typed errors (401/404/422), + in-memory mock
+- **Safety layer** - blocklist, 4-tier classifier, redaction (the C-category crown jewel)
+- **Append-only audit store** - SQLite + JSONL fallback
+- **Ticket routes** - list, detail, customer-system, sort/filter
 
 </div>
 <div>
@@ -465,13 +480,13 @@ Speaker (4:20–4:45): "And we built to the rubric deliberately. 55 of the 100 p
 - **Activity generation** from the audit trail
 - **Frontend** workspace
 
-<div class="small" style="margin-top:14px">We built the <strong>hard, point-bearing foundation first</strong> — safety, audit, and the ERP contract — then layer the loop on top. The risky part is done.</div>
+<div class="small" style="margin-top:14px">We built the <strong>hard, point-bearing foundation first</strong> - safety, audit, and the ERP contract - then layer the loop on top. The risky part is done.</div>
 
 </div>
 </div>
 
 <!--
-Speaker (only in the engineering/Q&A cut): "Where we are: the foundation that actually carries the points — the safety layer, the append-only audit store, and the ERP client — is built and green across 254 tests. The SSH executor, agent loop, run API, and UI are scaffolded and next. We deliberately built the hard, point-bearing part first. Mock mode lets the entire loop run offline so the demo can't hard-fail on flaky Wi-Fi."
+Speaker (only in the engineering/Q&A cut): "Where we are: the foundation that actually carries the points - the safety layer, the append-only audit store, and the ERP client - is built and green across 254 tests. The SSH executor, agent loop, run API, and UI are scaffolded and next. We deliberately built the hard, point-bearing part first. Mock mode lets the entire loop run offline so the demo can't hard-fail on flaky Wi-Fi."
 -->
 
 ---
@@ -490,41 +505,41 @@ Speaker (only in the engineering/Q&A cut): "Where we are: the foundation that ac
 <div>
 
 5. **Diagnose → minimal fix → validate** the customer benefit, then **re-check after a restart** (persistence is graded).
-6. **Open the audit log** — every command, decision, exit code, redacted output.
+6. **Open the audit log** - every command, decision, exit code, redacted output.
 7. **The activity drafts itself** from that log; point at a claim, trace it to a command.
 8. **Submit** → ticket `DONE`.
 
 </div>
 </div>
 
-<div class="center" style="margin-top:8px"><span class="pill brand">Mock mode is first-class</span> &nbsp; the whole loop runs offline — the demo survives flaky Wi-Fi and VM reboots.</div>
+<div class="center" style="margin-top:8px"><span class="pill brand">Mock mode is first-class</span> &nbsp; the whole loop runs offline - the demo survives flaky Wi-Fi and VM reboots.</div>
 
 <!--
-Speaker (4:45–5:10, demo handoff): "Live, we'll load a real ticket, watch the ranked hypotheses, and approve a probe. Then we'll try to paste 'rm -rf slash' — and watch it get blocked before it ever reaches a human. We'll edit a command and see the safety check re-fire. We'll fix the incident, validate it survives a restart, open the full audit log, and watch the ERP report write itself from that log. Everything runs in mock mode too, so the demo can't die on bad Wi-Fi."
+Speaker (4:45-5:10, demo handoff): "Live, we'll load a real ticket, watch the ranked hypotheses, and approve a probe. Then we'll try to paste 'rm -rf slash' - and watch it get blocked before it ever reaches a human. We'll edit a command and see the safety check re-fire. We'll fix the incident, validate it survives a restart, open the full audit log, and watch the ERP report write itself from that log. Everything runs in mock mode too, so the demo can't die on bad Wi-Fi."
 -->
 
 ---
 
 <!-- _class: close -->
 
-## Why Service Desk Autopilot wins
+## Why Sphinx wins
 
 <div class="grid2">
 <div>
 
-1. **The AI can't act on its own** — propose / approve / execute is split in code.
-2. **Hard-fails are blocked before they run** — deterministic, tested.
-3. **Diagnosis-first** — ranked hypotheses + evidence (the brief's own bar).
-4. **The report is the audit log** — nothing invented.
-5. **It generalises** — no incident hardcoded.
+1. **The AI can't act on its own** - propose / approve / execute is split in code.
+2. **Hard-fails are blocked before they run** - deterministic, tested.
+3. **Diagnosis-first** - ranked hypotheses + evidence (the brief's own bar).
+4. **The report is the audit log** - nothing invented.
+5. **It generalises** - no incident hardcoded.
 
 </div>
 <div>
 
 <div class="big" style="color:var(--brand-2)">55/100</div>
-<p style="color:#C7D6F5">are B + C — troubleshooting & safety. <strong>That's where we put the product.</strong></p>
+<p style="color:#C7D6F5">are B + C - troubleshooting & safety. <strong>That's where we put the product.</strong></p>
 
-<p class="byline" style="margin-top:30px">Build us a technician that never forgets to write it down — and never reaches for <code style="color:#FCA5A5;background:#22132a">rm&nbsp;-rf</code> by accident.</p>
+<p class="byline" style="margin-top:30px">Build us a technician that never forgets to write it down - and never reaches for <code style="color:#FCA5A5;background:#22132a">rm&nbsp;-rf</code> by accident.</p>
 
 </div>
 </div>
@@ -532,5 +547,5 @@ Speaker (4:45–5:10, demo handoff): "Live, we'll load a real ticket, watch the 
 <p class="byline">MIT-licensed · <code>docker compose up</code> · mock mode offline · 254 tests green</p>
 
 <!--
-Speaker (5:10–5:30, close): "To close: the AI can't act on its own, dangerous commands are blocked before they run, diagnosis is evidence-first, the report is the audit log, and nothing is hardcoded. Fifty-five of a hundred points are troubleshooting and safety — and that's exactly where we put the product. Thank you."
+Speaker (5:10-5:30, close): "To close: the AI can't act on its own, dangerous commands are blocked before they run, diagnosis is evidence-first, the report is the audit log, and nothing is hardcoded. Fifty-five of a hundred points are troubleshooting and safety - and that's exactly where we put the product. Thank you."
 -->

@@ -1,8 +1,8 @@
 # Shared HTTP API contract (frontend ⇄ backend)
 
 **Both backends (`backend-py` on :8000, `backend-node` on :8001) implement this identical
-contract.** The Vite React frontend is backend-agnostic and talks to whichever
-`VITE_API_BASE` points at. The Phoenix token and the SSH key live **only** on the backend
+contract.** The Next.js dashboard is backend-agnostic and talks to whichever
+`NEXT_PUBLIC_API_BASE` points at. The Phoenix token and the SSH key live **only** on the backend
 and are never exposed to the browser.
 
 > This is the single source of truth. If you change a shape here, change it in both backends

@@ -1,8 +1,0 @@
-node_modules/
-recording/
-remotion/node_modules/
-remotion/out/
-remotion/public/*.mp3
-remotion/public/*.mp4
-remotion/public/*.webm
-remotion/public/*.aiff
