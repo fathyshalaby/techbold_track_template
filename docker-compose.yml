@@ -65,6 +65,25 @@ services:
               count: all
               capabilities: [gpu]
 
+  # Secondary backend: the Python/FastAPI implementation. Opt-in (profile: py) so the
+  # node backend stays the default on :8000. Its auto-drive run engine (selective HITL)
+  # is the unattended-autograde-capable variant. Runs on :8002 to coexist with node.
+  backend-py:
+    profiles:
+      - py
+    build:
+      context: ./apps/backend-py
+      dockerfile: Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./keys:/keys:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   autopilot-data:
   model-hf-cache:
