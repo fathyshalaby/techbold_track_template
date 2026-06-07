@@ -17,8 +17,18 @@ const EnvSchema = z
     PHOENIX_API_BASE_URL: z.string().default(''),
     PHOENIX_API_TOKEN: z.string().default(''),
     OPENAI_API_KEY: z.string().default(''),
+    // 'openai' (default) | 'azure' (Azure AI Foundry / OpenAI on Azure) |
+    // 'openai-compatible' (OpenRouter, a local server, any OpenAI-shaped API).
     LLM_PROVIDER: z.string().default('openai'),
     LLM_MODEL: z.string().default('gpt-4o'),
+    // OpenAI-compatible base URL (OpenRouter / local). When set, selects the
+    // 'openai-compatible' provider unless an Azure endpoint is also configured.
+    LLM_BASE_URL: z.string().default(''),
+    // Azure AI Foundry: the project/resource endpoint, its key, and the model
+    // deployment name. Setting AZURE_ENDPOINT selects the 'azure' provider.
+    AZURE_ENDPOINT: z.string().default(''),
+    AZURE_API_KEY: z.string().default(''),
+    AZURE_DEPLOYMENT: z.string().default(''),
     // No placeholder default — required in real SSH mode (see superRefine) so a
     // missing key fails loudly at startup instead of silently targeting a wrong
     // key at execution time.
@@ -41,11 +51,43 @@ const EnvSchema = z
     const sshReal = !cfg.MOCK_MODE && !cfg.MOCK_SSH;
     requireVar(phoenixReal, 'PHOENIX_API_BASE_URL', cfg.PHOENIX_API_BASE_URL);
     requireVar(phoenixReal, 'PHOENIX_API_TOKEN', cfg.PHOENIX_API_TOKEN);
-    requireVar(llmReal, 'OPENAI_API_KEY', cfg.OPENAI_API_KEY);
+    if (llmReal) {
+      // Require only the credentials the SELECTED provider actually needs, so a
+      // misconfig fails loudly at startup pointing at the right variable.
+      const provider = effectiveLlmProvider(cfg);
+      if (provider === 'azure') {
+        requireVar(true, 'AZURE_ENDPOINT', cfg.AZURE_ENDPOINT);
+        requireVar(true, 'AZURE_API_KEY', cfg.AZURE_API_KEY);
+      } else if (provider === 'openai-compatible') {
+        requireVar(true, 'LLM_BASE_URL', cfg.LLM_BASE_URL);
+        requireVar(true, 'OPENAI_API_KEY', cfg.OPENAI_API_KEY);
+      } else {
+        requireVar(true, 'OPENAI_API_KEY', cfg.OPENAI_API_KEY);
+      }
+    }
     requireVar(sshReal, 'SSH_PRIVATE_KEY_PATH', cfg.SSH_PRIVATE_KEY_PATH);
   });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
+
+// Single source of truth for which LLM provider is active. Explicit LLM_PROVIDER
+// wins; otherwise the presence of an Azure endpoint or a compatible base URL
+// selects the provider. Hoisted so superRefine (above) can use it during parse.
+export function effectiveLlmProvider(
+  cfg: Pick<EnvConfig, 'LLM_PROVIDER' | 'AZURE_ENDPOINT' | 'LLM_BASE_URL'>,
+): 'openai' | 'azure' | 'openai-compatible' {
+  const p = (cfg.LLM_PROVIDER ?? '').trim().toLowerCase();
+  if (p === 'azure' || cfg.AZURE_ENDPOINT.trim() !== '') return 'azure';
+  if (
+    p === 'openai-compatible' ||
+    p === 'openrouter' ||
+    p === 'local' ||
+    cfg.LLM_BASE_URL.trim() !== ''
+  ) {
+    return 'openai-compatible';
+  }
+  return 'openai';
+}
 
 export function parseEnv(raw: Record<string, string | undefined>): EnvConfig {
   const result = EnvSchema.safeParse(raw);
