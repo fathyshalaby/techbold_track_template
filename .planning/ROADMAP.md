@@ -217,7 +217,29 @@ Plans:
   5. Activity editor allows the technician to edit generated fields and submit to Phoenix
   6. Retry and abort controls are visible and functional on the run page
 
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+
+**Wave 1** *(independent)*
+
+- [ ] 08-01-PLAN.md — Shared types, API fetch wrappers, pure mappers (TDD)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 08-02-PLAN.md — Custom hooks (useTickets, useRunEvents)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 08-03-PLAN.md — App shell + TicketListView
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 08-04-PLAN.md — RunView + ApprovalCard + abort/advance controls
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 08-05-PLAN.md — ActivityView + CSS finalization
+
 **UI hint**: yes
 
 ### Phase 9: Tests + Submission Polish
