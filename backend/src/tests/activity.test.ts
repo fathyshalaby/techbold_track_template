@@ -177,6 +177,26 @@ describe('POST /api/runs/:runId/activity/submit', () => {
     expect((await second.json() as Record<string, unknown>)['error']).toBe('activity already submitted');
   });
 
+  it('Test 6c (ticket close): submit sets the ERP ticket status to DONE', async () => {
+    const phoenixModule = await import('../phoenix/mock.js');
+    const setStatusSpy = vi.spyOn(phoenixModule.default.prototype, 'setStatus');
+
+    const run = createRun(7, '10.0.0.1:22');
+    updateRunPhase(run.id, 'WAITING_FOR_ACTIVITY_REVIEW');
+    saveActivityDraft(run.id, {
+      summary: 's', rootCause: 'rc', actionsTaken: 'a', commandsSummary: 'c', validationResult: 'v',
+    });
+
+    const res = await testApp.request(
+      `/api/runs/${run.id}/activity/submit`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+    );
+
+    expect(res.status).toBe(200);
+    expect(setStatusSpy).toHaveBeenCalledWith(7, 'DONE');
+    setStatusSpy.mockRestore();
+  });
+
   it('Test 7 (field overrides): uses technician-edited summary when provided', async () => {
     const runsModule = await import('../routes/activity.js');
     // Use the test app which has activityRouter mounted; spy on phoenix client via runs module

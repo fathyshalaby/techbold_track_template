@@ -178,6 +178,18 @@ activityRouter.post('/:runId/activity/submit', async (c) => {
   appendAuditEvent(runId, 'activity.submitted', 'system', { activityId: activity.id });
   runEventBus.emit(runId, 'activity.submitted', { activityId: activity.id });
 
+  // Close the ERP ticket — the manual workflow always sets the ticket DONE after
+  // logging the resolution (ARCHITECTURE: COMPLETED → ticket DONE), reached only
+  // after a validated fix. Best-effort: the activity (the scored record) is
+  // already created, so a failed status PATCH must NOT fail the submit (which
+  // would risk a duplicate activity on retry) — audit it and continue.
+  try {
+    await client.setStatus(run.ticket_id, 'DONE');
+    appendAuditEvent(runId, 'ticket.status_updated', 'system', { ticketId: run.ticket_id, status: 'DONE' });
+  } catch {
+    appendAuditEvent(runId, 'ticket.status_update_failed', 'system', { ticketId: run.ticket_id });
+  }
+
   // Mark the specific draft submitted. UPDATE … ORDER BY … LIMIT is non-portable
   // (only some SQLite builds support it, and the JSONL adapter can't parse it),
   // so target the draft by id — works on every backend.
