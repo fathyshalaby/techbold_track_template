@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { z } from "zod";
 import { getEnv, resolveClientMode } from "../env.js";
 import {
@@ -55,7 +56,9 @@ ticketsRouter.get("/", async (c) => {
   }
 });
 
-ticketsRouter.get("/:id/customer-system", async (c) => {
+// Customer-system handler, registered at both /customer-system (Phoenix-aligned)
+// and /system (python-backend path) so the two backends expose identical routes.
+const customerSystemHandler = async (c: Context) => {
   // Number() (not parseInt) rejects trailing garbage like "5abc"/"5.9" -> NaN.
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id <= 0) {
@@ -80,7 +83,9 @@ ticketsRouter.get("/:id/customer-system", async (c) => {
     }
     throw err;
   }
-});
+};
+ticketsRouter.get("/:id/customer-system", customerSystemHandler);
+ticketsRouter.get("/:id/system", customerSystemHandler);
 
 // SSH connectivity preflight for a ticket's VM (merged from the python backend):
 // loads the customer system, then opens+closes an SSH connection and reports

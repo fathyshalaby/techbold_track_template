@@ -49,4 +49,19 @@ describe("merged endpoints (multi-key SSH preflight + reset)", () => {
     expect(body.id).toBeGreaterThan(0);
     expect(typeof body.username).toBe("string");
   });
+
+  it("GET /api/tickets/:id/system is an alias for customer-system (path parity)", async () => {
+    const a = await app.request("/api/tickets/1/system");
+    const b = await app.request("/api/tickets/1/customer-system");
+    expect(a.status).toBe(200);
+    expect(await a.json()).toEqual(await b.json());
+  });
+
+  it("GET /api/case-source reports the ticket source (parity)", async () => {
+    const res = await app.request("/api/case-source");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { case_source: string; sandbox_available: boolean };
+    expect(["sandbox_cases", "real_erp"]).toContain(body.case_source);
+    expect(typeof body.sandbox_available).toBe("boolean");
+  });
 });

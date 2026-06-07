@@ -21,7 +21,17 @@
     { "id": "log_wipe", "pattern": "(\\brm\\b[^\\n]*/var/log|>\\s*/var/log/|\\btruncate\\b[^\\n]*/var/log|journalctl\\s+--vacuum)", "reason": "Deleting/truncating system logs" },
     { "id": "history_wipe", "pattern": "\\b(history\\s+-c|rm\\b[^\\n]*\\.bash_history|unset\\s+HISTFILE)|cat\\s+/dev/null\\s*>\\s*~?/?\\.bash_history", "reason": "Clearing shell history to hide actions" },
     { "id": "overwrite_critical_etc", "pattern": ">\\s*/etc/(passwd|shadow|sudoers|fstab|hosts)", "reason": "Overwriting a critical /etc file" },
-    { "id": "user_home_delete", "pattern": "\\b(userdel\\s+-r\\b|deluser\\s+--remove-home\\b)", "reason": "Deleting a user and their home directory" }
+    { "id": "user_home_delete", "pattern": "\\b(userdel\\s+-r\\b|deluser\\s+--remove-home\\b)", "reason": "Deleting a user and their home directory" },
+    { "id": "recursive_find_delete", "pattern": "\\bfind\\b[^|;&]*-delete|\\bfind\\b[^|;&]*-exec(?:dir)?\\s+(rm|shred|chmod|chown|mv|dd)\\b|\\bxargs\\b[^|;&]*\\b(rm|shred|chmod|chown)\\b", "reason": "Bulk delete/mutate via find -delete / -exec / xargs" },
+    { "id": "shutdown_reboot", "pattern": "\\b(shutdown|reboot|halt|poweroff)\\b|\\binit\\s+(0|6)\\b", "reason": "Shutting down or rebooting the host (the grader controls reboots)" },
+    { "id": "privilege_escalation", "pattern": "\\bsudo\\b[^;&|]*\\s(?:-i|-s|--login|--shell)\\b|\\bsu\\b(\\s+-)?(\\s+(root|-l|--login))*\\s*$", "reason": "Opening a privileged interactive shell" },
+    { "id": "reverse_shell", "pattern": "/dev/(tcp|udp)/|\\bbash\\s+[^|;&]*>&\\s*/dev/|\\b(nc|ncat)\\b[^|;&]*\\s-e\\b", "reason": "Reverse shell / remote shell redirection" },
+    { "id": "setuid_setgid", "pattern": "\\bchmod\\s+(?:-\\S+\\s+)*([ugoa]*\\+s|[2467][0-7]{3})\\b", "reason": "Setting setuid/setgid bits" },
+    { "id": "mass_kill", "pattern": "\\bkill\\s+-9\\s+-1\\b|\\bkill\\s+(-\\d+\\s+)?1\\b", "reason": "Killing PID 1 / every process" },
+    { "id": "exfiltration", "pattern": "\\b(nc|netcat|ncat|socat)\\b", "reason": "Network exfiltration / remote-shell tooling" },
+    { "id": "disk_wipe_extra", "pattern": "\\b(wipefs|shred)\\b", "reason": "Wiping a filesystem signature / shredding data" },
+    { "id": "secret_exposure", "pattern": "\\bprintenv\\b|^\\s*(sudo\\s+)?env\\s*($|\\|)", "reason": "Dumping environment variables (may contain secrets)" },
+    { "id": "secret_file_access", "pattern": "/etc/(shadow|gshadow)\\b|/etc/ssh/ssh_host_[a-z0-9]+_key\\b|(?:^|[\\s/=])id_(rsa|dsa|ecdsa|ed25519)\\b|\\.ssh/[^\\s]*id_|/proc/(self|[0-9]+)/environ\\b|(?:^|[\\s/=])\\.env(?:\\.[\\w-]+)?($|[\\s|;&])|/etc/environment\\b|/root/\\.[A-Za-z]|\\.aws/credentials\\b|\\.kube/config\\b", "reason": "Accessing a secret file (shadow, SSH keys, .env, cloud credentials)" }
   ],
   "readonly_allow": [
     { "id": "systemctl_readonly", "pattern": "^\\s*(sudo\\s+)?systemctl\\s+(status|is-active|is-enabled|is-failed|show|list-units|list-unit-files|list-dependencies|cat)\\b" },
@@ -32,7 +42,7 @@
     { "id": "fs_inspect", "pattern": "^\\s*(sudo\\s+)?(ls|stat|file|du|df|free|lsblk|blkid|mount\\s*$)\\b" },
     { "id": "process_inspect", "pattern": "^\\s*(sudo\\s+)?(ps|top\\s+-b|uptime|vmstat|iostat|lscpu|nproc|who|w)\\b" },
     { "id": "net_inspect", "pattern": "^\\s*(sudo\\s+)?(ip\\s+(a|addr|r|route|link|neigh)|ifconfig|ping\\s+-c|getent|dig|nslookup|host)\\b" },
-    { "id": "id_inspect", "pattern": "^\\s*(sudo\\s+)?(id|whoami|hostnamectl|uname|date|env|printenv)\\b" },
+    { "id": "id_inspect", "pattern": "^\\s*(sudo\\s+)?(id|whoami|hostnamectl|uname|date)\\b" },
     { "id": "config_tests", "pattern": "^\\s*(sudo\\s+)?(nginx\\s+-t|apachectl\\s+configtest|apache2ctl\\s+-t|sshd\\s+-t|named-checkconf|postconf\\s+-n|php\\s+-v|node\\s+-v|python3?\\s+--version|psql\\s+--version)\\b" },
     { "id": "security_inspect", "pattern": "^\\s*(sudo\\s+)?(getenforce|sestatus|ufw\\s+status|iptables\\s+-(L|S)|aa-status)\\b" },
     { "id": "dmesg", "pattern": "^\\s*(sudo\\s+)?dmesg\\b" },

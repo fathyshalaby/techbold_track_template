@@ -29,9 +29,10 @@ class Settings(BaseSettings):
     ssh_command_timeout: int = 30
 
     # ---- behaviour ----
-    # Auto-execute read-only diagnostics; require human approval ONLY for writes (needs_review).
-    # Set false to require approval for EVERY command (strict rubric reading).
-    auto_run_readonly: bool = True
+    # Default FALSE: require explicit human approval for EVERY command — identical to
+    # the node backend and to the rules ("a human confirms every action; the agent
+    # never acts on its own"). Set true only for an explicitly unattended run.
+    auto_run_readonly: bool = False
 
     # ---- LLM: azure (primary) | openrouter | local ----
     llm_provider: str = "azure"

