@@ -230,7 +230,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 08-03-PLAN.md — App shell + TicketListView
+- [x] 08-03-PLAN.md — App shell + TicketListView
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
