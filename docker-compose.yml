@@ -17,6 +17,19 @@ services:
   frontend:
     build:
       context: .
+      dockerfile: apps/dashboard/Dockerfile
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  frontend-vite:
+    profiles:
+      - fallback
+    build:
+      context: .
       dockerfile: apps/frontend/Dockerfile
     environment:
       VITE_API_BASE: http://localhost:8000
@@ -25,5 +38,33 @@ services:
     depends_on:
       - backend
 
+  model:
+    profiles:
+      - model
+    build:
+      context: ./apps/model
+      dockerfile: Dockerfile
+    environment:
+      PORT: 8001
+      HF_HOME: /workspace/model/.cache/huggingface
+      HF_TOKEN: ${HF_TOKEN:-}
+      BASE_MODEL: ${MODEL_BASE_MODEL:-mistralai/Ministral-3-14B-Instruct-2512}
+      ADAPTER_PATH: ${MODEL_ADAPTER_PATH:-outputs/adapter}
+      LORA_NAME: ${MODEL_LORA_NAME:-msp}
+    ports:
+      - "${MODEL_PORT:-8001}:8001"
+    volumes:
+      - ./apps/model/outputs:/workspace/model/outputs:ro
+      - model-hf-cache:/workspace/model/.cache/huggingface
+    command: make serve
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
 volumes:
   autopilot-data:
+  model-hf-cache:
