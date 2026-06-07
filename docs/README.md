@@ -8,6 +8,14 @@
 | Developer | [../README.md](../README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [API.md](API.md) |
 | Operator | [SAFETY_POLICY.md](SAFETY_POLICY.md), [SECURITY.md](SECURITY.md), [SUBMISSION_HANDOFF.md](SUBMISSION_HANDOFF.md) |
 
+## Local commands
+
+| Command | Purpose |
+|---|---|
+| `bun run dev:backend` | Start the Hono backend on port 8000. |
+| `bun run dev:frontend` | Start the primary Next.js dashboard on port 3000. |
+| `bun run dev:vite` | Start the temporary Vite fallback on port 5173. |
+
 ## Core docs
 
 | Doc | Purpose |

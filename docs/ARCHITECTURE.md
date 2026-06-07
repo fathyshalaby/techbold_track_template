@@ -8,6 +8,22 @@ See also: [PRD.md](./PRD.md) · [SAFETY_POLICY.md](./SAFETY_POLICY.md) · [IMPLE
 
 ---
 
+## Dashboard ownership
+
+`apps/dashboard` is the primary operational UI path for v1.3 onward. It is a Next.js dashboard that renders service desk tickets, runs, approvals, audit evidence, activity state, memory visibility, observability status, and backend health from Hono-owned contracts.
+
+`apps/frontend` remains available only as a temporary Vite compatibility fallback. The fallback command is `bun run dev:vite`, and it must not be treated as the main product path while the dashboard is present.
+
+The Hono backend remains the source of truth for Phoenix access, SSH execution, LLM proposal flow, deterministic safety checks, technician approvals, audit writes, SSE events, activity drafting and submission, memory rules, and observability rules. The dashboard can call typed HTTP and SSE endpoints, but it does not own those rules and must not call Phoenix, SSH, model, safety, store, or audit internals directly.
+
+Retire the Vite fallback only after all of these criteria are true:
+
+1. The Next.js dashboard passes mock-mode smoke verification.
+2. The dashboard run workflow covers ticket selection, run creation, SSE, approval edit/approve/reject, abort, activity draft, and activity submit.
+3. The dashboard contains no sample dashboard content, fake metrics, fake charts, placeholder documents, throughput, conversion, revenue, or lorem content on the main path.
+4. The dashboard component/runtime assertions from Phase 1 Plan 03 remain passing as the required proof for sample-content absence and main-path behavior. Source search is supplemental hygiene only.
+5. No active milestone requirement points to the Vite fallback.
+
 ## 1. Stack decision (opinionated, final)
 
 | Concern | Choice | Why (and what we rejected) |

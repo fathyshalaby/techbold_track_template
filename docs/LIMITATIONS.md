@@ -12,7 +12,12 @@ This file lists current limits and accepted blockers. It is intentionally conser
 | Enterprise deployment hardening | Out of scope. No auth layer, RBAC, queue, Kubernetes, or multi-tenant controls. |
 | Generic shell assistant | Out of scope. The product is scoped to service-desk incidents from Phoenix tickets. |
 | Hidden VM guarantee | Not claimed. The system is designed for generalization, but this workspace lacks real VM access. |
-| Production frontend hosting | Out of scope. The frontend is a Vite app suitable for local demo. |
+| Production frontend hosting | Out of scope. The primary UI is the local Next.js dashboard on port 3000. |
+| Vite frontend ownership | The Vite app is a temporary compatibility fallback on port 5173 until documented dashboard parity and retirement criteria are satisfied. |
+| Postgres and pgvector | Deferred to Phase 2 and Phase 3. Phase 1 still uses the current backend store path. |
+| RAG memory implementation | Deferred to Phase 4. Phase 1 memory panels are read-only deferred statuses. |
+| Observability instrumentation | Deferred to Phase 5. Phase 1 observability panels are read-only deferred or health-only statuses. |
+| Full v1.3 integration | Deferred to Phase 6. Phase 1 does not claim the full dashboard-to-memory-to-observability integration path. |
 
 ## Current External Blockers
 
@@ -43,6 +48,7 @@ Mock mode does not prove:
 - `azureuser` has passwordless sudo.
 - A real LLM can complete the troubleshooting loop.
 - A hidden VM incident can be solved.
+- Postgres, pgvector, RAG memory, or observability instrumentation is implemented.
 
 ## Safety Boundaries
 
@@ -59,6 +65,7 @@ The deterministic gate reduces hard-fail risk, but it is not a sandbox.
 - SQLite is the durable store in Docker Compose through the `autopilot-data` volume.
 - The JSONL adapter is an in-memory mock/test fallback and is not durable.
 - `MOCK_MODE=true` is the recommended demo setting until real credentials and keys are provided.
+- The Phase 1 dashboard uses backend contracts for source labels and deferred memory/observability states. It must not present those deferred states as live memory retrieval, live Phoenix validation, live SSH validation, sudo validation, live LLM validation, or real observability telemetry.
 
 ## Demo Fallbacks
 
