@@ -7,9 +7,12 @@ node_modules
 **/tsconfig.tsbuildinfo
 .git
 .planning
+.claude
 docs
-knowledge
-demo
-sandbox
+infra/sandbox
+tools/demo
+apps/model/outputs
+apps/model/data/processed
 keys
 .env
+graphify-out

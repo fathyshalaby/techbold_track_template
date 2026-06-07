@@ -1,43 +1,45 @@
 # Agent Instructions
 
-This project is in v1.1 Professional Skeleton Rescue mode.
+Service Desk Autopilot: a technician-controlled troubleshooting copilot for the techbold START Hack Vienna track.
 
-Goal:
-Make the existing skeleton clean, connected, buildable, and ready for the team to build on.
+## Stack
 
-Non-goals:
-- Do not add new product features unless required to make the primary skeleton flow work.
-- Do not perform enterprise hardening.
-- Do not rewrite the whole project.
-- Do not keep fake, empty, placeholder, or disconnected files just because they exist.
+- TypeScript monorepo: `apps/backend` (Hono), `apps/frontend` (React/Vite)
+- Python sidecar: `apps/model` (LoRA adapter training, optional)
+- Package manager: Bun (`bun install`, `bun run check`)
+- Formatting: Biome (TS/JS), Ruff (Python)
 
-Coding rules:
-- Prefer simple working code over clever abstractions.
-- Every core file must be used, exported intentionally, or deleted.
-- Every placeholder must be finished, wired, simplified, deleted, or moved to backlog.
-- Comments should be rare and useful.
-- No broad comments explaining obvious code.
-- No commented-out code.
-- No TODO without a matching backlog item.
-- No generated-by-AI style text.
-- No emojis.
-- No em dash characters.
-- No fake tests, pass-always tests, source-grep tests, or tests that only prove mocks work.
-- No empty tracked source files.
-- No unused package kept without a documented reason.
-- No duplicate service layers for the same concept.
-- No silent catch blocks.
-- No broad any types unless isolated at an external boundary.
-- No UI element on the main path without a handler.
-- No handler on the main path without a real effect.
-- No endpoint on the main path without a caller or documented external consumer.
+## Layout
 
-Style target:
-Senior AI/ML Software Engineer style.
-Use direct names, small functions, typed boundaries, explicit error handling, deterministic setup, clean scripts, and truthful docs.
+```
+apps/backend/     API, orchestrator, safety layer, SSH, Phoenix client, store
+apps/frontend/    Technician workspace (App.tsx)
+apps/model/       MSP adapter training sidecar
+packages/contracts/  API and safety contracts (reference)
+infra/sandbox/    Docker VM archetypes for realistic incidents
+docs/knowledge/   Human-readable runbooks (encoded in backend agents)
+```
 
-Workflow:
-Audit first.
-Create report-only findings first.
-Then fix in small GSD phases.
-Every production change must trace back to .planning/audits/V1.1-MASTER-DEFECT-MAP.md.
+## Rules
+
+- The model proposes commands; humans approve; the backend executes after safety checks.
+- No incident-specific hardcoding (ticket IDs, hostnames, symptom strings).
+- Secrets stay server-side. Redact before audit, UI, or model context.
+- Comments: rare, intent-only. No emojis. No em dashes. ASCII punctuation in source.
+- Every endpoint and UI action on the main path must have a real effect.
+- Prefer small functions, typed boundaries, explicit errors.
+
+## Commands
+
+```bash
+cp .env.example .env
+bun install
+bun run check          # lint, typecheck, test, build
+bun run dev:backend    # :8000
+bun run dev:frontend   # :5173
+docker compose up --build
+```
+
+## Docs
+
+Authoritative design: `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/SAFETY_POLICY.md`.

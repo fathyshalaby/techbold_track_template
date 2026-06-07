@@ -1,4 +1,4 @@
-# Secrets & keys — NEVER commit these
+# Secrets & keys
 .env
 keys/*
 !keys/.gitkeep
@@ -11,20 +11,32 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+*.egg-info/
 
-# Node
+# Node / Bun
 node_modules/
-frontend/dist/
-backend/dist/
-backend/data/
+apps/frontend/dist/
+apps/backend/dist/
+apps/backend/data/
 *.tsbuildinfo
+
+# Model sidecar artifacts
+apps/model/outputs/
+apps/model/data/processed/
+apps/model/data/quarantine/
+apps/model/.venv/
+
+# Planning (local reference, not shipped)
+.planning/
+.claude/
+
+# Generated docs
+docs/AUDIT_LOG.md
+graphify-out/
+.planning/graphs/
 
 # OS / editor
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
-
-# GSD generated knowledge-graph output
-graphify-out/
-.planning/graphs/

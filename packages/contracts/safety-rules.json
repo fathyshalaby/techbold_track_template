@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "description": "Shared command safety rules, loaded by BOTH backends so safety behaviour is identical. Patterns are case-insensitive and use a regex subset valid in both Python `re` and JS `RegExp` (no lookbehind). Classification: blocked = NEVER runs; low_risk = read-only diagnostics; needs_review = default. ALL non-blocked commands still require an explicit human approval.",
+  "require_human_approval_for_all": true,
+  "default_classification": "needs_review",
+  "deny": [
+    {
+      "id": "rm_recursive_protected",
+      "pattern": "\\brm\\s+(?:-\\S+\\s+)*-\\S*[rf]\\S*\\b[^|;&]*\\s(/etc|/usr|/bin|/sbin|/lib|/boot|/var|/var/lib|/srv|/home|/root|/opt|~|\\$HOME)/?(\\s|$|;|&|\\|)",
+      "reason": "Recursive/forced delete of a protected system root (targeted subpaths fall through to human review)"
+    },
+    {
+      "id": "rm_root_slash",
+      "pattern": "\\brm\\s+(?:-\\S+\\s+)*-\\S*[rf]\\S*\\s+/\\s*($|;|&|\\|)",
+      "reason": "rm -rf / - root wipe"
+    },
+    {
+      "id": "rm_db_data",
+      "pattern": "\\brm\\b[^\\n]*/var/lib/(postgresql|mysql|mongodb|redis)",
+      "reason": "Deleting database data files"
+    },
+    {
+      "id": "chmod_777",
+      "pattern": "\\bchmod\\s+(?:-\\S+\\s+)*(0?777|a\\+rwx|ugo\\+rwx)\\b",
+      "reason": "World-writable 0777 permissions"
+    },
+    {
+      "id": "chmod_recursive_system",
+      "pattern": "\\bchmod\\s+(?:-\\S+\\s+)*-\\S*R\\S*\\b[^|;&]*\\s(/|/etc|/usr|/bin|/sbin|/lib|/boot|/var|/var/lib|/srv|/home|/root|/opt)/?(\\s|$|;|&|\\|)",
+      "reason": "Recursive chmod on a system root (targeted subpaths fall through to human review)"
+    },
+    {
+      "id": "chown_recursive_system",
+      "pattern": "\\bchown\\s+(?:-\\S+\\s+)*-\\S*R\\S*\\b[^|;&]*\\s(/|/etc|/usr|/bin|/sbin|/lib|/boot|/var|/var/lib|/srv|/home|/root|/opt)/?(\\s|$|;|&|\\|)",
+      "reason": "Recursive chown on a system root (targeted subpaths fall through to human review)"
+    },
+    { "id": "mkfs", "pattern": "\\bmkfs(\\.\\w+)?\\b", "reason": "Formatting a filesystem" },
+    {
+      "id": "dd_to_disk",
+      "pattern": "\\bdd\\b[^\\n]*\\bof=/dev/(sd|nvme|vd|xvd|mapper)",
+      "reason": "Raw write to a block device"
+    },
+    {
+      "id": "redirect_block_device",
+      "pattern": ">\\s*/dev/(sd|nvme|vd|xvd)",
+      "reason": "Writing to a raw disk device"
+    },
+    {
+      "id": "fork_bomb",
+      "pattern": ":\\s*\\(\\s*\\)\\s*\\{\\s*:\\s*\\|\\s*:",
+      "reason": "Fork bomb"
+    },
+    {
+      "id": "firewall_disable",
+      "pattern": "\\b(ufw\\s+disable|iptables\\s+-F|ip6tables\\s+-F|nft\\s+flush\\s+ruleset|systemctl\\s+(stop|disable)\\s+\\S*(ufw|firewalld|nftables))",
+      "reason": "Disabling the firewall"
+    },
+    {
+      "id": "security_disable",
+      "pattern": "\\b(setenforce\\s+0|aa-disable|aa-teardown|systemctl\\s+(stop|disable|mask)\\s+\\S*(apparmor|auditd|audit))",
+      "reason": "Disabling a security/audit control"
+    },
+    {
+      "id": "db_destroy",
+      "pattern": "(DROP\\s+DATABASE|DROP\\s+TABLE|DROP\\s+SCHEMA|TRUNCATE\\s+(TABLE\\s+)?\\w|FLUSHALL|FLUSHDB|\\bdropdb\\b)",
+      "reason": "Destructive database operation"
+    },
+    {
+      "id": "pipe_to_shell",
+      "pattern": "\\b(curl|wget)\\b[^\\n]*\\|\\s*(sudo\\s+)?(ba|z|da)?sh\\b",
+      "reason": "Piping a download straight into a shell"
+    },
+    {
+      "id": "log_wipe",
+      "pattern": "(\\brm\\b[^\\n]*/var/log|>\\s*/var/log/|\\btruncate\\b[^\\n]*/var/log|journalctl\\s+--vacuum)",
+      "reason": "Deleting/truncating system logs"
+    },
+    {
+      "id": "history_wipe",
+      "pattern": "\\b(history\\s+-c|rm\\b[^\\n]*\\.bash_history|unset\\s+HISTFILE)|cat\\s+/dev/null\\s*>\\s*~?/?\\.bash_history",
+      "reason": "Clearing shell history to hide actions"
+    },
+    {
+      "id": "overwrite_critical_etc",
+      "pattern": ">\\s*/etc/(passwd|shadow|sudoers|fstab|hosts)",
+      "reason": "Overwriting a critical /etc file"
+    },
+    {
+      "id": "user_home_delete",
+      "pattern": "\\b(userdel\\s+-r\\b|deluser\\s+--remove-home\\b)",
+      "reason": "Deleting a user and their home directory"
+    }
+  ],
+  "readonly_allow": [
+    {
+      "id": "systemctl_readonly",
+      "pattern": "^\\s*(sudo\\s+)?systemctl\\s+(status|is-active|is-enabled|is-failed|show|list-units|list-unit-files|list-dependencies|cat)\\b"
+    },
+    { "id": "journalctl", "pattern": "^\\s*(sudo\\s+)?journalctl\\b(?![^\\n]*--vacuum)" },
+    { "id": "sockets", "pattern": "^\\s*(sudo\\s+)?(ss|netstat|lsof)\\b" },
+    { "id": "readers", "pattern": "^\\s*(sudo\\s+)?(cat|less|head|tail|grep|egrep|zgrep|zcat)\\b" },
+    { "id": "find_safe", "pattern": "^\\s*(sudo\\s+)?find\\b(?![^\\n]*(-delete|-exec|-fprint))" },
+    {
+      "id": "fs_inspect",
+      "pattern": "^\\s*(sudo\\s+)?(ls|stat|file|du|df|free|lsblk|blkid|mount\\s*$)\\b"
+    },
+    {
+      "id": "process_inspect",
+      "pattern": "^\\s*(sudo\\s+)?(ps|top\\s+-b|uptime|vmstat|iostat|lscpu|nproc|who|w)\\b"
+    },
+    {
+      "id": "net_inspect",
+      "pattern": "^\\s*(sudo\\s+)?(ip\\s+(a|addr|r|route|link|neigh)|ifconfig|ping\\s+-c|getent|dig|nslookup|host)\\b"
+    },
+    {
+      "id": "id_inspect",
+      "pattern": "^\\s*(sudo\\s+)?(id|whoami|hostnamectl|uname|date|env|printenv)\\b"
+    },
+    {
+      "id": "config_tests",
+      "pattern": "^\\s*(sudo\\s+)?(nginx\\s+-t|apachectl\\s+configtest|apache2ctl\\s+-t|sshd\\s+-t|named-checkconf|postconf\\s+-n|php\\s+-v|node\\s+-v|python3?\\s+--version|psql\\s+--version)\\b"
+    },
+    {
+      "id": "security_inspect",
+      "pattern": "^\\s*(sudo\\s+)?(getenforce|sestatus|ufw\\s+status|iptables\\s+-(L|S)|aa-status)\\b"
+    },
+    { "id": "dmesg", "pattern": "^\\s*(sudo\\s+)?dmesg\\b" },
+    {
+      "id": "pkg_query",
+      "pattern": "^\\s*(sudo\\s+)?(dpkg\\s+-l|apt\\s+list|apt-cache|systemctl\\s+--version)\\b"
+    },
+    {
+      "id": "validate_localhost",
+      "pattern": "^\\s*(sudo\\s+)?curl\\b[^\\n|]*(localhost|127\\.0\\.0\\.1|\\[::1\\])"
+    }
+  ]
+}

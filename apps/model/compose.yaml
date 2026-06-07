@@ -1,0 +1,40 @@
+services:
+  train:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - .:/workspace/model
+    working_dir: /workspace/model
+    command: make train
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  serve:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - .:/workspace/model
+    working_dir: /workspace/model
+    ports:
+      - "8001:8001"
+    command: make serve
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

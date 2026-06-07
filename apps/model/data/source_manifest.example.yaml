@@ -1,0 +1,34 @@
+version: 1
+policy:
+  default_visibility: private
+  public_adapter_requires_license_review: true
+  raw_private_data_allowed_in_repo: false
+sources:
+  - id: internal_msp_tickets_redacted
+    kind: internal_jsonl
+    path: /absolute/path/outside/repo/redacted_tickets.jsonl
+    license: internal_training_approval
+    approved_for_training: true
+    contains_private_data: false
+    redacted: true
+    weight: 1.0
+    notes: Best source when generated from real MSP tickets with approval.
+  - id: repo_sandbox_scenarios
+    kind: sandbox
+    path: ../../infra/sandbox/scenarios/scenarios.json
+    license: MIT project scenario
+    approved_for_training: true
+    contains_private_data: false
+    redacted: true
+    weight: 0.7
+    notes: Verified local scenario seed data.
+  - id: ibm_itbench_lite
+    kind: huggingface
+    dataset_id: ibm-research/ITBench-Lite
+    split: train
+    license: Apache-2.0
+    approved_for_training: true
+    contains_private_data: false
+    redacted: true
+    weight: 0.4
+    notes: SRE/IT operations examples, not classic MSP tickets.

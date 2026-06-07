@@ -7,8 +7,9 @@ This file records verified behavior, not intended behavior. Mock-mode evidence a
 ## Verified Commands
 
 ```bash
-pnpm --dir backend test -- vertical-slice store-jsonl
-pnpm --dir backend typecheck
+bun run --filter techbold-track-backend test -- vertical-slice store-jsonl
+bun run --filter techbold-track-backend typecheck
+bun run check
 docker compose up --build
 ```
 
@@ -27,7 +28,7 @@ Results:
 | Area | Status | Notes |
 |---|---|---|
 | Backend API | Built | Hono routes for tickets, runs, approvals, SSE, activity draft, and activity submit. |
-| Frontend | Built | React/Vite technician workspace mounted through `frontend/src/App.tsx`. |
+| Frontend | Built | React/Vite workspace at `apps/frontend/src/App.tsx`. |
 | Safety gate | Built and tested | Proposal check and edited-command recheck before execution. |
 | Audit trail | Built and tested | SQLite durable store plus JSONL mock fallback. |
 | Mock Phoenix, SSH, LLM | Built and tested | Supports offline demo and deterministic coverage. |

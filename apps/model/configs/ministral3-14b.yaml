@@ -1,0 +1,43 @@
+# Default: strong European/open model for MSP troubleshooting adapter training.
+base_model: mistralai/Ministral-3-14B-Instruct-2512
+model_loader: image-text
+train_file: data/processed/train.jsonl
+eval_file: data/processed/eval.jsonl
+output_dir: outputs/adapter
+eval_score_file: outputs/eval_scores.jsonl
+
+# Context: start with 8k for reliable QLoRA; use RAG for long docs.
+max_seq_length: 8192
+packing: true
+assistant_only_loss: true
+
+# QLoRA
+load_in_4bit: true
+bnb_4bit_quant_type: nf4
+bnb_4bit_use_double_quant: true
+bnb_4bit_compute_dtype: bfloat16
+
+# LoRA
+lora_r: 64
+lora_alpha: 128
+lora_dropout: 0.05
+target_modules: all-linear
+
+# Training
+num_train_epochs: 1
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 16
+learning_rate: 0.0001
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+weight_decay: 0.0
+logging_steps: 5
+save_steps: 100
+eval_steps: 100
+save_total_limit: 2
+gradient_checkpointing: true
+optim: paged_adamw_8bit
+bf16: true
+fp16: false
+seed: 42

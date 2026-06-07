@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "techbold-msp-adapter"
+version = "0.1.0"
+description = "Clean sidecar for training an MSP troubleshooting LoRA/QLoRA adapter."
+requires-python = ">=3.10"
+dependencies = [
+  "pyyaml>=6.0.1",
+  "typer>=0.12.0",
+  "rich>=13.7.0",
+  "datasets>=3.0.0",
+  "huggingface_hub>=0.25.0",
+]
+
+[project.optional-dependencies]
+train = [
+  "accelerate>=1.0.0",
+  "bitsandbytes>=0.45.0; platform_system == 'Linux'",
+  "mistral-common>=1.8.5",
+  "peft>=0.17.0",
+  "transformers>=4.57.0",
+  "trl>=0.26.0",
+  "torch>=2.7.0",
+  "safetensors>=0.4.5",
+]
+serve = [
+  "vllm>=0.11.0; platform_system == 'Linux'",
+  "openai>=1.40.0",
+]
+mlx = [
+  "mlx>=0.31.1; platform_machine == 'arm64' and platform_system == 'Darwin'",
+  "mlx-lm>=0.31.2; platform_machine == 'arm64' and platform_system == 'Darwin'",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/msp_model/evaluate.py" = ["F821"]
+"src/msp_model/train.py" = ["F821"]
+
+[tool.ruff.format]
+quote-style = "double"

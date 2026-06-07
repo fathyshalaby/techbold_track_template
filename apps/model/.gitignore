@@ -1,0 +1,26 @@
+.env
+.env.*
+!.env.example
+.venv/
+.cache/
+__pycache__/
+*.pyc
+*.egg-info/
+*.log
+wandb/
+mlruns/
+*.sqlite
+*.db
+
+# private/generated data
+data/source/*
+!data/source/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/quarantine/*
+!data/quarantine/.gitkeep
+
+# generated model artifacts
+outputs/*
+!outputs/.gitkeep
+checkpoints/
