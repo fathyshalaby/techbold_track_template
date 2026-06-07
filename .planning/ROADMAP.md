@@ -10,9 +10,15 @@
 
 Phase numbering is reset for this milestone.
 
+- [x] **Phase 1: Fresh-Clone Runtime Validation** - completed 2026-06-07
+- [ ] **Phase 2: Browser SSE UAT**
+- [ ] **Phase 3: Vertical-Slice Coverage**
+- [ ] **Phase 4: Real Integration Validation**
+- [ ] **Phase 5: Submission and Evidence Handoff**
+
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|------------------|
-| 01 | Fresh-Clone Runtime Validation | Prove the skeleton installs and starts from a clean checkout. | LIVE-01, LIVE-02 | 4 |
+| 01 | Fresh-Clone Runtime Validation | Prove the skeleton installs and starts from a clean checkout. | LIVE-01, LIVE-02 | Complete |
 | 02 | Browser SSE UAT | Prove the mounted frontend reflects the primary technician flow and SSE lifecycle. | UAT-01, UAT-02 | 4 |
 | 03 | Vertical-Slice Coverage | Add deterministic coverage for the run, approval, SSE, and activity path. | E2E-01, PLAN-01 | 4 |
 | 04 | Real Integration Validation | Validate or precisely block Phoenix, SSH, and LLM live paths. | REAL-01, REAL-02, REAL-03 | 5 |
@@ -33,7 +39,7 @@ Success criteria:
 4. README or infrastructure docs are corrected only where validation proves drift.
 
 Plans:
-- [ ] 01-01-PLAN.md - Fresh-clone runtime validation
+- [x] 01-01-PLAN.md - Fresh-clone runtime validation
 
 ### Phase 2: Browser SSE UAT
 

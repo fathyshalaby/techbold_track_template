@@ -69,8 +69,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LIVE-01 | Phase 1 | Pending |
-| LIVE-02 | Phase 1 | Pending |
+| LIVE-01 | Phase 1 | Complete |
+| LIVE-02 | Phase 1 | Complete |
 | UAT-01 | Phase 2 | Pending |
 | UAT-02 | Phase 2 | Pending |
 | E2E-01 | Phase 3 | Pending |
