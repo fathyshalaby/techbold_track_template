@@ -162,10 +162,10 @@ describe('runActivityLogGenerator', () => {
       },
     };
 
-    const promise = runActivityLogGenerator(SAMPLE_INPUT, neverModel);
+    const assertion = expect(runActivityLogGenerator(SAMPLE_INPUT, neverModel)).rejects.toBeInstanceOf(AgentUnavailableError);
     await vi.advanceTimersByTimeAsync(31_000);
 
-    await expect(promise).rejects.toBeInstanceOf(AgentUnavailableError);
+    await assertion;
     vi.useRealTimers();
   });
 

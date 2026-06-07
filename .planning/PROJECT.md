@@ -1,94 +1,76 @@
 # Service Desk Autopilot
 
+## Current State
+
+**Shipped:** v1.0 milestone on 2026-06-07
+**Archive:** `.planning/milestones/v1.0-ROADMAP.md`
+**Audit:** `.planning/milestones/v1.0-MILESTONE-AUDIT.md`
+**Status:** Built and verified in automated/mock mode; manual live validation remains.
+
 ## What This Is
 
-A technician-controlled AI troubleshooting copilot for the techbold START Hack Vienna '26 track. It loads a service ticket and its SSH target from the Phoenix ERP, an AI proposes **one diagnostic command at a time** (with ranked root-cause hypotheses and evidence), and the technician approves, edits, or rejects every command. The backend runs only approved commands through a safety layer, observes output, iterates to a root cause, proposes a minimal reversible fix, validates it, then drafts a complete ERP activity report built **only from the audit trail** for the technician to edit and submit. The AI never acts on its own.
+A technician-controlled AI troubleshooting copilot for the techbold START Hack Vienna '26 track. It loads Phoenix ERP tickets and customer-system details, lets an AI propose one diagnostic or fix command at a time, requires the technician to approve, edit, or reject every command, executes only through deterministic backend code, records an append-only audit trail, and drafts the Phoenix activity report from that audit trail.
 
-For: service-desk technicians (primary driver) and hackathon judges (decisive evaluators who watch a live demo and read the repo + audit log + ERP activities).
+The AI never acts on its own. It proposes structured outputs; the backend owns safety, approval, SSH execution, persistence, event streaming, and Phoenix writes.
 
 ## Core Value
 
-Win the scoring rubric. 55 of 100 points are **B (troubleshooting, 35) + C (safety & audit, 20)** — the entire product is shaped around solving hidden Linux-service incidents on fresh VMs, safely and auditably. A polished UI alone does not win.
+Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs, safely and auditably. The highest-value proof is a real run that restores customer benefit, survives persistence checks, and leaves a complete redacted audit trail.
 
-## Requirements
+## Validated In v1.0
 
-### Validated
+- Node 22 + Hono + TypeScript backend with Zod-validated environment configuration.
+- React 18 + Vite frontend technician workspace.
+- Mock mode for Phoenix, SSH, and LLM paths.
+- Typed Phoenix ERP client and in-memory mock.
+- Ticket list/detail routes with customer-system data and graceful error handling.
+- Deterministic safety layer with blocklist, classifier, redaction, and edited-command recheck.
+- Append-only run/audit store with SQLite and JSONL fallback.
+- ssh2 single-command executor with timeout, output cap, redaction, mock mode, and preflight behavior.
+- Specialist AI roles: problem analyzer, customer-system analyzer, problem solver, validator, and activity log generator.
+- Deterministic orchestrator state machine with approval, rejection, blocked-command, validation, and activity handoff paths.
+- Run API, approval API, SSE stream, and activity draft/submit routes.
+- Frontend ticket list, run view, approval card, audit timeline, retry/abort controls, and activity editor.
+- Root `pnpm test`, README, MIT license, REPORT.md, and reviewed secret scan.
 
-- [x] Repo migrated to Node 22 + Hono + TypeScript; `docker compose up` serves `GET /health` — *Validated in Phase 1: Repo Foundation*
-- [x] Zod-validated env config; `.env.example` with placeholders only, no committed secrets — *Validated in Phase 1: Repo Foundation*
-- [x] Mock mode (`MOCK_MODE`) drives the full loop offline for Phoenix, SSH, and LLM — *Validated in Phase 1: Repo Foundation*
-- [x] Typed Phoenix ERP client (list tickets, get customer-system, create activity) + in-memory mock — *Validated in Phase 2: ERP Client + Ticket Routes*
-- [x] Ticket routes with title/customer/priority/status + sort/filter; detail + SSH-target view; graceful 401/404/empty handling — *Validated in Phase 2: ERP Client + Ticket Routes*
+## Manual Validation Debt
 
-### Active
+These items were accepted at milestone close and are tracked in the milestone audit:
 
-- [ ] Deterministic safety layer: blocklist, risk classifier, secret redaction — tested
-- [ ] Run store + append-only audit log (SQLite, JSONL fallback)
-- [ ] ssh2 single-command executor (timeout, output cap, exit code, redaction) + mock
-- [ ] `problem_analyzer` agent: ranked hypotheses + evidence → one read-only diagnostic command
-- [ ] Deterministic orchestrator state machine driving the run; max-steps cap; block→ask-alternative
-- [ ] Run + approval routes (create/get/next/abort; approve/edit/reject with safety re-check + execute)
-- [ ] SSE run-event stream feeding a live timeline
-- [ ] `problem_solver` + `validator` agents: minimal reversible fix + persistence-checked validation
-- [ ] `activity_log_generator`: all 5 graded fields from audit trail only → submit to Phoenix
-- [ ] Frontend: ticket list, run page, approval card, audit timeline, activity editor
-- [ ] Generalising loop solves all 5 practice VMs cleanly, reboot-persistent, zero safety flags
-- [ ] Tests (safety, phoenix-client, orchestrator) + real README + MIT license + REPORT.md
+- Fresh-clone `docker compose up --build` check.
+- Real Phoenix token validation.
+- Real SSH `.pem` validation against practice VMs.
+- Real LLM loop validation.
+- Browser SSE/UAT pass.
+- Demo video recording and external submission form.
+- Passwordless `sudo -n true` confirmation for `azureuser`.
 
-### Out of Scope
+## Out Of Scope
 
-- Fully autonomous remediation — explicitly against the rules; a human confirms every action
-- Multi-tenant auth / RBAC / SSO — single-team local tool; Phoenix token stays server-side
-- WebSockets, queues, Redis, background workers, k8s, microservices, MCP servers — non-goals under time pressure
-- RAG / vector DB — nothing in the case requires document retrieval
-- Analytics, charts, theming, animations, design-system polish — UI is only 10 rubric points
-- A generic Linux admin assistant — agent is scoped to diagnose-and-fix-this-ticket
-- Setting ticket status `DONE` — unscored courtesy, never gate the demo on it
-
-## Context
-
-- **Hackathon, hard freeze:** Sunday June 7, 14:00 sharp. ~24h from project init. Prize €10,000.
-- **Two evaluations:** (1) automated grading on fresh hidden VMs — state checks, persistence test after reboot, ERP logs, repo/secret scans; (2) live jury demo (~4-min pitch) + 3-min video. The jury built the case *and* the grader — correctness, safety, and engineering are judged directly.
-- **Incident scope:** every incident is a local-service Linux problem solvable over the shell (systemd, ports, configs, disk, permissions, logs, cron, deps). Out of scope: kernel, bootloader, hardware, cloud-networking.
-- **Generalise, never hardcode:** practice on own 5 Ubuntu VMs + reset endpoint; grading uses different fresh VMs.
-- **Authoritative docs (LOCKED — source of truth, do not re-derive):** `docs/PRD.md` (product, scope, scoring, API contract), `docs/ARCHITECTURE.md` (stack, agents, state machine, data model), `docs/SAFETY_POLICY.md` (command policy, blocklist, redaction), `docs/IMPLEMENTATION_PROCEDURE.md` (build guide), `docs/TASKS.md` (roadmap P0/P1/P2 + build order), `docs/scoring.md` (rubric), `docs/phoenix-openapi.yaml` (ERP types).
-- **Phoenix is LIVE** at `http://68.210.101.85:8000` (per PRD §13b); full endpoint set exposed. SSH `.pem` not yet placed in `keys/` — a hard blocker for real VM work until added. Passwordless sudo for `azureuser` unconfirmed — preflight `sudo -n true`.
-
-## Constraints
-
-- **Tech stack:** Node 22 + Hono + TypeScript (backend), React 18 + Vite (frontend), Vercel AI SDK v5, ssh2, better-sqlite3 (JSONL fallback), Zod everywhere — fixed by `docs/ARCHITECTURE.md`. (Note: codebase `STACK.md` says Python/FastAPI; that's a stale dead skeleton, superseded by the Node decision.)
-- **Timeline:** code freeze Sun Jun 7 14:00; build the P0 vertical slice in mock mode first, then make it real.
-- **Safety (hard-fail):** the model NEVER executes SSH — it proposes; a deterministic backend executes after human approval and a safety re-check. Blocklisted commands or leaked secrets zero the incident and cost further points.
-- **Security:** Phoenix token + SSH key stay server-side, never in the browser. Redaction runs on every string before it reaches audit, UI, or model. `.env`/`keys/` git-ignored.
-- **Generalisation:** no incident-specific branches keyed to ticket IDs, hostnames, or symptom strings — grading uses fresh VMs and penalises hardcoding.
+- Fully autonomous remediation.
+- Multi-tenant auth, RBAC, SSO.
+- WebSockets, queues, Redis, background workers, Kubernetes, or microservices.
+- RAG/vector database.
+- Analytics, charts, theming, or design-system polish beyond the demo path.
+- A generic Linux admin assistant beyond the incident ticket.
+- Setting ticket status `DONE` as a scoring gate.
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| Node 22 + Hono replaces the FastAPI skeleton | Architecture doc mandates TS/Hono; matches AI SDK + ssh2 ecosystem | — Pending |
-| Skip per-phase GSD research; treat `docs/` as locked source of truth | Domain research already captured in the case brief + docs; ~24h freeze | — Pending |
-| Coarse roadmap derived from `docs/TASKS.md` build order | Tight time box; 9 build-order steps map cleanly to phases | — Pending |
-| Deterministic state machine owns truth; AI proposes only | Core safety guarantee + the product's main differentiator | — Pending |
-| Mock mode is first-class (Phoenix, SSH, LLM) | Demo must survive flaky Wi-Fi / VM reboots | — Pending |
-| SSE over WebSockets; SQLite with JSONL fallback | One-directional events; audit durability is the only hard requirement | — Pending |
+| --- | --- | --- |
+| Node 22 + Hono replaced the FastAPI skeleton | Same language across API, agents, safety, and frontend types | Good |
+| Mock mode is first-class | Demo and tests must survive missing live credentials | Good |
+| Deterministic state machine owns truth | Keeps AI useful without making it dangerous | Good |
+| Model proposes; backend executes | Core human-in-the-loop safety invariant | Good |
+| SSE instead of WebSockets | One-way event stream matches the product flow | Good |
+| SQLite with JSONL fallback | Durable local audit trail without extra services | Good |
+| Audit trail is the activity source | Prevents invented actions in Phoenix reports | Good |
 
-## Evolution
+## Next Milestone Goals
 
-This document evolves at phase transitions and milestone boundaries.
-
-**After each phase transition** (via `/gsd-transition`):
-1. Requirements invalidated? → Move to Out of Scope with reason
-2. Requirements validated? → Move to Validated with phase reference
-3. New requirements emerged? → Add to Active
-4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
-
-**After each milestone** (via `/gsd-complete-milestone`):
-1. Full review of all sections
-2. Core Value check — still the right priority?
-3. Audit Out of Scope — reasons still valid?
-4. Update Context with current state
+No active next milestone is defined. If work continues, start with `$gsd-new-milestone` and decide whether the next slice is live validation hardening, browser E2E coverage, or v2 human-control boosters.
 
 ---
-*Last updated: 2026-06-06 after Phase 2 (ERP Client + Ticket Routes) completion*
+*Last updated: 2026-06-07 after v1.0 milestone completion*
+
