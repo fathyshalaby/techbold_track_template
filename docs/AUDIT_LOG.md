@@ -459,6 +459,28 @@ The "AI SRE / incident-remediation agent" space has an explicit maturity model *
 
 ---
 
+# Phase 7 — ERP Activity Generation (`gsd/phase-07-activity-generation`, merge `dfe5a8b`)
+
+**Checked & landed on `main`.** The final lifecycle step: the `activity-log-generator` agent (was a stub) + `routes/activity.ts` (draft + submit to Phoenix) + prompt/types additions + ~470 lines of tests (`activity.test`, `activity-log-generator.test`). Phase 7's own suite: 473 pass.
+
+### No divergence this time (notable)
+Unlike Phases 5 & 6, Phase 7 branched from **`22fd1f8`** — the *reconciled* `main` (my hardening + CI already in place) — so it **already carried** signal-capture / OBSERVING / VALIDATING / evidence-gate / safety blocklist. The merge had only **3 conflicts** (2 planning docs → theirs; `app.ts` route mounts → combined), **no engine reversion**, and `main`'s live-SSE fix is preserved (phase-07 never touched `orchestrator.ts`). Verified post-merge: hardening markers + live-SSE emit intact; full suite **457 → 473 pass / 0 fail**, `tsc` clean.
+
+### Audit — activity generation honours the core domain constraint ✅
+The PRD rule is "draft the ERP activity **only from the audit trail**." Verified:
+- The generator's **entire input is the store**: audit events + `command_results` (redacted columns) + observations + the ticket description — nothing else, no live re-querying of the VM. So the report is grounded in what actually happened, not hallucinated.
+- **Redaction is end-to-end:** every input is already redacted at write time (audit payloads, `stdout_redacted`/`stderr_redacted`, observations), AND the route **re-redacts every generated field** before save (`redactSecrets` on summary/rootCause/actionsTaken/commandsSummary/validationResult) — defense-in-depth so no secret reaches the model *or* the ERP on submit.
+- **Phase-gated:** draft only allowed in `WAITING_FOR_ACTIVITY_REVIEW`/`DRAFTING_ACTIVITY`/`COMPLETED` (409 otherwise) — can't draft mid-run.
+- **Graceful degradation:** agent-unavailable → 502; Phoenix submit errors mapped (network/auth/validation). The technician edits + submits (HITL preserved — the AI drafts, the human sends).
+
+### Considerations (documented, not changed)
+- *Submit→Phoenix `createActivity` 422 shape* — the live ERP's exact validation contract is still only mock-verified (the long-standing "mocks ≠ reality" carry-forward); confirm against the real Phoenix during the smoke.
+- *Activity events on the live SSE* — `activity.draft_ready`/`activity.drafted` audit names vs `SSE_EVENT_TYPES` may still mismatch (Phase-6 note) — minor live-stream polish.
+
+**Verdict.** Phase 7 lands cleanly with no reversion and respects the audit-trail-only + redaction invariants. **The full incident lifecycle is now wired end to end: ticket → diagnose → approve → execute → validate → draft activity → submit.** All 7 phases are on `main`, 473 tests green, CI live.
+
+---
+
 ## Cross-phase open items (carry forward)
 - **Post-freeze: migrate store to `node:sqlite`** (Node 22 built-in) — kills the better-sqlite3 native-build dependency and lets the fragile regex-SQL JSONL fallback be deleted. Experimental today, so not pre-freeze.
 - ✅ **Audit-trail durability across container restart** — fixed (`87307e5`, named volume + node-owned data dir + loud fallback). **Still must be *executed*:** `docker compose up`, run an incident, recreate the container, confirm the trail persists.
@@ -482,4 +504,4 @@ The "AI SRE / incident-remediation agent" space has an explicit maturity model *
 
 ---
 
-*Last updated: Phase 6 IMPLEMENTED & reconciled onto main (HTTP/SSE surface; live-SSE fix) — full suite 457 pass, tsc clean, CI green. System now drivable end-to-end via the API in mock mode. Real docker/VM smoke still owed; Phase 7 (activity gen) is next. Append a new section per phase as it is audited.*
+*Last updated: Phase 7 (ERP activity generation) landed on main — clean merge, no divergence; full suite 473 pass, tsc clean. ALL 7 PHASES on main; full incident lifecycle wired end to end. Remaining: real docker compose + VM smoke (the one unproven path). Append a new section per phase as it is audited.*
