@@ -582,6 +582,14 @@ each tested + pushed + CI-green.
 three CI runs green. The integrated absorptions strengthen B (config-test diagnostics, scenario catalog)
 and C (input guard, safety corpus) — the 55-point core.
 
+### Follow-on: scenario catalog wired into the demo (commit `fba6e7d`)
+The offline demo now boots into the realistic incidents: `MockPhoenixClient` takes an opt-in
+`seedScenarios` (env `MOCK_SCENARIOS`, default false so the 4-ticket unit fixtures are untouched) and
+serves the 5-scenario catalog from a shared module store (so `setStatus` persists across per-request
+clients). Both Phoenix-mock factories (tickets, runs) pass the flag; `.env.example` sets
+`MOCK_SCENARIOS=true` so `cp .env.example .env && docker compose up` demos the realistic incidents, and
+documents the new Azure / OpenAI-compatible provider env. **556 tests green (+4), tsc clean.**
+
 ---
 
 ## Knowledge ingestion · dead-stub verdict · branch capability scan (commit `eacd287`)
