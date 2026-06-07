@@ -2,8 +2,8 @@
 
 ## Milestones
 
-- [x] **v1.0 milestone** — Service Desk Autopilot hackathon submission slice (shipped 2026-06-07)
-- [ ] **v1.1 Professional Skeleton Rescue** — skeleton rescue and buildability (in planning)
+- [x] **v1.0 milestone** - Service Desk Autopilot hackathon submission slice (shipped 2026-06-07)
+- [ ] **v1.1 Professional Skeleton Rescue** - skeleton rescue and buildability (in planning)
 
 ## Planned Milestone: v1.1
 

@@ -25,16 +25,16 @@ See: .planning/PROJECT.md (updated 2026-06-07)
 ## Current Position
 
 Phase: Not started (defining requirements)
-Plan: —
+Plan: -
 Status: Defining requirements
-Last activity: 2026-06-07 — Milestone v1.1 started
+Last activity: 2026-06-07 - Milestone v1.1 started
 
 ## Performance Metrics
 
 **Velocity:**
 
 - Total plans completed: 0
-- Average duration: —
+- Average duration: -
 - Total execution time: 0 hours
 
 ## Accumulated Context
@@ -82,5 +82,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-06-07T01:25:40.125Z
-Stopped at: 06-01 complete — run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)
+Stopped at: 06-01 complete - run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)
 Resume file: .planning/phases/06-run-api-approvals-sse/06-01-SUMMARY.md
