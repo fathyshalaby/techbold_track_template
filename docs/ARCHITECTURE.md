@@ -158,6 +158,16 @@ Docker Compose · pytest / tsc / dual-engine regex tests.
 
 ## 7. Observability & live progress
 
-Every action streams into the **audit/event log** rail. The run engine exposes `emit()` snapshot
-hooks for Server-Sent-Events streaming (live step-by-step trace); the UI also renders progress from
-each request's response, and a scripted `?demo=1` replay drives the full loop for demos.
+Every action streams into the **audit/event log** rail. **Live trace via SSE:** the run engine runs
+the agent loop in a background thread and `emit()`s a full run snapshot to subscribers on every state
+change. `GET /api/runs/{id}/events` streams them and the frontend `EventSource` updates the trace in
+real time as the agent diagnoses and fixes. A scripted `?demo=1` replay drives the full loop for
+recording the demo video.
+
+## 8. Local sandbox (offline cases)
+
+For fully-local development and as an eval harness, `SANDBOX_CASE_COUNT>0` spins up broken Ubuntu
+containers (`sandbox/scenarios`) behind a Phoenix-compatible sandbox ERP, so the entire loop —
+tickets → SSH → fix → activity — runs on localhost with **no Builder Base creds and no real customer
+VM**. It pairs naturally with `LLM_PROVIDER=local` (see [LOCAL-MODEL.md](LOCAL-MODEL.md)) for a 100%
+on-prem run, and is the held-out test bed for the QLoRA roadmap.
