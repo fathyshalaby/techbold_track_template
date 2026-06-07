@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Product Dashboard, RAG Memory, and Observability
 status: planning
-last_updated: "2026-06-07T04:50:56.094Z"
+last_updated: "2026-06-07T05:00:29Z"
 last_activity: 2026-06-07
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-07)
 
 **Core value:** Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs, safely and auditably
-**Current focus:** No active milestone
+**Current focus:** v1.3 Product Dashboard, RAG Memory, and Observability
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-06-07 — Milestone v1.3 started
+Phase: 1 - Dashboard Ownership and Data Contract
+Plan: Ready to plan
+Status: Ready to plan Phase 1
+Last activity: 2026-06-07 - v1.3 roadmap created with 6 phases and 27/27 requirements mapped
 
 ## Performance Metrics
 
@@ -53,6 +53,14 @@ Recent decisions affecting current work:
 
 ### Roadmap Evolution
 
+- v1.3 roadmap created with reset phase numbering:
+  - Phase 1: Dashboard Ownership and Data Contract
+  - Phase 2: Postgres Store Foundation
+  - Phase 3: pgvector Retrieval Contract
+  - Phase 4: RAG Memory Loop
+  - Phase 5: Observability Baseline
+  - Phase 6: End-to-End v1.3 Integration and Handoff
+- v1.3 traceability maps all 27 active requirements to exactly one phase.
 - Phase 5 added: Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline
 - Phase 6 added: Primary vertical slice: make the main demo flow work end to end
 - Phase 7 added: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling
@@ -98,4 +106,4 @@ Resume file: .planning/STATE.md
 
 ## Operator Next Steps
 
-- Start the next milestone with `$gsd-new-milestone` after choosing the next objective.
+- Plan Phase 1: Dashboard Ownership and Data Contract.

@@ -87,40 +87,40 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |---|---|---|
-| DASH-01 | TBD | Pending |
-| DASH-02 | TBD | Pending |
-| DASH-03 | TBD | Pending |
-| DASH-04 | TBD | Pending |
-| PG-01 | TBD | Pending |
-| PG-02 | TBD | Pending |
-| PG-03 | TBD | Pending |
-| PG-04 | TBD | Pending |
-| PG-05 | TBD | Pending |
-| VEC-01 | TBD | Pending |
-| VEC-02 | TBD | Pending |
-| VEC-03 | TBD | Pending |
-| VEC-04 | TBD | Pending |
-| MEM-01 | TBD | Pending |
-| MEM-02 | TBD | Pending |
-| MEM-03 | TBD | Pending |
-| MEM-04 | TBD | Pending |
-| MEM-05 | TBD | Pending |
-| OBS-01 | TBD | Pending |
-| OBS-02 | TBD | Pending |
-| OBS-03 | TBD | Pending |
-| OBS-04 | TBD | Pending |
-| OBS-05 | TBD | Pending |
-| INT-01 | TBD | Pending |
-| INT-02 | TBD | Pending |
-| INT-03 | TBD | Pending |
-| INT-04 | TBD | Pending |
+| DASH-01 | Phase 1 | Pending |
+| DASH-02 | Phase 1 | Pending |
+| DASH-03 | Phase 1 | Pending |
+| DASH-04 | Phase 1 | Pending |
+| PG-01 | Phase 2 | Pending |
+| PG-02 | Phase 2 | Pending |
+| PG-03 | Phase 2 | Pending |
+| PG-04 | Phase 2 | Pending |
+| PG-05 | Phase 2 | Pending |
+| VEC-01 | Phase 3 | Pending |
+| VEC-02 | Phase 3 | Pending |
+| VEC-03 | Phase 3 | Pending |
+| VEC-04 | Phase 3 | Pending |
+| MEM-01 | Phase 4 | Pending |
+| MEM-02 | Phase 4 | Pending |
+| MEM-03 | Phase 4 | Pending |
+| MEM-04 | Phase 4 | Pending |
+| MEM-05 | Phase 4 | Pending |
+| OBS-01 | Phase 5 | Pending |
+| OBS-02 | Phase 5 | Pending |
+| OBS-03 | Phase 5 | Pending |
+| OBS-04 | Phase 5 | Pending |
+| OBS-05 | Phase 5 | Pending |
+| INT-01 | Phase 6 | Pending |
+| INT-02 | Phase 6 | Pending |
+| INT-03 | Phase 6 | Pending |
+| INT-04 | Phase 6 | Pending |
 
 **Coverage:**
 
 - v1.3 requirements: 27 total
-- Mapped to phases: 0
-- Unmapped: 27
+- Mapped to phases: 27
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-07*
-*Last updated: 2026-06-07 after initial definition*
+*Last updated: 2026-06-07 after v1.3 roadmap creation*
