@@ -55,9 +55,11 @@ Recent decisions affecting current work:
 
 - Phase 5 added: Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline
 - Phase 6 added: Primary vertical slice: make the main demo flow work end to end
-- Phase 7 added: Primary vertical slice: make the main demo flow work end to end
-- Phase 8 added: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling
-- Phase 9 added: Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup
+- Phase 7 added: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling
+- Phase 8 added: Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup
+- A duplicate phase 7 entry was merged into phase 6; remaining phases were renumbered:
+  - old phase 8 -> phase 7
+  - old phase 9 -> phase 8
 
 ### Pending Todos
 

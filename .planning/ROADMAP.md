@@ -5,7 +5,17 @@
 - [x] **v1.0 milestone** - Service Desk Autopilot hackathon submission slice (shipped 2026-06-07)
 - [ ] **v1.1 Professional Skeleton Rescue** - skeleton rescue and buildability (in planning)
 
-### Phase 8: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling
+### Phase 7: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 6
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 7 to break down)
+
+### Phase 8: Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup
 
 **Goal:** [To be planned]
 **Requirements**: TBD
@@ -14,16 +24,6 @@
 
 Plans:
 - [ ] TBD (run /gsd-plan-phase 8 to break down)
-
-### Phase 9: Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup
-
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 8
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd-plan-phase 9 to break down)
 
 ## Planned Milestone: v1.1
 
@@ -35,9 +35,8 @@ Plans:
 | 04 | Store Mode Clarity | Clarify and enforce persistent store behavior under runtime fallback and startup | STOR-01, STOR-02 | 3 |
 | 05 | Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline | [To be planned] | TBD | TBD |
 | 06 | Primary vertical slice: make the main demo flow work end to end | [To be planned] | TBD | TBD |
-| 07 | Primary vertical slice: make the main demo flow work end to end | [To be planned] | TBD | TBD |
-| 08 | Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling | [To be planned] | TBD | TBD |
-| 09 | Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup | [To be planned] | TBD | TBD |
+| 07 | Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling | [To be planned] | TBD | TBD |
+| 08 | Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup | [To be planned] | TBD | TBD |
 
 ## Phase Details
 
@@ -105,7 +104,7 @@ Requirements: TBD
 Success criteria:
 1. [To be planned]
 
-### Phase 7: Primary vertical slice: make the main demo flow work end to end
+### Phase 7: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling
 
 Goal: [To be planned]
 
@@ -114,16 +113,7 @@ Requirements: TBD
 Success criteria:
 1. [To be planned]
 
-### Phase 8: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling
-
-Goal: [To be planned]
-
-Requirements: TBD
-
-Success criteria:
-1. [To be planned]
-
-### Phase 9: Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup
+### Phase 8: Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup
 
 Goal: [To be planned]
 
