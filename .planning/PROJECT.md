@@ -1,16 +1,17 @@
 # Service Desk Autopilot
 
-## Current Milestone: Awaiting next milestone
+## Current Milestone: v1.2 Professional Skeleton Rescue Follow-up
 
-**Last completed:** v1.1 Professional Skeleton Rescue.
+**Goal:** Close the remaining skeleton-readiness gaps left after v1.1 by validating the live/demo path, adding evidence-backed vertical-slice confidence, and cleaning planning/docs artifacts without adding new product features.
 
-**Completed v1.1 outcomes:**
+**Target features:**
 
-- Restored deterministic event contracts between backend run events and frontend SSE consumers.
-- Consolidated frontend execution into a single mounted path and removed duplicate surface trees.
-- Normalized package manager, Docker, CI, and store-mode reporting across backend and frontend.
-
-**Current focus:** Await the next requirements cycle.
+- Fresh-clone Docker Compose validation for the current skeleton.
+- Browser SSE and primary technician workflow UAT.
+- Deterministic vertical-slice coverage for run creation, SSE updates, approval edit/execute, and activity flow.
+- Real Phoenix, SSH, and LLM validation where credentials, keys, and practice VMs are available.
+- Demo video and external submission handoff readiness.
+- Planning and docs cleanup tied back to `.planning/audits/V1.1-MASTER-DEFECT-MAP.md`.
 
 ## What This Is
 
@@ -67,6 +68,15 @@ Deferred:
 - **E2E-01**: Add deterministic vertical-slice coverage for run creation, SSE updates, approval edit/execute, and activity flow.
 - **PLAN-01**: Remove stale planning artifacts and regenerate evidence-only docs after milestone close.
 
+Active in v1.2:
+
+- [ ] **LIVE-01**: Operator can run a fresh clone through `docker compose up --build` with documented setup and no hidden manual repair steps.
+- [ ] **LIVE-02**: Operator can complete a browser UAT pass for the primary technician run flow with SSE updates visible in the mounted frontend.
+- [ ] **E2E-01**: Developer can run deterministic vertical-slice coverage for run creation, SSE updates, approval edit/execute, and activity flow.
+- [ ] **REAL-01**: Operator can validate Phoenix, SSH, and LLM paths against real credentials, keys, and practice VMs when those inputs are available.
+- [ ] **SUBM-01**: Operator has evidence needed for demo video recording and external submission handoff.
+- [ ] **PLAN-01**: Developer can rely on evidence-only planning/docs artifacts that trace unresolved work back to `.planning/audits/V1.1-MASTER-DEFECT-MAP.md`.
+
 ## Out Of Scope
 
 - Fully autonomous remediation.
@@ -111,8 +121,8 @@ PROJECT.md evolves at phase transitions and milestone boundaries.
 
 ## Next Milestone Goals
 
-- Start manual live validation milestones once credentials, SSH keys, and practice VMs are available.
-- Start the next product requirements cycle with `$gsd-new-milestone` when ready.
+- Complete v1.2 follow-up validation and evidence cleanup before adding new product features.
+- Start a new product requirements cycle only after the skeleton is proven clean, connected, buildable, and team-ready.
 
 ---
-*Last updated: 2026-06-07 after v1.1 milestone completion*
+*Last updated: 2026-06-07 after v1.2 milestone start*

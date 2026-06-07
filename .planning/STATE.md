@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Professional Skeleton Rescue
-status: Awaiting next milestone
-last_updated: "2026-06-07T03:39:46.226Z"
-last_activity: 2026-06-07 - Milestone v1.1 completed and archived
+milestone: v1.2
+milestone_name: Professional Skeleton Rescue Follow-up
+status: planning
+last_updated: "2026-06-07T04:00:15.654Z"
+last_activity: 2026-06-07
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-07)
 
 **Core value:** Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs, safely and auditably
-**Current focus:** Milestone complete
+**Current focus:** v1.2 requirements definition
 
 ## Current Position
 
-Phase: Milestone v1.1 complete
-Plan: Complete
-Status: Awaiting next milestone
-Last activity: 2026-06-07 - Milestone v1.1 completed and archived
+Phase: Not started (defining requirements)
+Plan: -
+Status: Defining requirements
+Last activity: 2026-06-07 - Milestone v1.2 started
 
 ## Performance Metrics
 
@@ -66,7 +66,7 @@ Recent decisions affecting current work:
 - Manual fresh-clone `docker compose up --build` check.
 - Manual real Phoenix/SSH/LLM practice VM validation.
 - Demo video recording and external submission form.
-- Start a fresh requirements cycle with `$gsd-new-milestone` if continuing beyond v1.0.
+- Define and execute v1.2 follow-up requirements from the remaining validation debt.
 
 ### Blockers/Concerns
 
@@ -91,9 +91,9 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-06-07T05:51:24+0200
-Stopped at: Resumed project state; v1.1 complete and awaiting next milestone selection.
+Stopped at: Started v1.2 Professional Skeleton Rescue Follow-up.
 Resume file: .planning/STATE.md
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Define v1.2 requirements and roadmap.
