@@ -2,28 +2,34 @@ import { describe, expect, it } from "vitest";
 import type { DashboardResponse, RunDetail } from "./index.js";
 import { SOURCE_LABELS, SSE_EVENT_TYPES } from "./index.js";
 
+// Must match the backend's actually-emitted audit/event types (see events.ts).
 const EXPECTED_SSE_EVENTS = [
   "run.started",
-  "agent.thought_summary",
-  "command.proposed",
-  "command.blocked",
+  "agent.unavailable",
   "approval.required",
-  "command.executing",
+  "command.approved",
+  "command.rejected",
+  "command.blocked",
   "command.completed",
-  "observation.added",
-  "fix.proposed",
+  "diagnosis.root_cause_found",
+  "diagnosis.more_needed",
+  "fix.failed",
   "validation.completed",
   "activity.drafted",
+  "activity.fields_overridden",
   "activity.submitted",
-  "agent.unavailable",
-  "run.completed",
+  "ticket.status_updated",
+  "ticket.status_update_failed",
+  "ticket.left_open_unvalidated",
+  "run.steps_capped",
+  "run.aborted",
   "run.failed",
 ] as const;
 
 describe("shared contracts", () => {
   it("exports the canonical SSE event tuple", () => {
     expect(SSE_EVENT_TYPES).toEqual(EXPECTED_SSE_EVENTS);
-    expect(SSE_EVENT_TYPES).toHaveLength(15);
+    expect(SSE_EVENT_TYPES).toHaveLength(20);
   });
 
   it("exports typed source labels", () => {
