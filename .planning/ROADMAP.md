@@ -15,6 +15,16 @@
 Plans:
 - [ ] TBD (run /gsd-plan-phase 8 to break down)
 
+### Phase 9: Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 9 to break down)
+
 ## Planned Milestone: v1.1
 
 | # | Phase | Goal | Requirements | Success criteria |
@@ -27,6 +37,7 @@ Plans:
 | 06 | Primary vertical slice: make the main demo flow work end to end | [To be planned] | TBD | TBD |
 | 07 | Primary vertical slice: make the main demo flow work end to end | [To be planned] | TBD | TBD |
 | 08 | Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling | [To be planned] | TBD | TBD |
+| 09 | Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup | [To be planned] | TBD | TBD |
 
 ## Phase Details
 
@@ -104,6 +115,15 @@ Success criteria:
 1. [To be planned]
 
 ### Phase 8: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling
+
+Goal: [To be planned]
+
+Requirements: TBD
+
+Success criteria:
+1. [To be planned]
+
+### Phase 9: Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup
 
 Goal: [To be planned]
 

@@ -57,6 +57,7 @@ Recent decisions affecting current work:
 - Phase 6 added: Primary vertical slice: make the main demo flow work end to end
 - Phase 7 added: Primary vertical slice: make the main demo flow work end to end
 - Phase 8 added: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling
+- Phase 9 added: Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup
 
 ### Pending Todos
 
