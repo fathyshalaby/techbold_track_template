@@ -13,6 +13,7 @@
 | 02 | Frontend Surface Consolidation | Remove duplicate runtime surfaces and centralize flow rendering | FEIN-01, FEIN-02 | 3 |
 | 03 | Tooling Baseline Alignment | Make backend/frontend/container/CI package and script strategy deterministic | TOOL-01, TOOL-02, TOOL-03 | 4 |
 | 04 | Store Mode Clarity | Clarify and enforce persistent store behavior under runtime fallback and startup | STOR-01, STOR-02 | 3 |
+| 05 | Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline | [To be planned] | TBD | TBD |
 
 ## Phase Details
 
@@ -61,6 +62,15 @@ Success criteria:
 1. Startup configuration states active store mode and reason when fallback is active.
 2. Runtime behavior differs clearly between durable and fallback modes and is documented.
 3. Logs include clear warnings when non-persistent behavior is active.
+
+### Phase 5: Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline
+
+Goal: [To be planned]
+
+Requirements: TBD
+
+Success criteria:
+1. [To be planned]
 
 ## Traceability Update Rule
 

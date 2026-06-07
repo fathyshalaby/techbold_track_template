@@ -51,6 +51,10 @@ Recent decisions affecting current work:
 - Init: SSE transport is the baseline event model.
 - [Phase v1.1]: Event contract repair and frontend consolidation are mandatory before new feature expansion.
 
+### Roadmap Evolution
+
+- Phase 5 added: Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline
+
 ### Pending Todos
 
 - Manual fresh-clone `docker compose up --build` check.
