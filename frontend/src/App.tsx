@@ -94,19 +94,6 @@ type ConnectionState = ConnectionCheck | {
   latency_ms?: number;
   message?: string;
 };
-type ActivityPreviewField = {
-  key: keyof ActivityDraft;
-  title: string;
-};
-
-const ACTIVITY_PREVIEW_FIELDS: ActivityPreviewField[] = [
-  { key: "summary", title: "Summary" },
-  { key: "root_cause", title: "Root cause" },
-  { key: "actions_taken", title: "Actions taken" },
-  { key: "commands_summary", title: "Commands summary" },
-  { key: "validation_result", title: "Validation result" },
-  { key: "description", title: "Description" },
-];
 
 export default function App() {
   const [theme, setTheme] = useState<ThemeMode>(START_THEME);
@@ -544,7 +531,6 @@ function StepNode({ step, pending, runId, busy, setRun, guard }: {
 function ActivityPanel({ run, guard, onSubmitted }: { run: Run; guard: Guard; onSubmitted: () => void }) {
   const [draft, setDraft] = useState<ActivityDraft | null>(run.activity_draft ?? null);
   const [submitted, setSubmitted] = useState(false);
-  const preview = draft ? activityPreviewMarkdown(draft) : "";
 
   async function generate() {
     const d = await guard("drafting activity", () => api.draftActivity(run.id));
@@ -574,17 +560,7 @@ function ActivityPanel({ run, guard, onSubmitted }: { run: Run; guard: Guard; on
       {!draft && <button className="btn primary" onClick={generate}>Generate documentation from the trace</button>}
       {draft && (
         <>
-          <div className="report-preview">
-            <div className="report-preview-head">
-              <div>
-                <div className="micro">Final report preview</div>
-                <h3>Technician-facing documentation</h3>
-              </div>
-            </div>
-            {preview
-              ? <MarkdownBlock content={preview} className="report" />
-              : <div className="micro list-state">No report fields have content yet.</div>}
-          </div>
+          <ReportPreview draft={draft} steps={run.steps} />
           <details className="activity-editor">
             <summary>Edit ERP fields</summary>
             <div className="activity-editor-body">
@@ -605,43 +581,180 @@ function ActivityPanel({ run, guard, onSubmitted }: { run: Run; guard: Guard; on
   );
 }
 
-function activityPreviewMarkdown(draft: ActivityDraft): string {
-  return ACTIVITY_PREVIEW_FIELDS
-    .map(({ key, title }) => {
-      const body = formatReportField(draft[key]);
-      return body ? `## ${title}\n\n${body}` : "";
-    })
-    .filter(Boolean)
-    .join("\n\n");
+function ReportPreview({ draft, steps }: { draft: ActivityDraft; steps: Step[] }) {
+  const summary = reportText(draft.summary);
+  const rootCause = reportText(draft.root_cause);
+  const validation = reportText(draft.validation_result);
+  const description = reportText(draft.description);
+  const actions = actionListItems(reportText(draft.actions_taken));
+  const commands = commandSummaryItems(reportText(draft.commands_summary));
+  const hasContent = [summary, rootCause, validation, description].some(Boolean) || actions.length > 0 || commands.length > 0;
+
+  return (
+    <div className="report-preview">
+      <div className="report-preview-head">
+        <div>
+          <div className="micro">Final report preview</div>
+          <h3>Technician-facing documentation</h3>
+        </div>
+      </div>
+
+      {hasContent ? (
+        <div className="report-doc">
+          <ReportTextSection title="Summary" content={summary} />
+          <ReportTextSection title="Root cause" content={rootCause} />
+          {actions.length > 0 && (
+            <section className="report-section">
+              <h4>Actions taken</h4>
+              {actions.length > 1 ? (
+                <ol className="report-action-list">
+                  {actions.map((action, index) => (
+                    <li key={`${action}-${index}`}><MarkdownBlock content={action} className="report-inline-md" compact /></li>
+                  ))}
+                </ol>
+              ) : (
+                <MarkdownBlock content={actions[0]} className="report-inline-md" compact />
+              )}
+            </section>
+          )}
+          {commands.length > 0 && (
+            <section className="report-section">
+              <h4>Commands referenced</h4>
+              <div className="report-command-list">
+                {commands.map((command, index) => (
+                  <div className="report-command-row" key={`${command.command}-${index}`}>
+                    <code>{command.command}</code>
+                    {command.note && <span>{command.note}</span>}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+          <ReportTextSection title="Validation result" content={validation} />
+          <ReportTextSection title="Description" content={description} />
+        </div>
+      ) : (
+        <div className="micro list-state">No report fields have content yet.</div>
+      )}
+
+      <CommandHistory steps={steps} />
+    </div>
+  );
 }
 
-function formatReportField(value: ActivityDraft[keyof ActivityDraft]): string {
-  if (typeof value !== "string") return "";
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  if (!trimmed.includes("\n")) return denseNumberedListToMarkdown(trimmed);
-  if (hasMarkdownStructure(trimmed)) return trimmed;
-  return denseNumberedListToMarkdown(trimmed);
+function ReportTextSection({ title, content }: { title: string; content: string }) {
+  if (!content) return null;
+  return (
+    <section className="report-section">
+      <h4>{title}</h4>
+      <MarkdownBlock content={content} className="report-inline-md" compact />
+    </section>
+  );
 }
 
-function hasMarkdownStructure(value: string): boolean {
-  return /(^|\n)\s*(#{1,6}\s|\*{0,2}\d+[.)]\s|[-*+]\s|>\s|```|\|.+\|)/.test(value);
+function actionListItems(value: string): string[] {
+  if (!value) return [];
+  const arrayItems = arrayLikeItems(value);
+  if (arrayItems.length > 1) return arrayItems;
+
+  const numberedItems = denseNumberedListItems(value);
+  if (numberedItems.length > 1) return numberedItems;
+
+  return [value];
 }
 
-function denseNumberedListToMarkdown(value: string): string {
+function commandListItems(value: string): string[] {
+  if (!value) return [];
+  const structuredItems = actionListItems(value);
+  if (structuredItems.length > 1) return structuredItems;
+
+  const semicolonItems = splitReadableList(value, ";");
+  if (semicolonItems.length > 1) return semicolonItems;
+
+  return [value];
+}
+
+function arrayLikeItems(value: string): string[] {
+  if (!/^\[\s*(['"])/.test(value) || !/\]\s*$/.test(value)) return [];
+  const items = Array.from(value.matchAll(/(['"])((?:\\.|(?!\1).)*?)\1/g))
+    .map((match) => match[2].replace(/\\(['"])/g, "$1").trim())
+    .filter(Boolean);
+  return items.length > 1 ? items : [];
+}
+
+function denseNumberedListItems(value: string): string[] {
   const matches = Array.from(value.matchAll(/(?:^|\s)(\d+)\)\s+/g));
-  if (matches.length < 2 || matches[0].index !== 0) return value;
+  if (matches.length < 2 || matches[0].index !== 0) return [];
 
   return matches
     .map((match, index) => {
       const next = matches[index + 1];
       const start = (match.index ?? 0) + match[0].length;
       const end = next?.index ?? value.length;
-      const item = value.slice(start, end).trim();
-      return item ? `${match[1]}. ${item}` : "";
+      return value.slice(start, end).trim();
     })
-    .filter(Boolean)
-    .join("\n");
+    .filter(Boolean);
+}
+
+function splitReadableList(value: string, delimiter: ";" | ","): string[] {
+  if (!value.includes(delimiter)) return [];
+  const parts = value.split(delimiter).map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) return [];
+  const tooFragmented = parts.some((part) => part.split(/\s+/).length < 2 && !looksCommandLike(part));
+  return tooFragmented ? [] : parts;
+}
+
+function commandSummaryItems(value: string): Array<{ command: string; note: string }> {
+  return commandListItems(value)
+    .map((item) => {
+      const match = item.match(/^(.+?)\s+\((.+)\)$/);
+      return {
+        command: (match ? match[1] : item).trim(),
+        note: (match ? match[2] : "").trim(),
+      };
+    })
+    .filter((item) => item.command);
+}
+
+function looksCommandLike(value: string): boolean {
+  return /^(?:sudo\s+)?(?:systemctl|journalctl|ss|netstat|lsof|curl|grep|sed|awk|find|cat|chmod|chown|mkdir|rm|cp|mv|touch|python3?|node|bun|npm|docker|psql)\b/i.test(value);
+}
+
+function reportText(value: ActivityDraft[keyof ActivityDraft]): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function CommandHistory({ steps }: { steps: Step[] }) {
+  const ran = steps.filter((step) => step.command && ["succeeded", "failed"].includes(step.status));
+  if (!ran.length) return null;
+  const succeeded = ran.filter((step) => step.status === "succeeded").length;
+  const failed = ran.filter((step) => step.status === "failed").length;
+  const meta = [
+    `${ran.length} command${ran.length === 1 ? "" : "s"}`,
+    succeeded ? `${succeeded} succeeded` : "",
+    failed ? `${failed} failed` : "",
+  ].filter(Boolean).join(" · ");
+
+  return (
+    <details className="command-history">
+      <summary>
+        <span>Command history</span>
+        <span>{meta}</span>
+      </summary>
+      <div className="command-history-list">
+        {ran.map((step) => (
+          <div className="command-history-row" key={step.id}>
+            <div className="command-history-meta">
+              <span>{step.kind}</span>
+              <span className={`command-status ${step.status}`}>{step.status}</span>
+              {step.result?.exit_code != null && <span>exit {step.result.exit_code}</span>}
+            </div>
+            <code>{step.edited_command || step.command}</code>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
 }
 
 function EventLog({ audit }: { audit: AuditEntry[] }) {
