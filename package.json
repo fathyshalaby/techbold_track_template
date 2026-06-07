@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": ["apps/backend", "apps/frontend", "packages/contracts"],
+  "workspaces": ["apps/backend", "apps/frontend", "apps/dashboard", "packages/contracts"],
   "trustedDependencies": ["better-sqlite3", "ssh2", "cpu-features", "esbuild"],
   "engines": {
     "bun": ">=1.1"
@@ -11,6 +11,7 @@
   "scripts": {
     "build": "bun run --filter techbold-track-frontend build",
     "check": "bun run lint && bun run typecheck && bun run test && bun run build",
+    "dev:dashboard": "bun run --filter techbold-track-dashboard dev",
     "dev:backend": "bun run --filter techbold-track-backend dev",
     "dev:frontend": "bun run --filter techbold-track-frontend dev",
     "format": "biome format --write .",
