@@ -1,7 +1,9 @@
+import { SSE_EVENT_TYPES as CONTRACT_SSE_EVENT_TYPES } from "@techbold/contracts";
 // Audit↔runEventBus symmetry test for PRD §9 SSE event set.
 // Drives a run to WAITING_FOR_APPROVAL and asserts that emitEvent-based events
 // appear in both the audit log (getAuditEvents) and the runEventBus.
 import { type MockInstance, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SSE_EVENT_TYPES as BACKEND_SSE_EVENT_TYPES } from "../events/sse.js";
 
 vi.mock("../env.js", () => ({
   getEnv: () => ({
@@ -85,5 +87,9 @@ describe("SSE audit↔bus symmetry", () => {
     // approval.required: present in BOTH audit (via emitEvent mirror) AND bus
     expect(auditTypes.has("approval.required")).toBe(true);
     expect((emitted.get("approval.required") ?? []).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("exports the shared canonical SSE event tuple", () => {
+    expect(BACKEND_SSE_EVENT_TYPES).toEqual(CONTRACT_SSE_EVENT_TYPES);
   });
 });

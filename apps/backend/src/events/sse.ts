@@ -1,28 +1,12 @@
+export { SSE_EVENT_TYPES } from "@techbold/contracts";
+export type { SseEventType } from "@techbold/contracts";
+
 import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { ulid } from "ulid";
 import { redactSecrets } from "../safety/redaction.js";
 import { getAuditEvents } from "../store/audit.js";
 import { runEventBus } from "./run-event-bus.js";
-
-export const SSE_EVENT_TYPES = [
-  "run.started",
-  "agent.thought_summary",
-  "command.proposed",
-  "command.blocked",
-  "approval.required",
-  "command.executing",
-  "command.completed",
-  "observation.added",
-  "fix.proposed",
-  "validation.completed",
-  "activity.drafted",
-  "activity.submitted",
-  "run.completed",
-  "run.failed",
-] as const;
-
-export type SseEventType = (typeof SSE_EVENT_TYPES)[number];
 
 export function createSseStream(c: Context, runId: string) {
   return streamSSE(c, async (stream) => {
