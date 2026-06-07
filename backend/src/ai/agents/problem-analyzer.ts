@@ -3,6 +3,7 @@ import type { LanguageModelV1 } from 'ai';
 import { getModel } from '../model.js';
 import { DiagnosticProposalSchema } from '../types.js';
 import { PROBLEM_ANALYZER_SYSTEM_PROMPT } from '../prompts.js';
+import { selectRunbooks } from '../knowledge.js';
 
 export { DiagnosticProposalSchema };
 export type { DiagnosticProposal } from '../types.js';
@@ -39,6 +40,11 @@ export async function runProblemAnalyzer(
   model?: LanguageModelV1,
 ): Promise<import('../types.js').DiagnosticProposal> {
   const resolvedModel = model ?? getModel();
+  // Route the relevant runbook slice by symptom (ticket + observations) — the
+  // method lives in the system prompt; the matched runbook is per-incident context.
+  const runbook = selectRunbooks(
+    `${input.ticketDescription} ${input.observations.join(' ')}`,
+  );
   try {
     const result = await Promise.race([
       generateObject({
@@ -48,6 +54,7 @@ export async function runProblemAnalyzer(
         prompt: JSON.stringify({
           ticketDescription: input.ticketDescription,
           observations: input.observations,
+          ...(runbook ? { runbook } : {}),
         }),
         maxTokens: 1024,
       }),

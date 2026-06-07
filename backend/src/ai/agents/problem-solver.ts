@@ -5,6 +5,7 @@ import { PROBLEM_SOLVER_SYSTEM_PROMPT } from '../prompts.js';
 import { FixProposalSchema } from '../types.js';
 import type { FixProposal } from '../types.js';
 import { AgentUnavailableError } from './problem-analyzer.js';
+import { selectRunbooks } from '../knowledge.js';
 
 export { AgentUnavailableError };
 export { FixProposalSchema };
@@ -20,6 +21,9 @@ export async function runProblemSolver(
   model?: LanguageModelV1,
 ): Promise<FixProposal> {
   const resolvedModel = model ?? getModel();
+  const runbook = selectRunbooks(
+    `${input.ticketDescription} ${input.observations.join(' ')}`,
+  );
   try {
     const result = await Promise.race([
       generateObject({
@@ -29,6 +33,7 @@ export async function runProblemSolver(
         prompt: JSON.stringify({
           ticketDescription: input.ticketDescription,
           observations: input.observations,
+          ...(runbook ? { runbook } : {}),
         }),
         maxTokens: 1024,
       }),
