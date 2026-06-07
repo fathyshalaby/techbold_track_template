@@ -1,3 +1,9 @@
+import type {
+  ActivityStateSummary,
+  AuditEvidenceSummary,
+  PendingApprovalSummary,
+  SourceLabel,
+} from "@techbold/contracts";
 import { ulid } from "ulid";
 import { redactSecrets } from "../safety/redaction.js";
 import { getDb } from "./db.js";
@@ -12,6 +18,7 @@ import {
   CommandResultSchema,
   type Observation,
   ObservationSchema,
+  RunSchema,
 } from "./schema.js";
 
 export function appendAuditEvent(
@@ -37,6 +44,134 @@ export function getAuditEvents(runId: string): AuditEvent[] {
     [runId],
   );
   return rows.map((r) => AuditEventSchema.parse(r));
+}
+
+function normalizeLimit(limit: number | undefined): number {
+  return Math.max(1, Math.min(50, limit ?? 20));
+}
+
+function summarizePayload(payloadJson: string): string {
+  try {
+    const parsed = JSON.parse(payloadJson) as unknown;
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return redactSecrets(String(parsed)).slice(0, 180);
+    }
+
+    const entries = Object.entries(parsed as Record<string, unknown>);
+    const summary = entries
+      .slice(0, 4)
+      .map(([key, value]) => {
+        if (/token|secret|private|key|password|error|message|detail/i.test(key)) {
+          return `${key}: [redacted]`;
+        }
+        if (value === null || value === undefined) return `${key}: ${value}`;
+        if (typeof value === "object")
+          return `${key}: ${Array.isArray(value) ? "array" : "object"}`;
+        return `${key}: ${redactSecrets(String(value))}`;
+      })
+      .join("; ");
+    return (summary || "empty payload").slice(0, 180);
+  } catch {
+    return "unparseable redacted payload";
+  }
+}
+
+export function listPendingApprovalSummaries(
+  limit?: number,
+  source: SourceLabel = "live-backend",
+): PendingApprovalSummary[] {
+  const max = normalizeLimit(limit);
+  const runs = new Map(
+    getDb()
+      .all<unknown>("SELECT * FROM runs")
+      .map((row) => {
+        const run = RunSchema.parse(row);
+        return [run.id, run] as const;
+      }),
+  );
+
+  return getDb()
+    .all<unknown>(
+      "SELECT * FROM command_approvals WHERE status = ? ORDER BY created_at DESC LIMIT ?",
+      ["PENDING", max],
+    )
+    .map((row) => CommandApprovalSchema.parse(row))
+    .filter((approval) => approval.status === "PENDING")
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, max)
+    .flatMap((approval) => {
+      const run = runs.get(approval.run_id);
+      if (!run) return [];
+      return [
+        {
+          approvalId: approval.id,
+          runId: approval.run_id,
+          ticketId: run.ticket_id,
+          ticketTitle: null,
+          proposedCommand: redactSecrets(approval.proposed_command),
+          riskLevel: approval.risk_level,
+          createdAt: approval.created_at,
+          source,
+        },
+      ];
+    });
+}
+
+export function listAuditEvidenceSummaries(
+  limit?: number,
+  source: SourceLabel = "live-backend",
+): AuditEvidenceSummary[] {
+  const max = normalizeLimit(limit);
+  return getDb()
+    .all<unknown>("SELECT * FROM audit_events ORDER BY ts DESC LIMIT ?", [max])
+    .map((row) => AuditEventSchema.parse(row))
+    .sort((a, b) => b.ts.localeCompare(a.ts))
+    .slice(0, max)
+    .map((event) => ({
+      id: event.id,
+      runId: event.run_id,
+      type: event.type,
+      actor: event.actor,
+      ts: event.ts,
+      payloadSummary: summarizePayload(event.payload_json),
+      source,
+    }));
+}
+
+export function listActivityStateSummaries(
+  limit?: number,
+  source: SourceLabel = "live-backend",
+): ActivityStateSummary[] {
+  const max = normalizeLimit(limit);
+  const latestDraftByRun = new Map<string, ActivityDraft>();
+  for (const row of getDb().all<unknown>(
+    "SELECT * FROM activity_drafts ORDER BY created_at DESC LIMIT ?",
+    [max],
+  )) {
+    const draft = ActivityDraftSchema.parse(row);
+    const existing = latestDraftByRun.get(draft.run_id);
+    if (!existing || draft.created_at > existing.created_at) {
+      latestDraftByRun.set(draft.run_id, draft);
+    }
+  }
+
+  return getDb()
+    .all<unknown>("SELECT * FROM runs ORDER BY updated_at DESC LIMIT ?", [max])
+    .map((row) => RunSchema.parse(row))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    .slice(0, max)
+    .map((run) => {
+      const draft = latestDraftByRun.get(run.id);
+      return {
+        runId: run.id,
+        ticketId: run.ticket_id,
+        state: draft ? (draft.submitted === 1 ? "submitted" : "drafted") : "not-drafted",
+        summary: draft ? redactSecrets(draft.summary) : null,
+        validationResult: draft ? redactSecrets(draft.validation_result) : null,
+        updatedAt: draft?.submitted_at ?? draft?.created_at ?? null,
+        source,
+      };
+    });
 }
 
 export function createPendingApproval(

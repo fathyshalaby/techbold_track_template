@@ -1,3 +1,4 @@
+import type { DashboardRunSummary, SafeTarget, SourceLabel } from "@techbold/contracts";
 import { ulid } from "ulid";
 import { getDb } from "./db.js";
 import { type Run, RunSchema } from "./schema.js";
@@ -17,6 +18,47 @@ export function getRunById(id: string): Run | undefined {
   const row = getDb().get("SELECT * FROM runs WHERE id = ?", [id]);
   if (!row) return undefined;
   return RunSchema.parse(row);
+}
+
+export function parseSafeTarget(customerSystemId: string): SafeTarget | null {
+  const match = customerSystemId.match(/^([^:]+):(\d{1,5})$/);
+  if (!match) return null;
+
+  const port = Number(match[2]);
+  if (!Number.isInteger(port) || port <= 0 || port > 65_535) return null;
+
+  return {
+    ip: match[1],
+    port,
+    username: "",
+    os: "",
+  };
+}
+
+export function listRunSummaries(
+  limit = 20,
+  source: SourceLabel = "live-backend",
+): DashboardRunSummary[] {
+  const rows = getDb().all<unknown>("SELECT * FROM runs ORDER BY updated_at DESC LIMIT ?", [
+    Math.max(1, limit),
+  ]);
+
+  return rows
+    .map((row) => RunSchema.parse(row))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    .slice(0, Math.max(1, limit))
+    .map((run) => ({
+      runId: run.id,
+      ticketId: run.ticket_id,
+      ticketTitle: null,
+      customerName: null,
+      status: run.status,
+      phase: run.current_phase,
+      updatedAt: run.updated_at,
+      latestAuditAt: null,
+      hasPendingApproval: false,
+      source,
+    }));
 }
 
 export function updateRunPhase(id: string, phase: string): void {
