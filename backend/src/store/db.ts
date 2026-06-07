@@ -1,8 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import type { Database } from 'better-sqlite3';
 
 export type StoreMode = 'sqlite' | 'jsonl';
+
+export type StoreStatus = {
+  mode: StoreMode;
+  durable: boolean;
+};
 
 export type DbAdapter = {
   run(sql: string, params?: unknown[]): void;
@@ -127,6 +133,8 @@ const CREATE_TABLES = `
   END;
 `;
 
+const require = createRequire(import.meta.url);
+
 export function makeJsonlAdapter(): DbAdapter {
   const tables = new Map<string, Record<string, unknown>[]>();
 
@@ -187,7 +195,7 @@ export function makeJsonlAdapter(): DbAdapter {
         if (idx === -1) return;
 
         // Parse SET clause by matching each `col = <expr with one ?>` assignment.
-        // Naive comma-splitting breaks on COALESCE(?, col) — its internal comma
+        // Naive comma-splitting breaks on COALESCE(?, col). Its internal comma
         // produces phantom fragments and misaligns params. Match assignments
         // directly instead: each consumes exactly one positional param, in order.
         const setMatch = sql.match(/SET\s+(.+?)\s+WHERE/is);
@@ -248,12 +256,19 @@ export function resetDb(): void {
   adapter = undefined;
 }
 
+export function getStoreStatus(): StoreStatus {
+  const db = getDb();
+  return {
+    mode: db.mode,
+    durable: db.mode === 'sqlite',
+  };
+}
+
 export function getDb(dbPath?: string): DbAdapter {
   if (adapter) return adapter;
 
   try {
-    // Dynamic import so the module loads even when native bindings are absent
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // Dynamic require so the module loads even when native bindings are absent.
     const BetterSqlite3 = require('better-sqlite3') as typeof import('better-sqlite3');
     const resolvedPath = dbPath ?? process.env['DB_PATH'] ?? './data/autopilot.db';
     if (resolvedPath !== ':memory:') {
@@ -283,7 +298,7 @@ export function getDb(dbPath?: string): DbAdapter {
     // The JSONL fallback is IN-MEMORY (non-durable). That is acceptable only for
     // offline/mock runs and tests. In a real run the audit trail is the C-score
     // source of truth, so silently degrading to a store that evaporates on
-    // restart is worse than failing — refuse to boot instead of pretending.
+    // restart is worse than failing. Refuse to boot instead of pretending.
     const mockEnv = ['MOCK_MODE', 'MOCK_PHOENIX', 'MOCK_SSH', 'MOCK_LLM'];
     const anyMock = mockEnv.some((k) => {
       const v = (process.env[k] ?? '').trim().toLowerCase();
@@ -292,12 +307,12 @@ export function getDb(dbPath?: string): DbAdapter {
     if (!anyMock) {
       throw new Error(
         `[store] SQLite unavailable (${reason}) and not in mock mode. The in-memory ` +
-          'fallback is non-durable and would lose the audit trail — refusing to start. ' +
+          'fallback is non-durable and would lose the audit trail. Refusing to start. ' +
           'Fix the native better-sqlite3 build or mount a writable data dir.',
       );
     }
     console.warn(
-      `[store] SQLite unavailable (${reason}) — falling back to an IN-MEMORY store ` +
+      `[store] SQLite unavailable (${reason}). Falling back to an IN-MEMORY store ` +
         '(mock mode). Run state and the audit trail will NOT survive a restart.',
     );
     adapter = makeJsonlAdapter();

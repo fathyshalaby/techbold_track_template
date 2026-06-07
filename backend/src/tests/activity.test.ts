@@ -184,7 +184,7 @@ describe('POST /api/runs/:runId/activity/submit', () => {
     const run = createRun(7, '10.0.0.1:22');
     updateRunPhase(run.id, 'WAITING_FOR_ACTIVITY_REVIEW');
     // A validated fix is what authorises closing the ticket.
-    appendAuditEvent(run.id, 'validation.complete', 'agent', { status: 'VERIFIED_FIXED' });
+    appendAuditEvent(run.id, 'validation.completed', 'agent', { status: 'VERIFIED_FIXED' });
     saveActivityDraft(run.id, {
       summary: 's', rootCause: 'rc', actionsTaken: 'a', commandsSummary: 'c', validationResult: 'v',
     });
@@ -203,7 +203,7 @@ describe('POST /api/runs/:runId/activity/submit', () => {
     const phoenixModule = await import('../phoenix/mock.js');
     const setStatusSpy = vi.spyOn(phoenixModule.default.prototype, 'setStatus');
 
-    // Reached activity review via the MAX_STEPS cap — no validation.complete event.
+    // Reached activity review via the MAX_STEPS cap without a validation.completed event.
     const run = createRun(8, '10.0.0.1:22');
     updateRunPhase(run.id, 'WAITING_FOR_ACTIVITY_REVIEW');
     saveActivityDraft(run.id, {

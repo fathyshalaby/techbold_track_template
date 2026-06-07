@@ -1,16 +1,16 @@
 # Service Desk Autopilot
 
-## Current Milestone: v1.1 Professional Skeleton Rescue
+## Current Milestone: Awaiting next milestone
 
-**Goal:** Make the existing skeleton clean, connected, and buildable by removing contract drift, deleting or wiring duplicate UI surfaces, and aligning tooling baselines.
+**Last completed:** v1.1 Professional Skeleton Rescue.
 
-**Target features:**
+**Completed v1.1 outcomes:**
 
-- Restore deterministic end-to-end event contracts between backend run events and frontend SSE consumers.
-- Consolidate frontend execution into a single mounted path and remove duplicate surface trees.
-- Normalize package manager, Docker, and CI behavior across backend and frontend.
+- Restored deterministic event contracts between backend run events and frontend SSE consumers.
+- Consolidated frontend execution into a single mounted path and removed duplicate surface trees.
+- Normalized package manager, Docker, CI, and store-mode reporting across backend and frontend.
 
-**Current focus:** Defining requirements and creating a phase roadmap for the v1.1 skeleton rescue milestone.
+**Current focus:** Await the next requirements cycle.
 
 ## What This Is
 
@@ -48,17 +48,24 @@ Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs
 - Demo video recording and external submission form.
 - Passwordless `sudo -n true` confirmation for `azureuser`.
 
-## Active Requirements
+## Requirements
 
-- [ ] **EVNT-01**: Canonicalize SSE event names and payload shapes across backend and frontend.
-- [ ] **EVNT-02**: Implement a shared event contract for run, approval, validation, and activity state updates.
-- [ ] **FEIN-01**: Remove or migrate disconnected frontend surfaces into the mounted App flow.
-- [ ] **FEIN-02**: Ensure the runtime entry path exposes the full technician flow with no dead feature branches.
-- [ ] **TOOL-01**: Align package-manager assumptions and lockfile strategy across backend, frontend, and CI.
-- [ ] **TOOL-02**: Normalize Docker scripts and image builds for deterministic frontend + backend setup.
-- [ ] **TOOL-03**: Add deterministic monorepo scripts for install, lint, test, and build.
-- [ ] **STOR-01**: Make persistence mode selection explicit at startup.
-- [ ] **STOR-02**: Define documented fallback behavior when durable persistence is unavailable.
+Completed in v1.1:
+
+- [x] **EVNT-01**: Standardize backend SSE event names for run lifecycle state transitions.
+- [x] **EVNT-02**: Publish event payloads from a single shared contract used by backend and frontend.
+- [x] **FEIN-01**: Remove or migrate disconnected frontend app trees not mounted by `frontend/src/main.tsx`.
+- [x] **FEIN-02**: Ensure technician workflow rendering uses one runtime path with complete route handling.
+- [x] **TOOL-01**: Align package-manager assumptions and lockfile strategy across backend, frontend, and CI.
+- [x] **TOOL-02**: Normalize frontend Dockerfile and workspace build assumptions to the repository baseline.
+- [x] **TOOL-03**: Add and document monorepo scripts for install, typecheck, test, and build.
+- [x] **STOR-01**: Make persistence mode explicit in startup configuration and runtime logs.
+- [x] **STOR-02**: Document and enforce fallback semantics when durable persistence is disabled.
+
+Deferred:
+
+- **E2E-01**: Add deterministic vertical-slice coverage for run creation, SSE updates, approval edit/execute, and activity flow.
+- **PLAN-01**: Remove stale planning artifacts and regenerate evidence-only docs after milestone close.
 
 ## Out Of Scope
 
@@ -81,7 +88,7 @@ Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs
 | SSE instead of WebSockets | One-way event stream matches the product flow | Good |
 | SQLite with JSONL fallback | Durable local audit trail without extra services | Good |
 | Audit trail is the activity source | Prevents invented actions in Phoenix reports | Good |
-| Event and store repair work is now a controlled v1.1 objective | Current progress shows risk concentration outside the happy path | Pending |
+| Event and store repair work was completed as a controlled v1.1 objective | Reduced skeleton risk before new feature expansion | Good |
 
 ## Evolution
 
@@ -104,8 +111,8 @@ PROJECT.md evolves at phase transitions and milestone boundaries.
 
 ## Next Milestone Goals
 
-- v1.1 Professional Skeleton Rescue is now active and focused on skeleton rescue completion.
-- After v1.1, start manual live validation milestones once the core contract and tooling baseline are clean.
+- Start manual live validation milestones once credentials, SSH keys, and practice VMs are available.
+- Start the next product requirements cycle with `$gsd-new-milestone` when ready.
 
 ---
-*Last updated: 2026-06-07 after v1.1 milestone start*
+*Last updated: 2026-06-07 after v1.1 milestone completion*

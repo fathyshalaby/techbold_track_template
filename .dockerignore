@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+**/dist
+**/.turbo
+**/.next
+**/.vite
+**/tsconfig.tsbuildinfo
+.git
+.planning
+docs
+knowledge
+demo
+sandbox
+keys
+.env

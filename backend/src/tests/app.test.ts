@@ -14,10 +14,11 @@ describe('GET /health', () => {
     const body = await res.json();
     expect(body.status).toBe('ok');
     expect(body.mode).toBe('mock');
+    expect(body.store).toEqual({ mode: 'sqlite', durable: true });
   });
 });
 
-describe('errorHandler (regression: must not leak internal error text — see CLAUDE.md anti-patterns)', () => {
+describe('errorHandler regression', () => {
   it('returns a generic 500 and never the thrown message/stack', async () => {
     const SENTINEL = 'SECRET_LEAK_SENTINEL_xyz';
     // Fresh app wired with the REAL exported handler, so we test the actual logic.

@@ -1,19 +1,10 @@
-// Technician workspace for the AI Service Desk Autopilot.
-//
-// Flow: pick a ticket -> start a run -> drive the agent one step at a time
-// (POST /next) -> approve / edit / reject each proposed command -> watch the
-// live event stream (SSE) -> review and submit the ERP activity. The AI only
-// ever proposes; nothing runs on a system without the technician's approval.
-//
-// Talks to the backend at VITE_API_BASE (default http://localhost:8000).
-
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { SSE_EVENT_TYPES } from './types';
 
 const API_BASE: string =
   (import.meta as unknown as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE ??
   'http://localhost:8000';
 
-// ─── API types (subset of the backend contract) ────────────────────────────
 interface Ticket {
   id: number;
   title: string;
@@ -117,22 +108,27 @@ export default function App() {
     }
   }, []);
 
-  // Subscribe to the run's SSE stream; refresh the aggregate on every event.
   const openStream = useCallback(
     (runId: string) => {
       esRef.current?.close();
       const es = new EventSource(`${API_BASE}/api/runs/${runId}/events`);
-      es.onmessage = (m) => {
+
+      const handleEvent = (m: MessageEvent) => {
         try {
           const ev = JSON.parse(m.data) as { type: string; ts: string };
           setEvents((prev) => [...prev, { id: `${ev.ts}-${ev.type}-${prev.length}`, type: ev.type, ts: ev.ts }]);
         } catch {
-          /* ignore keepalive / non-JSON frames */
+          return;
         }
         void refreshRun(runId);
       };
+
+      for (const eventType of SSE_EVENT_TYPES) {
+        es.addEventListener(eventType, handleEvent);
+      }
+
       es.onerror = () => {
-        /* the browser auto-reconnects; backfill replays history on reconnect */
+        return;
       };
       esRef.current = es;
     },
@@ -200,9 +196,6 @@ export default function App() {
     });
   const submitActivity = () =>
     act(() => {
-      // The draft is snake_case (mirrors the DB row); the submit endpoint expects
-      // camelCase. Map explicitly so technician edits to ALL fields reach Phoenix
-      // (a silent snake/camel mismatch previously dropped 4 of 5 edited fields).
       const d = draft ?? run!.activityDraft;
       const body = d
         ? {
@@ -225,7 +218,6 @@ export default function App() {
     void loadTickets();
   };
 
-  // ─── styles ─────────────────────────────────────────────────────────────
   const wrap: React.CSSProperties = { fontFamily: 'system-ui, sans-serif', maxWidth: 920, margin: '4vh auto', padding: 24 };
   const card: React.CSSProperties = { border: '1px solid #d0d7de', borderRadius: 8, padding: 16, marginBottom: 16 };
   const btn: React.CSSProperties = { padding: '8px 14px', borderRadius: 6, border: '1px solid #d0d7de', cursor: 'pointer', background: '#f6f8fa' };
@@ -234,25 +226,25 @@ export default function App() {
     <main style={wrap}>
       <h1 style={{ marginBottom: 4 }}>AI Service Desk Autopilot</h1>
       <p style={{ color: '#666', marginTop: 0 }}>
-        Technician workspace — the AI proposes, you approve every action. <code>{API_BASE}</code>
+        Technician workspace - the AI proposes, you approve every action. <code>{API_BASE}</code>
       </p>
 
       {error && (
-        <div style={{ ...card, borderColor: '#cf222e', background: '#ffebe9', color: '#cf222e' }}>⚠ {error}</div>
+        <div style={{ ...card, borderColor: '#cf222e', background: '#ffebe9', color: '#cf222e' }}>{error}</div>
       )}
 
       {!run && (
         <section>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2>Tickets</h2>
-            <button style={btn} onClick={() => void loadTickets()} disabled={busy}>↻ Refresh</button>
+            <button style={btn} onClick={() => void loadTickets()} disabled={busy}>Refresh</button>
           </div>
           {tickets.length === 0 && <p style={{ color: '#666' }}>No tickets (or backend unreachable).</p>}
           {tickets.map((t) => (
             <div key={t.id} style={card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                 <div>
-                  <strong>#{t.id} — {t.title}</strong>
+                  <strong>#{t.id} - {t.title}</strong>
                   <div style={{ color: '#666', fontSize: 14 }}>
                     {t.customer_name} · priority {t.priority} · <Badge text={t.status} />
                   </div>
@@ -263,7 +255,7 @@ export default function App() {
                   onClick={() => void startRun(t)}
                   disabled={busy || t.status === 'DONE'}
                 >
-                  Start run →
+                  Start run
                 </button>
               </div>
             </div>
@@ -275,7 +267,7 @@ export default function App() {
         <section>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ marginBottom: 0 }}>Run <code>{run.runId.slice(0, 12)}</code></h2>
-            <button style={btn} onClick={closeRun}>← Back to tickets</button>
+            <button style={btn} onClick={closeRun}>Back to tickets</button>
           </div>
           <div style={{ color: '#666', margin: '6px 0 16px' }}>
             phase <strong>{run.phase}</strong> · status <strong>{run.status}</strong>
@@ -330,7 +322,7 @@ export default function App() {
           <div style={card}>
             <h3 style={{ marginTop: 0 }}>Live events</h3>
             <div style={{ maxHeight: 200, overflow: 'auto', fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>
-              {events.length === 0 && <span style={{ color: '#666' }}>Waiting for events…</span>}
+              {events.length === 0 && <span style={{ color: '#666' }}>Waiting for events...</span>}
               {events.map((e) => (
                 <div key={e.id}>
                   <span style={{ color: '#666' }}>{new Date(e.ts).toLocaleTimeString()}</span> {e.type}
@@ -344,7 +336,6 @@ export default function App() {
   );
 }
 
-// One-line, human-readable summary of an audit event's (already-redacted) payload.
 function summarizePayload(payloadJson?: string): string {
   if (!payloadJson) return '';
   try {
@@ -376,8 +367,6 @@ const ACTOR_COLORS: Record<string, string> = {
   phoenix: '#1a7f37',
 };
 
-// The audit trail — the persisted, redacted source of truth (rubric C). Rendered
-// from GET /api/runs/:id `timeline`, so it shows even if the live SSE stream is idle.
 function AuditTrail({ card, timeline }: { card: React.CSSProperties; timeline: RunView['timeline'] }) {
   return (
     <div style={card}>
@@ -391,7 +380,7 @@ function AuditTrail({ card, timeline }: { card: React.CSSProperties; timeline: R
               <span style={{ color: '#666' }}>{new Date(e.ts).toLocaleTimeString()}</span>{' '}
               <span style={{ color: ACTOR_COLORS[e.actor] ?? '#666', fontWeight: 600 }}>{e.actor}</span>{' '}
               <span>{e.type}</span>
-              {summary && <span style={{ color: '#444' }}> — {summary}</span>}
+              {summary && <span style={{ color: '#444' }}> - {summary}</span>}
             </div>
           );
         })}

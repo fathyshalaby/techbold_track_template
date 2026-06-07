@@ -297,7 +297,7 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
           return {
             nextState,
             sideEffects: [
-              auditEffect(state, 'validation.complete', 'agent', { status }),
+              auditEffect(state, 'validation.completed', 'agent', { status }),
               phaseEffect(state, 'DRAFTING_ACTIVITY'),
             ],
           };
@@ -307,7 +307,7 @@ export function reduce(state: OrchestratorState, event: OrchestratorEvent): Redu
           return {
             nextState,
             sideEffects: [
-              auditEffect(state, 'validation.complete', 'agent', { status }),
+              auditEffect(state, 'validation.completed', 'agent', { status }),
               phaseEffect(state, 'TRIAGING'),
             ],
           };
@@ -670,7 +670,7 @@ async function agentDispatch(
 
     case 'DRAFTING_ACTIVITY': {
       updateRunPhase(currentState.runId, 'WAITING_FOR_ACTIVITY_REVIEW');
-      appendAuditEvent(currentState.runId, 'activity.draft_ready', 'system', {});
+      appendAuditEvent(currentState.runId, 'activity.drafted', 'system', {});
       return { ...currentState, phase: 'WAITING_FOR_ACTIVITY_REVIEW' };
     }
 

@@ -7,24 +7,24 @@
 
 ### Event Contract and Transport
 
-- [ ] **EVNT-01**: Standardize backend SSE event names for run lifecycle state transitions.
-- [ ] **EVNT-02**: Publish event payloads from a single shared contract used by backend and frontend.
+- [x] **EVNT-01**: Standardize backend SSE event names for run lifecycle state transitions.
+- [x] **EVNT-02**: Publish event payloads from a single shared contract used by backend and frontend.
 
 ### Frontend Wiring
 
-- [ ] **FEIN-01**: Remove or migrate disconnected frontend app trees not mounted by `frontend/src/main.tsx`.
-- [ ] **FEIN-02**: Ensure technician workflow rendering uses one runtime path with complete route handling.
+- [x] **FEIN-01**: Remove or migrate disconnected frontend app trees not mounted by `frontend/src/main.tsx`.
+- [x] **FEIN-02**: Ensure technician workflow rendering uses one runtime path with complete route handling.
 
 ### Tooling Baseline
 
-- [ ] **TOOL-01**: Align package-manager assumptions and lockfile strategy across backend, frontend, and CI.
-- [ ] **TOOL-02**: Normalize frontend Dockerfile and workspace build assumptions to the repository baseline.
-- [ ] **TOOL-03**: Add and document monorepo scripts for install, lint, typecheck, test, and build.
+- [x] **TOOL-01**: Align package-manager assumptions and lockfile strategy across backend, frontend, and CI.
+- [x] **TOOL-02**: Normalize frontend Dockerfile and workspace build assumptions to the repository baseline.
+- [x] **TOOL-03**: Add and document monorepo scripts for install, typecheck, test, and build.
 
 ### Store Behavior
 
-- [ ] **STOR-01**: Make persistence mode explicit in startup configuration and runtime logs.
-- [ ] **STOR-02**: Document and enforce fallback semantics when durable persistence is disabled.
+- [x] **STOR-01**: Make persistence mode explicit in startup configuration and runtime logs.
+- [x] **STOR-02**: Document and enforce fallback semantics when durable persistence is disabled.
 
 ## v2 Requirements
 
@@ -50,21 +50,23 @@ Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EVNT-01 | Phase 1 | Pending |
-| EVNT-02 | Phase 1 | Pending |
-| FEIN-01 | Phase 2 | Pending |
-| FEIN-02 | Phase 2 | Pending |
-| TOOL-01 | Phase 3 | Pending |
-| TOOL-02 | Phase 3 | Pending |
-| TOOL-03 | Phase 3 | Pending |
-| STOR-01 | Phase 4 | Pending |
-| STOR-02 | Phase 4 | Pending |
+| EVNT-01 | Phase 1 | Complete |
+| EVNT-02 | Phase 1 | Complete |
+| FEIN-01 | Phase 2 | Complete |
+| FEIN-02 | Phase 2 | Complete |
+| TOOL-01 | Phase 3 | Complete |
+| TOOL-02 | Phase 3 | Complete |
+| TOOL-03 | Phase 3 | Complete |
+| STOR-01 | Phase 4 | Complete |
+| STOR-02 | Phase 4 | Complete |
+| E2E-01 | v2 | Deferred |
+| PLAN-01 | v2 | Deferred |
 
 **Coverage:**
 - v1 requirements: 9 total
 - Mapped to phases: 9
-- Unmapped: 0 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-07*
-*Last updated: 2026-06-07 after v1.1 requirements draft*
+*Last updated: 2026-06-07 after v1.1 completion*

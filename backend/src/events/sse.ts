@@ -22,40 +22,33 @@ export const SSE_EVENT_TYPES = [
   'run.failed',
 ] as const;
 
+export type SseEventType = (typeof SSE_EVENT_TYPES)[number];
+
 export function createSseStream(c: Context, runId: string) {
   return streamSSE(c, async (stream) => {
     const backfill = getAuditEvents(runId);
     for (const event of backfill) {
       await stream.writeSSE({
+        event: event.type,
         data: JSON.stringify({
           type: event.type,
           runId: event.run_id,
           ts: event.ts,
           payload: JSON.parse(event.payload_json),
         }),
-        // No `event:` field — a default (unnamed) frame reaches EventSource.onmessage.
-        // Naming the frame (event:<type>) would only deliver to addEventListener(type),
-        // which the generic client doesn't register, so live updates would be lost.
-        // The event type is in the JSON `type` field instead.
         id: event.id,
       });
     }
 
-    // Subscribe to ALL events for this run via the wildcard channel, so every
-    // event the orchestrator emits streams live — no allowlist to drift out of
-    // sync with the real event names (the prior fixed list missed several).
     const anyListener = (eventType: string, payload: unknown) => {
-      // The live channel carries the orchestrator's in-memory payload (e.g. an
-      // LLM-authored proposal/rationale), which is NOT pre-redacted like the DB
-      // copy. Redact the serialized frame so no secret can stream to the browser.
       void stream.writeSSE({
+        event: eventType,
         data: redactSecrets(JSON.stringify({
           type: eventType,
           runId,
           ts: new Date().toISOString(),
           payload,
         })),
-        // Unnamed frame (see backfill note) so it reaches onmessage; type is in JSON.
         id: ulid(),
       });
     };

@@ -13,7 +13,7 @@ services:
       - ./keys:/keys:ro
       # Persist the SQLite store (audit trail + run state) across container
       # recreation. Without this, `docker compose down && up` wipes the audit
-      # trail — the C-score source of truth. Named volume (not a bind mount) so
+      # trail, the C-score source of truth. Named volume (not a bind mount) so
       # the non-root `node` user keeps write access to /app/backend/data.
       - autopilot-data:/app/backend/data
     extra_hosts:
@@ -21,7 +21,9 @@ services:
       - "host.docker.internal:host-gateway"
 
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     environment:
       VITE_API_BASE: http://localhost:8000
     ports:

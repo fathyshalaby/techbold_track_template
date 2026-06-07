@@ -35,6 +35,17 @@ const DRAFT_ALLOWED_PHASES = new Set([
   'COMPLETED',
 ]);
 
+function parseAuditPayload(payloadJson: string): Record<string, unknown> | null {
+  try {
+    const payload = JSON.parse(payloadJson) as unknown;
+    return payload !== null && typeof payload === 'object' && !Array.isArray(payload)
+      ? payload as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 activityRouter.post('/:runId/activity/draft', async (c) => {
   const { runId } = c.req.param();
 
@@ -65,14 +76,10 @@ activityRouter.post('/:runId/activity/draft', async (c) => {
   const startedEvent = auditEvents.find((e) => e.type === 'run.started');
   let ticketDescription = '';
   if (startedEvent) {
-    try {
-      const payload = JSON.parse(startedEvent.payload_json) as Record<string, unknown>;
-      ticketDescription = typeof payload['ticketDescription'] === 'string'
-        ? payload['ticketDescription']
-        : '';
-    } catch {
-      ticketDescription = '';
-    }
+    const payload = parseAuditPayload(startedEvent.payload_json);
+    ticketDescription = typeof payload?.['ticketDescription'] === 'string'
+      ? payload['ticketDescription']
+      : '';
   }
 
   const input: ActivityLogGeneratorInput = {
@@ -190,22 +197,18 @@ activityRouter.post('/:runId/activity/submit', async (c) => {
   // Close the ERP ticket ONLY when the fix was actually validated. The run can
   // reach activity review WITHOUT a validated fix (the MAX_STEPS cap jumps
   // straight to WAITING_FOR_ACTIVITY_REVIEW, and NOT_FIXED loops can hit it too).
-  // Marking such a ticket DONE would be an over-claim of resolution — the exact
+  // Marking such a ticket DONE would be an over-claim of resolution: the exact
   // failure the safety/audit rubric punishes. So gate on a recorded validation.
   const validated = auditEvents.some((e) => {
-    if (e.type !== 'validation.complete') return false;
-    try {
-      const p = JSON.parse(e.payload_json) as { status?: string };
-      return p.status === 'VERIFIED_FIXED' || p.status === 'LIKELY_FIXED';
-    } catch {
-      return false;
-    }
+    if (e.type !== 'validation.completed') return false;
+    const p = parseAuditPayload(e.payload_json);
+    return p?.status === 'VERIFIED_FIXED' || p?.status === 'LIKELY_FIXED';
   });
 
   if (validated) {
     // Best-effort: the activity (the scored record) is already created, so a
     // failed status PATCH must NOT fail the submit (which would risk a duplicate
-    // activity on retry) — audit it and continue.
+    // activity on retry), so audit it and continue.
     try {
       await client.setStatus(run.ticket_id, 'DONE');
       appendAuditEvent(runId, 'ticket.status_updated', 'system', { ticketId: run.ticket_id, status: 'DONE' });
@@ -213,13 +216,13 @@ activityRouter.post('/:runId/activity/submit', async (c) => {
       appendAuditEvent(runId, 'ticket.status_update_failed', 'system', { ticketId: run.ticket_id });
     }
   } else {
-    // No validated fix — leave the ticket OPEN/PENDING and record why.
+    // No validated fix: leave the ticket OPEN/PENDING and record why.
     appendAuditEvent(runId, 'ticket.left_open_unvalidated', 'system', { ticketId: run.ticket_id });
   }
 
-  // Mark the specific draft submitted. UPDATE … ORDER BY … LIMIT is non-portable
+  // Mark the specific draft submitted. UPDATE ORDER BY LIMIT is non-portable
   // (only some SQLite builds support it, and the JSONL adapter can't parse it),
-  // so target the draft by id — works on every backend.
+  // so target the draft by id.
   if (draft) {
     const now = new Date().toISOString();
     getDb().run(

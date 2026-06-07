@@ -1,5 +1,21 @@
 # Milestones
 
+## v1.1 (Shipped: 2026-06-07)
+
+**Phases completed:** 8 phases, 8 plans, 0 tasks
+
+**Key accomplishments:**
+
+- Repaired backend/frontend SSE event contracts and canonical event names.
+- Deleted the disconnected frontend surface so `frontend/src/App.tsx` is the only runtime UI path.
+- Aligned package manager, root scripts, CI checks, frontend Docker build, and lockfile ownership on pnpm.
+- Exposed store durability through startup logs and `/health`.
+- Updated README, infrastructure docs, requirements traceability, and phase artifacts.
+
+**Audit status:** passed
+
+---
+
 ## v1.0 milestone (Shipped: 2026-06-07)
 
 **Phases completed:** 9 phases, 35 plans
@@ -25,4 +41,3 @@
 Manual validation debt was accepted at close: live Phoenix/SSH/LLM validation, browser SSE/UAT, fresh-clone Docker check, demo video, and external submission form.
 
 ---
-

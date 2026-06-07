@@ -3,8 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.28.2",
   "scripts": {
+    "build": "pnpm --dir frontend build",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "dev:backend": "pnpm --dir backend dev",
+    "dev:frontend": "pnpm --dir frontend dev",
     "test": "pnpm --dir backend test && pnpm --dir frontend test",
-    "build": "pnpm --dir frontend build"
+    "typecheck": "pnpm --dir backend typecheck && pnpm --dir frontend typecheck"
   }
 }

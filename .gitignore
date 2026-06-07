@@ -16,6 +16,7 @@ venv/
 node_modules/
 frontend/dist/
 backend/dist/
+backend/data/
 *.tsbuildinfo
 
 # OS / editor

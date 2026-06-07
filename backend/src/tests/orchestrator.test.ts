@@ -1051,6 +1051,6 @@ describe('orchestrator driver — integration', () => {
     expect(state.phase).toBe('WAITING_FOR_ACTIVITY_REVIEW');
 
     const events = getAuditEvents(run.id);
-    expect(events.some((e) => e.type === 'validation.complete')).toBe(true);
+    expect(events.some((e) => e.type === 'validation.completed')).toBe(true);
   });
 });
