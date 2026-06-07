@@ -20,7 +20,7 @@ Requirements for the current follow-up milestone. Each maps to one roadmap phase
 
 ### Vertical-Slice Coverage
 
-- [ ] **E2E-01**: Developer can run deterministic vertical-slice coverage for run creation, SSE updates, approval edit/execute, and activity flow.
+- [x] **E2E-01**: Developer can run deterministic vertical-slice coverage for run creation, SSE updates, approval edit/execute, and activity flow.
 
 ### Real Integrations
 
@@ -34,7 +34,7 @@ Requirements for the current follow-up milestone. Each maps to one roadmap phase
 
 ### Planning Hygiene
 
-- [ ] **PLAN-01**: Developer can trace every v1.2 production change back to `.planning/audits/V1.1-MASTER-DEFECT-MAP.md`.
+- [x] **PLAN-01**: Developer can trace every v1.2 production change back to `.planning/audits/V1.1-MASTER-DEFECT-MAP.md`.
 - [ ] **PLAN-02**: Developer can rely on planning/docs artifacts that distinguish completed evidence, deferred work, and blocked manual validation.
 
 ## Future Requirements
@@ -73,12 +73,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LIVE-02 | Phase 1 | Complete |
 | UAT-01 | Phase 2 | Complete |
 | UAT-02 | Phase 2 | Complete |
-| E2E-01 | Phase 3 | Pending |
+| E2E-01 | Phase 3 | Complete |
 | REAL-01 | Phase 4 | Pending |
 | REAL-02 | Phase 4 | Pending |
 | REAL-03 | Phase 4 | Pending |
 | SUBM-01 | Phase 5 | Pending |
-| PLAN-01 | Phase 3 | Pending |
+| PLAN-01 | Phase 3 | Complete |
 | PLAN-02 | Phase 5 | Pending |
 
 **Coverage:**

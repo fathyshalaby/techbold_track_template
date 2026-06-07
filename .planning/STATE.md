@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Professional Skeleton Rescue Follow-up
 status: planning
-last_updated: "2026-06-07T04:00:15.654Z"
+last_updated: "2026-06-07T04:21:41Z"
 last_activity: 2026-06-07
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 5
-  completed_plans: 2
-  percent: 40
+  completed_plans: 3
+  percent: 60
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-07)
 
 **Core value:** Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs, safely and auditably
-**Current focus:** Phase 3 - Vertical-Slice Coverage
+**Current focus:** Phase 4 - Real Integration Validation
 
 ## Current Position
 
-Phase: 3 - Vertical-Slice Coverage
+Phase: 4 - Real Integration Validation
 Plan: -
 Status: Ready to plan
-Last activity: 2026-06-07 - Phase 2 completed
+Last activity: 2026-06-07 - Phase 3 completed
 
 ## Performance Metrics
 
@@ -63,16 +63,14 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- Manual fresh-clone `docker compose up --build` check.
 - Manual real Phoenix/SSH/LLM practice VM validation.
 - Demo video recording and external submission form.
-- Define and execute v1.2 follow-up requirements from the remaining validation debt.
 - Phase 1 completed clean-clone Docker Compose validation after fixing backend container startup.
 - Phase 2 completed browser-level UAT after fixing built-in mock agent outputs.
+- Phase 3 completed deterministic vertical-slice coverage and fixed JSONL mock-store query/update drift exposed by that coverage.
 
 ### Blockers/Concerns
 
-- Manual fresh-clone `docker compose up --build` validation remains to be run outside this automated pass.
 - Real Phoenix/SSH/LLM practice VM validation remains to be run with credentials and keys.
 
 ## Deferred Items
@@ -98,4 +96,4 @@ Resume file: .planning/STATE.md
 
 ## Operator Next Steps
 
-- Continue autonomous execution with Phase 3.
+- Continue autonomous execution with Phase 4.
