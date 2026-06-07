@@ -1,11 +1,16 @@
 # Service Desk Autopilot
 
-## Current State
+## Current Milestone: v1.1 Professional Skeleton Rescue
 
-**Shipped:** v1.0 milestone on 2026-06-07
-**Archive:** `.planning/milestones/v1.0-ROADMAP.md`
-**Audit:** `.planning/milestones/v1.0-MILESTONE-AUDIT.md`
-**Status:** Built and verified in automated/mock mode; manual live validation remains.
+**Goal:** Make the existing skeleton clean, connected, and buildable by removing contract drift, deleting or wiring duplicate UI surfaces, and aligning tooling baselines.
+
+**Target features:**
+
+- Restore deterministic end-to-end event contracts between backend run events and frontend SSE consumers.
+- Consolidate frontend execution into a single mounted path and remove duplicate surface trees.
+- Normalize package manager, Docker, and CI behavior across backend and frontend.
+
+**Current focus:** Defining requirements and creating a phase roadmap for the v1.1 skeleton rescue milestone.
 
 ## What This Is
 
@@ -17,7 +22,7 @@ The AI never acts on its own. It proposes structured outputs; the backend owns s
 
 Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs, safely and auditably. The highest-value proof is a real run that restores customer benefit, survives persistence checks, and leaves a complete redacted audit trail.
 
-## Validated In v1.0
+## Validated in v1.0
 
 - Node 22 + Hono + TypeScript backend with Zod-validated environment configuration.
 - React 18 + Vite frontend technician workspace.
@@ -31,11 +36,9 @@ Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs
 - Deterministic orchestrator state machine with approval, rejection, blocked-command, validation, and activity handoff paths.
 - Run API, approval API, SSE stream, and activity draft/submit routes.
 - Frontend ticket list, run view, approval card, audit timeline, retry/abort controls, and activity editor.
-- Root `pnpm test`, README, MIT license, REPORT.md, and reviewed secret scan.
+- Root `pnpm test`, README, REPORT, and reviewed secret scan.
 
 ## Manual Validation Debt
-
-These items were accepted at milestone close and are tracked in the milestone audit:
 
 - Fresh-clone `docker compose up --build` check.
 - Real Phoenix token validation.
@@ -45,13 +48,25 @@ These items were accepted at milestone close and are tracked in the milestone au
 - Demo video recording and external submission form.
 - Passwordless `sudo -n true` confirmation for `azureuser`.
 
+## Active Requirements
+
+- [ ] **EVNT-01**: Canonicalize SSE event names and payload shapes across backend and frontend.
+- [ ] **EVNT-02**: Implement a shared event contract for run, approval, validation, and activity state updates.
+- [ ] **FEIN-01**: Remove or migrate disconnected frontend surfaces into the mounted App flow.
+- [ ] **FEIN-02**: Ensure the runtime entry path exposes the full technician flow with no dead feature branches.
+- [ ] **TOOL-01**: Align package-manager assumptions and lockfile strategy across backend, frontend, and CI.
+- [ ] **TOOL-02**: Normalize Docker scripts and image builds for deterministic frontend + backend setup.
+- [ ] **TOOL-03**: Add deterministic monorepo scripts for install, lint, test, and build.
+- [ ] **STOR-01**: Make persistence mode selection explicit at startup.
+- [ ] **STOR-02**: Define documented fallback behavior when durable persistence is unavailable.
+
 ## Out Of Scope
 
 - Fully autonomous remediation.
 - Multi-tenant auth, RBAC, SSO.
 - WebSockets, queues, Redis, background workers, Kubernetes, or microservices.
 - RAG/vector database.
-- Analytics, charts, theming, or design-system polish beyond the demo path.
+- Analytics, charts, or design-system polish beyond the primary flow.
 - A generic Linux admin assistant beyond the incident ticket.
 - Setting ticket status `DONE` as a scoring gate.
 
@@ -66,11 +81,31 @@ These items were accepted at milestone close and are tracked in the milestone au
 | SSE instead of WebSockets | One-way event stream matches the product flow | Good |
 | SQLite with JSONL fallback | Durable local audit trail without extra services | Good |
 | Audit trail is the activity source | Prevents invented actions in Phoenix reports | Good |
+| Event and store repair work is now a controlled v1.1 objective | Current progress shows risk concentration outside the happy path | Pending |
+
+## Evolution
+
+PROJECT.md evolves at phase transitions and milestone boundaries.
+
+### After each phase transition
+
+1. Requirements invalidated? Move to Out of Scope with reason.
+2. Requirements validated? Move to Validated with phase reference.
+3. New requirements emerged? Add to Active.
+4. Decisions to log? Add to Key Decisions.
+5. "What This Is" still accurate? Update if drifted.
+
+### After each milestone
+
+1. Full review of all sections.
+2. Core Value check to confirm priority is still right.
+3. Audit Out of Scope and keep reasons current.
+4. Update context with what changed in usage and validation state.
 
 ## Next Milestone Goals
 
-No active next milestone is defined. If work continues, start with `$gsd-new-milestone` and decide whether the next slice is live validation hardening, browser E2E coverage, or v2 human-control boosters.
+- v1.1 Professional Skeleton Rescue is now active and focused on skeleton rescue completion.
+- After v1.1, start manual live validation milestones once the core contract and tooling baseline are clean.
 
 ---
-*Last updated: 2026-06-07 after v1.0 milestone completion*
-
+*Last updated: 2026-06-07 after v1.1 milestone start*
