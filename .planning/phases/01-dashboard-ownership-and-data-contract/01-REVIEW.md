@@ -1,7 +1,7 @@
 ---
 phase: "01-dashboard-ownership-and-data-contract"
-status: findings
-reviewed_at: "2026-06-07T08:29:11+02:00"
+status: clean
+reviewed_at: "2026-06-07T08:37:15+02:00"
 depth: standard
 files_reviewed:
   - .env.example
@@ -16,6 +16,7 @@ files_reviewed:
   - apps/backend/src/tests/dashboard.test.ts
   - apps/backend/src/tests/runs.test.ts
   - apps/backend/src/tests/sse-audit-symmetry.test.ts
+  - apps/backend/src/tests/activity.test.ts
   - apps/dashboard/Dockerfile
   - apps/dashboard/app/dashboard/activity/page.tsx
   - apps/dashboard/app/dashboard/approvals/page.tsx
@@ -82,43 +83,38 @@ files_reviewed:
   - packages/contracts/tsconfig.json
 findings:
   critical: 0
-  warning: 3
-  info: 1
-  total: 4
+  warning: 0
+  info: 0
+  total: 0
 ---
 
-# Phase 01 Code Review
+# Phase 01 Code Review Re-Review
 
 ## Findings
 
-### Warning: activity draft storage does not enforce redaction at the store boundary
+No unfixed critical, warning, or info defects found in the Phase 01 scope.
 
-- File/line: `apps/backend/src/store/audit.ts:294`
-- Impact: `appendAuditEvent`, `appendCommandResult`, and `appendObservation` all redact at write time, but `saveActivityDraft` stores its five UI-visible/activity fields directly. The current draft route may redact before calling it, but this public store function is also used from tests and can be called by future code with unredacted model, technician, or audit-derived text. That would persist secrets and expose them through `GET /api/runs/:runId`, dashboard activity summaries, or Phoenix submission, violating the project rule to redact before audit, UI, or model context.
-- Suggested fix: apply `redactSecrets` to `summary`, `rootCause`, `actionsTaken`, `commandsSummary`, and `validationResult` inside `saveActivityDraft`, and add a regression test that direct calls cannot persist token/key/password-looking strings.
+## Prior Warning Verification
 
-### Warning: API documentation is out of sync with shared contracts and dashboard calls
+- Activity draft redaction is resolved. `saveActivityDraft` now redacts `summary`, `rootCause`, `actionsTaken`, `commandsSummary`, and `validationResult` at the store boundary before inserting into `activity_drafts` (`apps/backend/src/store/audit.ts:294`). The regression test writes secret-looking values directly through `saveActivityDraft`, reloads the persisted draft, and asserts the raw token, password, API key, bearer value, and secret are absent (`apps/backend/src/tests/activity.test.ts:131`).
+- API documentation is aligned for the previously flagged contract drift. `docs/API.md` now uses canonical source labels from `packages/contracts/src/tickets.ts`, documents the snake_case pending approval shape returned by `apps/backend/src/routes/runs.ts`, and documents camelCase activity submit overrides with a `200` response. I also inspected `apps/backend/src/routes/activity.ts` as supporting source for the submit field casing, Phoenix snake_case translation, and status.
+- The dashboard Docker runtime is hardened. The final stage copies runtime files with `--chown=bun:bun` and sets `USER bun` before `CMD ["bun", "run", "start"]` (`apps/dashboard/Dockerfile:24`).
 
-- File/line: `docs/API.md:83`, `docs/API.md:130`, `docs/API.md:157`
-- Impact: The docs describe source labels as `live`, `mock`, `seed`, and `deferred`, but the shared contract exports `live-backend`, `mock-backend`, `seed-data`, and `deferred` in `packages/contracts/src/tickets.ts:1`. The `POST /api/runs/:runId/next` example shows camelCase approval fields, while the returned pending approval is the store/contract shape with fields such as `proposed_command` and `risk_level` (`apps/backend/src/routes/runs.ts:194`, `packages/contracts/src/runs.ts:11`). The activity submit example shows snake_case fields and `201`, while the dashboard client sends camelCase fields from `apps/dashboard/lib/api.ts:125`. Consumers following the docs will build against the wrong contract.
-- Suggested fix: update `docs/API.md` to use the exact exported contract names and route response shapes, including canonical `SourceLabel` values, approval field casing, activity submit field casing, and the implemented success status.
+## Regression Scan
 
-### Warning: dashboard image does not explicitly drop root privileges
+- Re-scanned dashboard action wiring and found main-path buttons and links call backend helpers or navigate to real dashboard routes.
+- Re-scanned dashboard imports for ownership leakage. The dashboard continues to call typed HTTP/SSE helpers and does not import backend Phoenix, SSH, model, safety, store, or audit internals.
+- Re-scanned source labels, pending approval field casing, activity submit field casing, SSE event sharing, dashboard placeholder/fake metric bans, and redaction boundaries. No new warning-level defects were found.
+- Accepted note: the root `dev:frontend` alias intentionally points at the primary Next.js dashboard, while `dev:vite` keeps the temporary Vite fallback. No concrete behavioral break was found from that ownership decision.
 
-- File/line: `apps/dashboard/Dockerfile:20`
-- Impact: The final dashboard runtime stage copies the built app and starts `bun run start`, but there is no `USER` directive or ownership adjustment. If the base image default is root, the primary UI container runs as root, which weakens Docker least-privilege posture and is inconsistent with the root-hardening expectations called out for this project.
-- Suggested fix: add an explicit non-root runtime user in the final stage, for example `USER bun`, and make copied files readable by that user with `COPY --chown=bun:bun` or equivalent.
+## Verification Evidence
 
-### Info: root command aliases conflict with the provided AGENTS command contract
-
-- File/line: `package.json:15`, `package.json:17`, `docs/README.md:16`
-- Impact: The supplied AGENTS.md instructions still describe `apps/frontend` as the React/Vite frontend and `bun run dev:frontend` as port 5173, while the root package now maps `dev:frontend` to the Next.js dashboard on port 3000 and moves Vite to `dev:vite`. This may be an intentional Phase 01 ownership change, but it leaves operator instructions split between old and new names.
-- Suggested fix: reconcile the AGENTS instructions with the Phase 01 dashboard ownership decision, or keep `dev:frontend` on the Vite app and use `dev:dashboard` for the Next.js dashboard.
-
-## Scope Notes
-
-- Backend ownership boundary: the dashboard calls typed backend HTTP/SSE helpers and does not import Phoenix, SSH, model, safety, store, or audit internals.
-- SSE sharing: backend and dashboard both consume `SSE_EVENT_TYPES` from `@techbold/contracts`; the contract symmetry test covers this.
-- Dashboard behavior: listed buttons and links on the main path call real routes or navigate to real page files. No disconnected action handlers were found.
-- Sample content: tests and source scan cover forbidden placeholder dashboard content, fake metrics/charts, throughput, conversion, revenue, and lorem content on the main path.
-- Verification: `bun run check` passed, including Biome, typecheck, contracts/backend/dashboard/frontend tests, dashboard and Vite builds, and artifact guard.
+- `git show --stat --oneline --decorate --no-renames 84a1ea66c74940f02210dae4712096eca087e495` inspected the fix commit scope.
+- `bun run --filter techbold-track-backend test src/tests/activity.test.ts src/tests/runs.test.ts src/tests/dashboard.test.ts src/tests/sse-audit-symmetry.test.ts src/tests/app.test.ts` passed: 5 test files, 42 tests.
+- `bun run --filter @techbold/contracts test` passed: 1 test file, 5 tests.
+- `bun run --filter techbold-track-dashboard test` passed: 1 test file, 8 tests.
+- `bun run --filter techbold-track-frontend test` passed: 1 test file, 2 tests. Vite emitted existing deprecation warnings, but tests passed.
+- `bun run check` passed: Biome checked 153 files, all workspace typechecks passed, contracts/backend/dashboard/frontend tests passed, dashboard and Vite production builds passed, and artifact guard passed.
+- `docker build -f apps/dashboard/Dockerfile -t techbold-dashboard-review:phase01 .` passed.
+- `docker image inspect techbold-dashboard-review:phase01 --format '{{.Config.User}} {{json .Config.Cmd}} {{json .Config.WorkingDir}}'` returned `bun ["bun","run","start"] "/app/apps/dashboard"`.
+- `docker run --rm --entrypoint sh techbold-dashboard-review:phase01 -lc 'id -u; id -g; whoami; test -r /app/apps/dashboard/package.json; test -r /app/apps/dashboard/.next/BUILD_ID; stat -c "%U:%G %a %n" /app/apps/dashboard/package.json /app/apps/dashboard/.next/BUILD_ID'` returned UID 1000, GID 1000, user `bun`, and readable `bun:bun` files.
