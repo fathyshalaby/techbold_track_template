@@ -79,6 +79,7 @@ export function updateApprovalStatus(
     status: string;
     editedCommand?: string;
     finalCommand?: string;
+    riskLevel?: string;
     technicianReason?: string;
     decidedAt?: string;
     executedAt?: string;
@@ -86,11 +87,12 @@ export function updateApprovalStatus(
 ): void {
   const db = getDb();
   db.run(
-    'UPDATE command_approvals SET status = ?, edited_command = COALESCE(?, edited_command), final_command = COALESCE(?, final_command), technician_reason = COALESCE(?, technician_reason), decided_at = COALESCE(?, decided_at), executed_at = COALESCE(?, executed_at) WHERE id = ?',
+    'UPDATE command_approvals SET status = ?, edited_command = COALESCE(?, edited_command), final_command = COALESCE(?, final_command), risk_level = COALESCE(?, risk_level), technician_reason = COALESCE(?, technician_reason), decided_at = COALESCE(?, decided_at), executed_at = COALESCE(?, executed_at) WHERE id = ?',
     [
       update.status,
       update.editedCommand ?? null,
       update.finalCommand ?? null,
+      update.riskLevel ?? null,
       update.technicianReason ?? null,
       update.decidedAt ?? null,
       update.executedAt ?? null,
@@ -122,8 +124,12 @@ export function appendCommandResult(
       approvalId,
       redactSecrets(result.command),
       result.exitCode,
-      result.stdoutRedacted,
-      result.stderrRedacted,
+      // Defence-in-depth: redact here too, not only at the caller. redactSecrets
+      // is idempotent, so re-redacting already-clean text is harmless — but a
+      // future caller that forgets to pre-redact can't leak a secret into the
+      // audit DB (the C-score source of truth).
+      redactSecrets(result.stdoutRedacted),
+      redactSecrets(result.stderrRedacted),
       result.durationMs,
       result.timedOut ? 1 : 0,
       now,
@@ -142,9 +148,11 @@ export function appendObservation(
   const db = getDb();
   const id = `obs_${ulid()}`;
   const now = new Date().toISOString();
+  // Defence-in-depth: redact here too. Observations feed the model and the
+  // activity draft, so an un-redacted write would leak into both. Idempotent.
   db.run(
     'INSERT INTO observations (id, run_id, source, content, created_at) VALUES (?, ?, ?, ?, ?)',
-    [id, runId, source, content, now],
+    [id, runId, source, redactSecrets(content), now],
   );
   return ObservationSchema.parse(db.get('SELECT * FROM observations WHERE id = ?', [id]));
 }

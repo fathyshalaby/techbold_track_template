@@ -596,6 +596,36 @@ the freeze. The rest (deck, demo pipeline, Azure endpoint, safety-cases corpus) 
 
 ---
 
+## Integration Audit — full wired-together system (4 parallel adversarial agents + manual verification)
+
+After all 7 phases landed, the per-phase passes couldn't see cross-component bugs, so we audited the **wired-together** system end-to-end (orchestrator ⇄ safety ⇄ SSH ⇄ store ⇄ routes ⇄ SSE) and repaired every confirmed finding. All fixes verified: **494 tests pass (+19 new), tsc clean.**
+
+### 🔴 HIGH — fixed
+1. **Ticket closed DONE without a validated fix** (`routes/activity.ts`) — submit unconditionally `setStatus(DONE)`, but `WAITING_FOR_ACTIVITY_REVIEW` is reachable via the MAX_STEPS cap / NOT_FIXED loop with no validation → over-claimed resolution (a C hard-fail). **Fix:** gate DONE on a recorded `validation.complete` = VERIFIED/LIKELY_FIXED; otherwise create the activity but leave the ticket OPEN and audit `ticket.left_open_unvalidated`. +2 tests.
+2. **Approved command executed on aborted/terminal/wrong-phase runs** (`ai/orchestrator.ts`) — the executor ran even when `reduce()` refused the transition. **Fix:** only execute when the reducer actually entered `EXECUTING_COMMAND`.
+3. **Agents diagnosed blind** (`ai/orchestrator.ts`, `routes/runs.ts`) — agents got only `Ticket #id — system:host`, never the symptom (caps B). **Fix:** seed the ticket title/description/priority as a `phoenix` observation at run creation; every agent + `run.started` payload now carry it.
+4. **Secret-exposure via cloud/cred files** (`safety/command-policy.ts` + `safety/redaction.ts`) — `~/.aws/credentials`, `.pgpass`, `.netrc`, `.kube/config`, root dotfiles weren't blocked, and redaction missed crypt hashes / vendor token prefixes / AWS secret keys. **Fix:** verb-independent path denials + new redaction patterns.
+
+### 🟠 MEDIUM — fixed
+5. **Edited command's risk not persisted** — `updateApprovalStatus` now stores the edited/final command + recomputed risk; the approve response returns the real (re-classified) risk level.
+6. **No transaction around persist** — result + approval-status + observation/audit/phase now commit atomically via a new `db.transaction()` (sqlite) / no-op (jsonl).
+7. **JSONL fallback was silently non-durable** — `getDb()` now refuses to boot on the in-memory fallback in non-mock mode (loud fail beats a vanishing audit trail).
+8. **Live SSE emitted un-redacted payloads** — the live frame is now `redactSecrets`-wrapped (the DB copy was already redacted).
+9. **Approval double-execute race** — an in-flight `Set` claim makes the approve handler an atomic single-run.
+10. **Newline / `&` segment-split bypass** — `normalizeCommand` treats newlines as separators and `splitSegments` splits on a single `&`, so end-anchored rules (e.g. `su -`) can't be evaded.
+11. **Fix exit code ignored before validating** — a fix with non-zero exit / timeout now routes back to TRIAGING (`fix.failed`) instead of being "validated".
+12. **Append-only only on `audit_events`** — extended the no-update/no-delete triggers (and the JSONL guard) to `command_results` and `observations`.
+13. **`sudo`→shell with intervening flags** (`sudo -u root bash`, `--login`) now blocked, without false-positiving `sudo apt install bash-completion`.
+14. **`find -exec rm` / `xargs rm`** destructive forms now blocked (the `-delete`-only rule missed them).
+15. **Activity submit overrides** are now audited (`activity.fields_overridden`) so any divergence from the audit-grounded draft is on the record.
+16. **Redaction defense-in-depth** — `appendCommandResult`/`appendObservation`/`formatObservation` redact internally (idempotent), not just at the caller.
+
+### 🟡 LOW / cleanup — fixed
+- SSH timeout now kills the remote process (`signal('KILL')`) and returns exit 124 (was -1). `env.getEnv()` throws instead of `process.exit` (bootstrap handles the exit); `SSH_PRIVATE_KEY_PATH` required in real SSH mode (no `your-key.pem` default). `app.onError` wired to the unit-tested `errorHandler` (dead duplicate removed). `/next` + `/abort` return 409 on a finished run. Ticket-id routes use `Number()` (reject `5abc`). Most-recent pending approval surfaced deterministically.
+- **Deferred (low value / would churn stable tests):** `bash -lc` → `--noprofile --norc` (kept); per-approval `kind` column (the in-flight lock + state machine already serialise execution).
+
+---
+
 ## Cross-phase open items (carry forward)
 - ~~Missing technician UI~~ ✅ **built** (`4778e89`) — needs a browser smoke against a running backend.
 - ~~SSE event-name drift~~ ✅ **fixed** (`dad9810`, wildcard channel).
@@ -621,4 +651,4 @@ the freeze. The rest (deck, demo pipeline, Azure endpoint, safety-cases corpus) 
 
 ---
 
-*Last updated: Fresh-eyes full-repo audit — built the technician UI (frontend was a stub), fixed SSE event-name drift (wildcard channel), removed dead tool stubs. Backend 475 pass + tsc clean + CI ✅; frontend tsc + vite build pass. Remaining: browser-smoke the UI + the real docker compose + VM/ERP smoke. Append a new section per phase as it is audited.*
+*Last updated: Integration audit of the full wired-together system — 16 cross-component findings repaired (ticket-DONE-without-validation, exec-after-abort, agents-diagnose-blind, cloud-cred secret exposure, edited-risk persistence, persist transaction, durable-fallback guard, SSE redaction, approval race, newline/`&` bypass, failed-fix routing, append-only on evidence tables, sudo/find-exec/xargs deny rules, override auditing, redaction defense-in-depth, SSH/env/route hardening). Backend 494 pass (+19) + tsc clean. Remaining: browser-smoke the UI + real docker compose + VM/ERP smoke. Append a new section per phase as it is audited.*

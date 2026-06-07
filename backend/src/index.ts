@@ -3,8 +3,15 @@ import { app } from './app.js';
 import { getEnv } from './env.js';
 
 // Fail fast on startup if any required env vars are missing; PORT is
-// validated/coerced by the env schema (no raw NaN).
-const { PORT } = getEnv();
+// validated/coerced by the env schema (no raw NaN). getEnv() throws on a
+// misconfig — this is the single place that turns that into a clean exit.
+let PORT: number;
+try {
+  ({ PORT } = getEnv());
+} catch (err) {
+  console.error((err as Error).message);
+  process.exit(1);
+}
 
 const server = serve({ fetch: app.fetch, port: PORT });
 

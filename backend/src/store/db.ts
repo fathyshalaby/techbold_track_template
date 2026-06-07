@@ -8,6 +8,9 @@ export type DbAdapter = {
   run(sql: string, params?: unknown[]): void;
   get<T>(sql: string, params?: unknown[]): T | undefined;
   all<T>(sql: string, params?: unknown[]): T[];
+  // Run fn atomically: on SQLite all writes commit together or roll back on
+  // throw, so a crash mid-sequence can't leave a half-written audit trail.
+  transaction(fn: () => void): void;
   mode: StoreMode;
 };
 
@@ -95,6 +98,33 @@ const CREATE_TABLES = `
   BEGIN
     SELECT RAISE(ABORT, 'audit_events is append-only');
   END;
+
+  -- The real evidence (command output + agent-visible observations) is as
+  -- load-bearing for the audit trail as the metadata events, so it is
+  -- append-only too. activity_drafts stays mutable (the submit flag).
+  CREATE TRIGGER IF NOT EXISTS command_results_no_update
+  BEFORE UPDATE ON command_results
+  BEGIN
+    SELECT RAISE(ABORT, 'command_results is append-only');
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS command_results_no_delete
+  BEFORE DELETE ON command_results
+  BEGIN
+    SELECT RAISE(ABORT, 'command_results is append-only');
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS observations_no_update
+  BEFORE UPDATE ON observations
+  BEGIN
+    SELECT RAISE(ABORT, 'observations is append-only');
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS observations_no_delete
+  BEFORE DELETE ON observations
+  BEGIN
+    SELECT RAISE(ABORT, 'observations is append-only');
+  END;
 `;
 
 export function makeJsonlAdapter(): DbAdapter {
@@ -123,10 +153,17 @@ export function makeJsonlAdapter(): DbAdapter {
   return {
     mode: 'jsonl',
 
+    // In-memory + synchronous, so a "transaction" is just running fn; mutations
+    // are already all-or-nothing within a single JS tick.
+    transaction(fn: () => void): void {
+      fn();
+    },
+
     run(sql: string, params: unknown[] = []): void {
-      // Enforce audit_events append-only at the adapter level
-      if (/^\s*UPDATE\s+audit_events\b/i.test(sql) || /^\s*DELETE\s+FROM\s+audit_events\b/i.test(sql)) {
-        throw new Error('audit_events is append-only');
+      // Enforce append-only at the adapter level for the evidence tables.
+      if (/^\s*(?:UPDATE|DELETE\s+FROM)\s+(audit_events|command_results|observations)\b/i.test(sql)) {
+        const m = sql.match(/(audit_events|command_results|observations)/i);
+        throw new Error(`${m?.[1] ?? 'table'} is append-only`);
       }
 
       const table = extractTableName(sql);
@@ -237,16 +274,31 @@ export function getDb(dbPath?: string): DbAdapter {
       all<T>(sql: string, params: unknown[] = []): T[] {
         return db.prepare(sql).all(params) as T[];
       },
+      transaction(fn: () => void): void {
+        db.transaction(fn)();
+      },
     };
   } catch (err) {
-    // Surface WHY SQLite failed AND that the fallback is EPHEMERAL — a silent
-    // degradation to a non-durable store would lose the audit trail (the C-score
-    // source of truth) without the operator noticing.
     const reason = err instanceof Error ? err.message : String(err);
+    // The JSONL fallback is IN-MEMORY (non-durable). That is acceptable only for
+    // offline/mock runs and tests. In a real run the audit trail is the C-score
+    // source of truth, so silently degrading to a store that evaporates on
+    // restart is worse than failing — refuse to boot instead of pretending.
+    const mockEnv = ['MOCK_MODE', 'MOCK_PHOENIX', 'MOCK_SSH', 'MOCK_LLM'];
+    const anyMock = mockEnv.some((k) => {
+      const v = (process.env[k] ?? '').trim().toLowerCase();
+      return ['true', '1', 'yes', 'on'].includes(v);
+    });
+    if (!anyMock) {
+      throw new Error(
+        `[store] SQLite unavailable (${reason}) and not in mock mode. The in-memory ` +
+          'fallback is non-durable and would lose the audit trail — refusing to start. ' +
+          'Fix the native better-sqlite3 build or mount a writable data dir.',
+      );
+    }
     console.warn(
-      `[store] SQLite unavailable (${reason}) — falling back to an IN-MEMORY store. ` +
-        'Run state and the audit trail will NOT survive a restart; fix the native ' +
-        'better-sqlite3 build (or mount a writable data dir) for durable storage.',
+      `[store] SQLite unavailable (${reason}) — falling back to an IN-MEMORY store ` +
+        '(mock mode). Run state and the audit trail will NOT survive a restart.',
     );
     adapter = makeJsonlAdapter();
   }

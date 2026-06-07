@@ -27,7 +27,4 @@ app.route('/api/runs', approvalsRouter);
 app.route('/api/runs', eventsRouter);
 app.route('/api/runs', activityRouter);
 
-app.onError((err, c) => {
-  console.error(err);
-  return c.json({ error: 'internal server error' }, 500);
-});
+app.onError(errorHandler);

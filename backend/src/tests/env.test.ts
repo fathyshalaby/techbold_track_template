@@ -5,6 +5,7 @@ const BASE_ENV = {
   PHOENIX_API_BASE_URL: 'https://phoenix.example.com',
   PHOENIX_API_TOKEN: 'tok_test',
   OPENAI_API_KEY: 'sk-test',
+  SSH_PRIVATE_KEY_PATH: '/keys/id_rsa',
 };
 
 describe('parseEnv', () => {
@@ -15,7 +16,7 @@ describe('parseEnv', () => {
     expect(result.OPENAI_API_KEY).toBe('sk-test');
     expect(result.LLM_PROVIDER).toBe('openai');
     expect(result.LLM_MODEL).toBe('gpt-4o');
-    expect(result.SSH_PRIVATE_KEY_PATH).toBe('/keys/your-key.pem');
+    expect(result.SSH_PRIVATE_KEY_PATH).toBe('/keys/id_rsa');
     expect(result.SSH_USERNAME).toBe('azureuser');
     expect(result.PORT).toBe(8000);
     expect(result.MOCK_MODE).toBe(false);
@@ -48,7 +49,16 @@ describe('parseEnv', () => {
 
   it('does not require OPENAI_API_KEY when MOCK_LLM=true', () => {
     expect(() =>
-      parseEnv({ PHOENIX_API_BASE_URL: 'u', PHOENIX_API_TOKEN: 't', MOCK_LLM: 'true' }),
+      parseEnv({ PHOENIX_API_BASE_URL: 'u', PHOENIX_API_TOKEN: 't', SSH_PRIVATE_KEY_PATH: 'k', MOCK_LLM: 'true' }),
+    ).not.toThrow();
+  });
+
+  it('requires SSH_PRIVATE_KEY_PATH in real SSH mode, but not under MOCK_SSH', () => {
+    expect(() =>
+      parseEnv({ PHOENIX_API_BASE_URL: 'u', PHOENIX_API_TOKEN: 't', OPENAI_API_KEY: 'k' }),
+    ).toThrow(/SSH_PRIVATE_KEY_PATH/);
+    expect(() =>
+      parseEnv({ PHOENIX_API_BASE_URL: 'u', PHOENIX_API_TOKEN: 't', OPENAI_API_KEY: 'k', MOCK_SSH: 'true' }),
     ).not.toThrow();
   });
 

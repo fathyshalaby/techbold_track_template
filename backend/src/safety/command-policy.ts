@@ -46,6 +46,19 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
     pattern: /\bfind\b.*(\/etc|\/var|\/home|\/srv|\/usr|\/boot|\/).*-delete/i,
     reason: 'Recursive find -delete over system directories is forbidden',
   },
+  {
+    ruleName: 'recursive-find-delete',
+    // `find … -exec rm/shred/chmod/chown … {}` and `find … -execdir …` route
+    // around the -delete rule by spawning a destructive command per match.
+    pattern: /\bfind\b[^;&|]*-exec(?:dir)?\s+(rm|shred|chmod|chown|mv|dd)\b/i,
+    reason: 'find -exec with a destructive command is forbidden',
+  },
+  {
+    ruleName: 'recursive-find-delete',
+    // `… | xargs rm/shred/chmod/chown` — the same destructive intent via a pipe.
+    pattern: /\bxargs\b[^;&|]*\b(rm|shred|chmod|chown)\b/i,
+    reason: 'xargs into a destructive command is forbidden',
+  },
 
   // ── Disk wipe ─────────────────────────────────────────────────────────────
   {
@@ -152,8 +165,19 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
   // ── Privilege escalation ──────────────────────────────────────────────────
   {
     ruleName: 'privilege-escalation',
-    pattern: /\bsudo\s+(su|bash|sh|zsh|fish|ksh|csh|tcsh|dash|-i|-s)\b/i,
+    // sudo escalating to an interactive shell, tolerating intervening options
+    // (sudo -u root bash, sudo -H bash, sudo --preserve-env php). The option chain
+    // only consumes flag-like / VAR=val tokens, so a real command in between
+    // (e.g. `sudo apt install bash-completion`) breaks the chain before the shell
+    // word and is NOT a false positive.
+    pattern: /\bsudo\b(?:\s+(?:-[A-Za-z]+|-u\s+\S+|--[A-Za-z-]+(?:=\S+)?|[A-Za-z_]+=\S+))*\s+(?:su|bash|sh|zsh|fish|ksh|csh|tcsh|dash)\b/i,
     reason: 'Gaining an interactive root shell via sudo is forbidden',
+  },
+  {
+    ruleName: 'privilege-escalation',
+    // sudo's own interactive/login shell flags, regardless of intervening tokens.
+    pattern: /\bsudo\b[^;&|]*\s(?:-i|-s|--login|--shell)\b/i,
+    reason: 'sudo interactive/login shell is forbidden',
   },
   {
     ruleName: 'privilege-escalation',
@@ -260,6 +284,20 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
     pattern: /(?:^|[\s\/=])\.env(?:\.[\w-]+)?(?=$|[\s|;&])|\/etc\/environment\b/i,
     reason: 'Reading .env or system environment files (any command) exposes secrets',
   },
+  {
+    ruleName: 'secret-file-access',
+    // Cloud / service credential files (any reader/verb). These are NOT under
+    // /etc or ~/.ssh, so the rules above miss them — yet they leak long-lived
+    // secrets whose shapes redaction can't fully catch. Block at the path.
+    pattern: /\.aws\/credentials\b|\.pgpass\b|\.netrc\b|\.kube\/config\b|\.docker\/config\.json\b|\.git-credentials\b|\.npmrc\b|\.netlify\b|\.azure\/|gcloud\/[^\s]*credentials/i,
+    reason: 'Accessing a cloud/service credential file (any command) is forbidden',
+  },
+  {
+    ruleName: 'secret-file-access',
+    // Reading dotfiles under root's home (tokens, histories, keys live here).
+    pattern: /\/root\/\.[A-Za-z]/i,
+    reason: "Accessing root's home dotfiles is forbidden",
+  },
 
   // ── Hide tracks ───────────────────────────────────────────────────────────
   {
@@ -353,9 +391,12 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
 // This is deliberately simple — no full shell parse, just enough to catch
 // chained dangerous segments like `echo hi; rm -rf /etc`.
 function splitSegments(cmd: string): string[] {
-  // Split on ||, &&, ;, and | — order matters: check two-char ops first
+  // Split on ||, &&, ;, |, and a single & (background) — order matters: the
+  // two-char ops (||, &&) are listed first so they win over | and &. A single &
+  // backgrounds a command, so `safe & rm -rf /etc` is two commands; without it
+  // the dangerous half could hide from a per-segment check.
   return cmd
-    .split(/\|\||&&|;|\|/)
+    .split(/\|\||&&|;|\||&/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
@@ -367,7 +408,13 @@ function normalizeCommand(cmd: string): string {
   // 1. Trim
   let result = cmd.trim();
 
-  // 2. Collapse runs of whitespace to single space
+  // 2a. Treat newlines as command separators. A multi-line command string runs
+  //     as multiple commands on the VM, so a trailing newline must not let an
+  //     end-anchored rule (e.g. `su -$`) be evaded by `su -\nrm -rf /etc`.
+  //     Convert to ';' BEFORE collapsing whitespace so splitSegments() sees them.
+  result = result.replace(/[\r\n]+/g, ' ; ');
+
+  // 2b. Collapse runs of whitespace to single space
   result = result.replace(/\s+/g, ' ');
 
   // 3. Strip ALL quote characters so embedded-quote obfuscation cannot hide a

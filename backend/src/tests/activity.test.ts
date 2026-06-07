@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { makeJsonlAdapter, setDb, resetDb } from '../store/db.js';
 import { createRun } from '../store/runs.js';
 import { updateRunPhase } from '../store/runs.js';
-import { saveActivityDraft, getAuditEvents } from '../store/audit.js';
+import { saveActivityDraft, getAuditEvents, appendAuditEvent } from '../store/audit.js';
 import { activityRouter } from '../routes/activity.js';
 import { AgentUnavailableError } from '../ai/agents/activity-log-generator.js';
 import { PhoenixNetworkError } from '../phoenix/client.js';
@@ -177,12 +177,14 @@ describe('POST /api/runs/:runId/activity/submit', () => {
     expect((await second.json() as Record<string, unknown>)['error']).toBe('activity already submitted');
   });
 
-  it('Test 6c (ticket close): submit sets the ERP ticket status to DONE', async () => {
+  it('Test 6c (ticket close): submit sets the ERP ticket status to DONE when the fix was validated', async () => {
     const phoenixModule = await import('../phoenix/mock.js');
     const setStatusSpy = vi.spyOn(phoenixModule.default.prototype, 'setStatus');
 
     const run = createRun(7, '10.0.0.1:22');
     updateRunPhase(run.id, 'WAITING_FOR_ACTIVITY_REVIEW');
+    // A validated fix is what authorises closing the ticket.
+    appendAuditEvent(run.id, 'validation.complete', 'agent', { status: 'VERIFIED_FIXED' });
     saveActivityDraft(run.id, {
       summary: 's', rootCause: 'rc', actionsTaken: 'a', commandsSummary: 'c', validationResult: 'v',
     });
@@ -194,6 +196,31 @@ describe('POST /api/runs/:runId/activity/submit', () => {
 
     expect(res.status).toBe(200);
     expect(setStatusSpy).toHaveBeenCalledWith(7, 'DONE');
+    setStatusSpy.mockRestore();
+  });
+
+  it('Test 6c-2 (no over-claim): submit does NOT close the ticket when no fix was validated', async () => {
+    const phoenixModule = await import('../phoenix/mock.js');
+    const setStatusSpy = vi.spyOn(phoenixModule.default.prototype, 'setStatus');
+
+    // Reached activity review via the MAX_STEPS cap — no validation.complete event.
+    const run = createRun(8, '10.0.0.1:22');
+    updateRunPhase(run.id, 'WAITING_FOR_ACTIVITY_REVIEW');
+    saveActivityDraft(run.id, {
+      summary: 's', rootCause: 'rc', actionsTaken: 'a', commandsSummary: 'c', validationResult: 'v',
+    });
+
+    const res = await testApp.request(
+      `/api/runs/${run.id}/activity/submit`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+    );
+
+    // The activity (scored record) is still created…
+    expect(res.status).toBe(200);
+    // …but the ticket is left OPEN — no DONE — and the trail records why.
+    expect(setStatusSpy).not.toHaveBeenCalled();
+    const left = getAuditEvents(run.id).some((e) => e.type === 'ticket.left_open_unvalidated');
+    expect(left).toBe(true);
     setStatusSpy.mockRestore();
   });
 

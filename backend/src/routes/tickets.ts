@@ -49,8 +49,9 @@ ticketsRouter.get('/', async (c) => {
 });
 
 ticketsRouter.get('/:id/customer-system', async (c) => {
-  const id = parseInt(c.req.param('id'), 10);
-  if (Number.isNaN(id)) {
+  // Number() (not parseInt) rejects trailing garbage like "5abc"/"5.9" → NaN.
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) {
     return c.json({ error: 'invalid ticket id' }, 400);
   }
 
@@ -75,8 +76,9 @@ ticketsRouter.get('/:id/customer-system', async (c) => {
 });
 
 ticketsRouter.get('/:id', async (c) => {
-  const id = parseInt(c.req.param('id'), 10);
-  if (Number.isNaN(id)) {
+  // Number() (not parseInt) rejects trailing garbage like "5abc"/"5.9" → NaN.
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) {
     return c.json({ error: 'invalid ticket id' }, 400);
   }
 

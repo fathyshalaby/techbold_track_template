@@ -87,6 +87,27 @@ const REDACTION_PATTERNS: RedactionPattern[] = [
     pattern: /([Xx]-[A-Za-z0-9-]*(?:token|key|secret|auth)[A-Za-z0-9-]*\s*:\s*)\S+/gi,
     replacement: '$1«redacted»',
   },
+  {
+    name: 'unix-crypt-hash',
+    // /etc/shadow-style password hashes: $id$[rounds$]salt$hash (md5/sha/yescrypt).
+    // A `cat`/`grep` of shadow is blocked upstream, but a hash can also surface in
+    // backups, dumps, or config — redact it wherever it appears.
+    pattern: /\$(?:1|2[abxy]?|5|6|7|y|gy)\$[^\s:'"]{3,}/g,
+    replacement: '«redacted»',
+  },
+  {
+    name: 'provider-token-prefix',
+    // High-confidence vendor token shapes (GitHub, Slack, OpenAI, Stripe, GitLab,
+    // Google API/OAuth). Distinctive prefixes ⇒ ~zero false positives.
+    pattern: /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{20,}|sk_live_[A-Za-z0-9]{16,}|rk_live_[A-Za-z0-9]{16,}|glpat-[A-Za-z0-9_-]{16,}|AIza[A-Za-z0-9_-]{16,}|ya29\.[A-Za-z0-9_-]{20,})/g,
+    replacement: '«redacted»',
+  },
+  {
+    name: 'aws-secret-access-key',
+    // The 40-char secret that pairs with an AKIA id (only the id was covered).
+    pattern: /\b(aws_secret_access_key\s*[=:]\s*)\S+/gi,
+    replacement: '$1«redacted»',
+  },
 ];
 
 export function redactSecrets(text: string): string {

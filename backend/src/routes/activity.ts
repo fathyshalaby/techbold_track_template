@@ -134,9 +134,18 @@ activityRouter.post('/:runId/activity/submit', async (c) => {
 
   const draft = getActivityDraft(runId);
 
-  const hasOverrides = Object.values(overrides).some((v) => v !== undefined);
+  const overriddenFields = (Object.keys(overrides) as (keyof typeof overrides)[]).filter(
+    (k) => overrides[k] !== undefined,
+  );
+  const hasOverrides = overriddenFields.length > 0;
   if (!draft && !hasOverrides) {
     return c.json({ error: 'no draft to submit' }, 409);
+  }
+
+  // Record any technician edits that diverge from the audit-grounded draft, so the
+  // trail explains why a submitted field differs from what the generator produced.
+  if (hasOverrides) {
+    appendAuditEvent(runId, 'activity.fields_overridden', 'technician', { fields: overriddenFields });
   }
 
   const summary = redactSecrets(overrides.summary ?? draft?.summary ?? '');
@@ -178,16 +187,34 @@ activityRouter.post('/:runId/activity/submit', async (c) => {
   appendAuditEvent(runId, 'activity.submitted', 'system', { activityId: activity.id });
   runEventBus.emit(runId, 'activity.submitted', { activityId: activity.id });
 
-  // Close the ERP ticket — the manual workflow always sets the ticket DONE after
-  // logging the resolution (ARCHITECTURE: COMPLETED → ticket DONE), reached only
-  // after a validated fix. Best-effort: the activity (the scored record) is
-  // already created, so a failed status PATCH must NOT fail the submit (which
-  // would risk a duplicate activity on retry) — audit it and continue.
-  try {
-    await client.setStatus(run.ticket_id, 'DONE');
-    appendAuditEvent(runId, 'ticket.status_updated', 'system', { ticketId: run.ticket_id, status: 'DONE' });
-  } catch {
-    appendAuditEvent(runId, 'ticket.status_update_failed', 'system', { ticketId: run.ticket_id });
+  // Close the ERP ticket ONLY when the fix was actually validated. The run can
+  // reach activity review WITHOUT a validated fix (the MAX_STEPS cap jumps
+  // straight to WAITING_FOR_ACTIVITY_REVIEW, and NOT_FIXED loops can hit it too).
+  // Marking such a ticket DONE would be an over-claim of resolution — the exact
+  // failure the safety/audit rubric punishes. So gate on a recorded validation.
+  const validated = auditEvents.some((e) => {
+    if (e.type !== 'validation.complete') return false;
+    try {
+      const p = JSON.parse(e.payload_json) as { status?: string };
+      return p.status === 'VERIFIED_FIXED' || p.status === 'LIKELY_FIXED';
+    } catch {
+      return false;
+    }
+  });
+
+  if (validated) {
+    // Best-effort: the activity (the scored record) is already created, so a
+    // failed status PATCH must NOT fail the submit (which would risk a duplicate
+    // activity on retry) — audit it and continue.
+    try {
+      await client.setStatus(run.ticket_id, 'DONE');
+      appendAuditEvent(runId, 'ticket.status_updated', 'system', { ticketId: run.ticket_id, status: 'DONE' });
+    } catch {
+      appendAuditEvent(runId, 'ticket.status_update_failed', 'system', { ticketId: run.ticket_id });
+    }
+  } else {
+    // No validated fix — leave the ticket OPEN/PENDING and record why.
+    appendAuditEvent(runId, 'ticket.left_open_unvalidated', 'system', { ticketId: run.ticket_id });
   }
 
   // Mark the specific draft submitted. UPDATE … ORDER BY … LIMIT is non-portable

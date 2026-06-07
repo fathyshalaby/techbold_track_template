@@ -19,7 +19,10 @@ const EnvSchema = z
     OPENAI_API_KEY: z.string().default(''),
     LLM_PROVIDER: z.string().default('openai'),
     LLM_MODEL: z.string().default('gpt-4o'),
-    SSH_PRIVATE_KEY_PATH: z.string().default('/keys/your-key.pem'),
+    // No placeholder default — required in real SSH mode (see superRefine) so a
+    // missing key fails loudly at startup instead of silently targeting a wrong
+    // key at execution time.
+    SSH_PRIVATE_KEY_PATH: z.string().default(''),
     SSH_USERNAME: z.string().default('azureuser'),
     PORT: z.coerce.number().int().positive().default(8000),
     MOCK_MODE: booleanFromString.default(false),
@@ -35,9 +38,11 @@ const EnvSchema = z
     };
     const phoenixReal = !cfg.MOCK_MODE && !cfg.MOCK_PHOENIX;
     const llmReal = !cfg.MOCK_MODE && !cfg.MOCK_LLM;
+    const sshReal = !cfg.MOCK_MODE && !cfg.MOCK_SSH;
     requireVar(phoenixReal, 'PHOENIX_API_BASE_URL', cfg.PHOENIX_API_BASE_URL);
     requireVar(phoenixReal, 'PHOENIX_API_TOKEN', cfg.PHOENIX_API_TOKEN);
     requireVar(llmReal, 'OPENAI_API_KEY', cfg.OPENAI_API_KEY);
+    requireVar(sshReal, 'SSH_PRIVATE_KEY_PATH', cfg.SSH_PRIVATE_KEY_PATH);
   });
 
 export type EnvConfig = z.infer<typeof EnvSchema>;
@@ -61,13 +66,11 @@ let cachedEnv: EnvConfig | undefined;
 // readable message the first time the real config is actually needed.
 export function getEnv(): EnvConfig {
   if (cachedEnv) return cachedEnv;
-  try {
-    cachedEnv = parseEnv(process.env as Record<string, string | undefined>);
-    return cachedEnv;
-  } catch (err) {
-    console.error((err as Error).message);
-    process.exit(1);
-  }
+  // Throw (don't process.exit) so a misconfig surfaces as a catchable error — a
+  // request handler degrades to a 500, tests can assert it, and the top-level
+  // bootstrap (index.ts) is the single place that turns it into an exit.
+  cachedEnv = parseEnv(process.env as Record<string, string | undefined>);
+  return cachedEnv;
 }
 
 export function resolveClientMode(

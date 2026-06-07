@@ -3,6 +3,7 @@ import { ulid } from 'ulid';
 import type { Context } from 'hono';
 import { runEventBus } from './run-event-bus.js';
 import { getAuditEvents } from '../store/audit.js';
+import { redactSecrets } from '../safety/redaction.js';
 
 export const SSE_EVENT_TYPES = [
   'run.started',
@@ -41,13 +42,16 @@ export function createSseStream(c: Context, runId: string) {
     // event the orchestrator emits streams live — no allowlist to drift out of
     // sync with the real event names (the prior fixed list missed several).
     const anyListener = (eventType: string, payload: unknown) => {
+      // The live channel carries the orchestrator's in-memory payload (e.g. an
+      // LLM-authored proposal/rationale), which is NOT pre-redacted like the DB
+      // copy. Redact the serialized frame so no secret can stream to the browser.
       void stream.writeSSE({
-        data: JSON.stringify({
+        data: redactSecrets(JSON.stringify({
           type: eventType,
           runId,
           ts: new Date().toISOString(),
           payload,
-        }),
+        })),
         event: eventType,
         id: ulid(),
       });

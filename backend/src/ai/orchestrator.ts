@@ -32,10 +32,27 @@ export const ROOT_CAUSE_CONFIDENCE_THRESHOLD = 0.8;
 // technician needs the EXIT CODE and STDERR, not just stdout — many failures
 // (nginx -t, OOM=137, "No such file") show only there. Empty streams omitted.
 function formatObservation(r: import('../store/schema.js').CommandResult): string {
-  const parts = [`$ ${r.command}`, `exit_code: ${r.exit_code}${r.timed_out ? ' (timed out)' : ''}`];
-  if (r.stdout_redacted && r.stdout_redacted.trim()) parts.push(`stdout:\n${r.stdout_redacted}`);
-  if (r.stderr_redacted && r.stderr_redacted.trim()) parts.push(`stderr:\n${r.stderr_redacted}`);
+  // The command itself can carry a secret (e.g. `mysql -pHUNTER2`), so redact it
+  // too — stdout/stderr are already redacted upstream, redact again (idempotent).
+  const parts = [`$ ${redactSecrets(r.command)}`, `exit_code: ${r.exit_code}${r.timed_out ? ' (timed out)' : ''}`];
+  if (r.stdout_redacted && r.stdout_redacted.trim()) parts.push(`stdout:\n${redactSecrets(r.stdout_redacted)}`);
+  if (r.stderr_redacted && r.stderr_redacted.trim()) parts.push(`stderr:\n${redactSecrets(r.stderr_redacted)}`);
   return parts.join('\n');
+}
+
+// ── Ticket context ───────────────────────────────────────────────────────────
+// The diagnostic agents must see the customer's reported SYMPTOM, not just an id.
+// The run route seeds it as a 'phoenix'-source observation at creation; read it
+// back here so every agent call (and the run.started payload) carries it. Falls
+// back to the bare id+system string if no context was seeded.
+function readTicketContext(state: OrchestratorState, db: DbAdapter): string {
+  const rows = db.all<{ source: string; content: string }>(
+    'SELECT * FROM observations WHERE run_id = ?',
+    [state.runId],
+  );
+  const ctx = rows.find((r) => r.source === 'phoenix');
+  if (ctx && ctx.content.trim()) return ctx.content;
+  return `Ticket #${state.ticketId} — system: ${state.customerSystemId}`;
 }
 
 export interface OrchestratorState {
@@ -385,7 +402,13 @@ export function createInitialState(run: Run): OrchestratorState {
 
 // ─── Side-effect performer ─────────────────────────────────────────────────────
 
-async function performSideEffects(effects: SideEffect[], _db: DbAdapter): Promise<void> {
+async function performSideEffects(effects: SideEffect[], db: DbAdapter): Promise<void> {
+  applySideEffects(effects, db);
+}
+
+// Synchronous core — so it can run inside a db.transaction() (which requires a
+// sync fn). All operations here are synchronous DB writes + event emits.
+function applySideEffects(effects: SideEffect[], _db: DbAdapter): void {
   for (const effect of effects) {
     switch (effect.type) {
       case 'updateRunPhase':
@@ -440,7 +463,9 @@ async function agentDispatch(
 
   switch (currentState.phase) {
     case 'CREATED': {
-      appendAuditEvent(currentState.runId, 'run.started', 'system', {});
+      appendAuditEvent(currentState.runId, 'run.started', 'system', {
+        ticketDescription: readTicketContext(currentState, db),
+      });
       updateRunPhase(currentState.runId, 'LOADED_CONTEXT');
       updateRunStatus(currentState.runId, 'RUNNING');
       updateRunPhase(currentState.runId, 'TRIAGING');
@@ -483,7 +508,7 @@ async function agentDispatch(
           .map((o) => o.content);
 
         const proposal = await runProblemAnalyzer({
-          ticketDescription: `Ticket #${currentState.ticketId} — system: ${currentState.customerSystemId}`,
+          ticketDescription: readTicketContext(currentState, db),
           observations,
         });
 
@@ -538,7 +563,7 @@ async function agentDispatch(
           .map((o) => o.content);
 
         const proposal = await runProblemSolver({
-          ticketDescription: `Ticket #${currentState.ticketId} — system: ${currentState.customerSystemId}`,
+          ticketDescription: readTicketContext(currentState, db),
           observations,
         });
 
@@ -579,7 +604,7 @@ async function agentDispatch(
           .map((o) => o.content);
 
         const result = await runValidator({
-          ticketDescription: `Ticket #${currentState.ticketId} — system: ${currentState.customerSystemId}`,
+          ticketDescription: readTicketContext(currentState, db),
           observations,
           fixApplied: observations[observations.length - 1] ?? '',
         });
@@ -610,7 +635,7 @@ async function agentDispatch(
           .map((o) => o.content);
 
         const proposal = await runProblemAnalyzer({
-          ticketDescription: `Ticket #${currentState.ticketId} — system: ${currentState.customerSystemId}`,
+          ticketDescription: readTicketContext(currentState, db),
           observations,
         });
 
@@ -705,16 +730,26 @@ export async function advance(
       const { nextState: executingState, sideEffects: approvalEffects } = reduce(state, incomingEvent);
       await performSideEffects(approvalEffects, activeDb);
 
+      // The reducer is the single authority on whether execution may proceed. If
+      // it did NOT enter EXECUTING_COMMAND (run aborted/terminal, or not actually
+      // awaiting approval), we must NOT run anything over SSH — a stale/duplicate
+      // /approve after an abort previously still executed the command.
+      if (executingState.phase !== 'EXECUTING_COMMAND') {
+        return executingState;
+      }
+
       // Env-selected executor (mock|real via resolveClientMode), unless a test
       // injected one. Target host:port comes from the ticket's customer system;
-      // SSH user/key come from env (never hardcoded) with the documented defaults.
+      // SSH user/key come from env (never hardcoded), validated at startup.
       const exec = sshExecutor ?? createSshExecutor();
       const [host, portStr] = run.customer_system_id.split(':');
       const target = {
         host: host ?? run.customer_system_id,
         port: parseInt(portStr ?? '22', 10),
         username: process.env.SSH_USERNAME ?? 'azureuser',
-        privateKeyPath: process.env.SSH_PRIVATE_KEY_PATH ?? '/keys/your-key.pem',
+        // No placeholder default: env.ts requires SSH_PRIVATE_KEY_PATH in real
+        // SSH mode, so a missing key fails loudly at startup, not silently here.
+        privateKeyPath: process.env.SSH_PRIVATE_KEY_PATH ?? '',
       };
 
       const cmdResult = await exec.executeApprovedCommand(
@@ -726,21 +761,19 @@ export async function advance(
       const stdoutRedacted = redactSecrets(cmdResult.stdout);
       const stderrRedacted = redactSecrets(cmdResult.stderr);
 
-      appendCommandResult(runId, incomingEvent.approvalId, {
-        command: incomingEvent.finalCommand,
-        exitCode: cmdResult.exitCode,
-        stdoutRedacted,
-        stderrRedacted,
-        durationMs: cmdResult.durationMs,
-        timedOut: cmdResult.timedOut,
-      });
+      // Persist the EDITED command + its recomputed risk on the approval row so
+      // the audit reflects what actually ran, not the original proposal.
+      const approvalRow = activeDb.get<{ proposed_command: string }>(
+        'SELECT proposed_command FROM command_approvals WHERE id = ?',
+        [incomingEvent.approvalId],
+      );
+      const wasEdited = approvalRow ? approvalRow.proposed_command !== incomingEvent.finalCommand : false;
 
-      updateApprovalStatus(incomingEvent.approvalId, {
-        status: 'EXECUTED',
-        executedAt: new Date().toISOString(),
-      });
+      // A fix command that did not apply (non-zero exit / timeout) must NOT be
+      // routed to the validator as if it worked — re-plan instead.
+      const fixFailed = wasFix && (cmdResult.exitCode !== 0 || cmdResult.timedOut);
 
-      // Transition EXECUTING_COMMAND → OBSERVING
+      // Transition EXECUTING_COMMAND → OBSERVING | VALIDATING
       const commandResultEvent = {
         type: 'command_result' as const,
         approvalId: incomingEvent.approvalId,
@@ -760,7 +793,38 @@ export async function advance(
       };
 
       const { nextState: postState, sideEffects: postEffects } = reduce(executingState, commandResultEvent);
-      await performSideEffects(postEffects, activeDb);
+
+      // Atomic: result row + approval status + observation/audit/phase commit
+      // together (or roll back), so a crash can't leave a half-written trail.
+      activeDb.transaction(() => {
+        appendCommandResult(runId, incomingEvent.approvalId, {
+          command: incomingEvent.finalCommand,
+          exitCode: cmdResult.exitCode,
+          stdoutRedacted,
+          stderrRedacted,
+          durationMs: cmdResult.durationMs,
+          timedOut: cmdResult.timedOut,
+        });
+        updateApprovalStatus(incomingEvent.approvalId, {
+          status: 'EXECUTED',
+          editedCommand: wasEdited ? incomingEvent.finalCommand : undefined,
+          finalCommand: incomingEvent.finalCommand,
+          riskLevel: policyResult.riskLevel,
+          executedAt: new Date().toISOString(),
+        });
+        applySideEffects(postEffects, activeDb);
+      });
+
+      if (fixFailed && postState.phase === 'VALIDATING') {
+        updateRunPhase(runId, 'TRIAGING');
+        appendAuditEvent(runId, 'fix.failed', 'system', {
+          approvalId: incomingEvent.approvalId,
+          exitCode: cmdResult.exitCode,
+          timedOut: cmdResult.timedOut,
+        });
+        return { ...postState, phase: 'TRIAGING' };
+      }
+
       return postState;
     }
 

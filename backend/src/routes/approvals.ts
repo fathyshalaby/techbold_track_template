@@ -16,6 +16,12 @@ export const RejectBodySchema = z.object({
   reason: z.string().min(1),
 });
 
+// Approvals currently executing. The PENDING check + SSH execution span an
+// await, so two near-simultaneous /approve POSTs could both pass the check and
+// double-execute. Node is single-threaded, so this synchronous check-and-add
+// between awaits is an atomic claim that prevents the double run.
+const inFlightApprovals = new Set<string>();
+
 function getApproval(approvalId: string) {
   const row = getDb().get('SELECT * FROM command_approvals WHERE id = ?', [approvalId]);
   if (!row) return undefined;
@@ -48,19 +54,33 @@ approvalsRouter.post('/:runId/approvals/:approvalId/approve', async (c) => {
     return c.json({ error: 'invalid request body' }, 400);
   }
 
+  // Atomically claim the approval so a concurrent duplicate can't double-execute.
+  if (inFlightApprovals.has(approvalId)) {
+    return c.json({ error: 'approval is already being processed' }, 409);
+  }
+  inFlightApprovals.add(approvalId);
+
   const finalCommand = parsed.data.editedCommand ?? approval.proposed_command;
-  const state = await advance(runId, { type: 'command_approved', approvalId, finalCommand });
+  let state;
+  try {
+    state = await advance(runId, { type: 'command_approved', approvalId, finalCommand });
+  } finally {
+    inFlightApprovals.delete(approvalId);
+  }
 
   if (state.phase === 'WAITING_FOR_APPROVAL') {
     return c.json({ error: 'command blocked by safety policy', riskLevel: 'HIGH_RISK_BLOCKED' }, 422);
   }
 
+  // Report the risk level of what ACTUALLY ran. advance() re-classified the
+  // (possibly edited) command and persisted the recomputed level on the row.
+  const executed = getApproval(approvalId);
   const result = getLatestResult(approvalId) ?? null;
   return c.json({
     status: state.status,
     phase: state.phase,
     approvalId,
-    safetyRecheck: { riskLevel: approval.risk_level, allowed: true },
+    safetyRecheck: { riskLevel: executed?.risk_level ?? approval.risk_level, allowed: true },
     result,
   });
 });

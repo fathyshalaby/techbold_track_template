@@ -274,6 +274,43 @@ describe('safety — policy and classifier', () => {
     });
   });
 
+  // ─── Regression: integration-audit bypasses (cred files, find -exec/xargs,
+  //     sudo-with-flags, newline-separated end-anchored evasion) ──────────────
+  describe('audit regression — integration-audit bypasses', () => {
+    it.each([
+      'cat ~/.aws/credentials',            // cloud cred file (not under /etc or ~/.ssh)
+      'cp /home/azureuser/.aws/credentials /tmp/x',
+      'cat .pgpass',
+      'cat ~/.netrc',
+      'cat ~/.kube/config',
+      'cat /root/.bash_history',           // root home dotfile
+      'find /var -name "*.log" -exec rm -rf {} ;', // find -exec destructive
+      'find /srv -execdir shred {} +',
+      'ls /tmp | xargs rm -rf',            // xargs destructive
+      'sudo -u root bash',                 // sudo→shell with intervening flag
+      'sudo -H bash',
+      'sudo --login',
+      'su -\nrm -rf /etc',                 // newline-separated: each line checked
+    ])('blocks "%s"', (cmd) => {
+      const result = validateCommandAgainstPolicy(cmd);
+      expect(result.allowed).toBe(false);
+      expect(result.riskLevel).toBe(RiskLevel.HIGH_RISK_BLOCKED);
+      expect(result.matchedRule).toBeTruthy();
+    });
+  });
+
+  // ─── Guard against over-blocking from the broadened rules above ────────────
+  describe('integration-audit fixes do not over-block legitimate commands', () => {
+    it.each([
+      'sudo apt install bash-completion',  // "bash" appears but not as a sudo shell
+      'sudo systemctl restart nginx',
+      'find /var/log -name "*.gz"',        // find without a destructive -exec
+      'cat /etc/nginx/nginx.conf',
+    ])('does not block "%s"', (cmd) => {
+      expect(validateCommandAgainstPolicy(cmd).riskLevel).not.toBe(RiskLevel.HIGH_RISK_BLOCKED);
+    });
+  });
+
   // ─── Regression: classifyCommand must fail safe when called standalone ─────
   // classifyCommand is exported and may be used WITHOUT the policy gate (e.g. a
   // UI risk badge or an auto-approve tier). Quote-obfuscation and unresolved

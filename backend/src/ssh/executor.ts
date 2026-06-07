@@ -80,10 +80,21 @@ export async function executeApprovedCommand(
       });
     };
 
+    let activeChannel: ClientChannel | undefined;
+
     // Kill the channel and resolve with timedOut=true on overrun — never hang.
     const timer = setTimeout(() => {
       timedOut = true;
-      exitCode = -1;
+      // 124 mirrors coreutils `timeout`, so it never collides with the -1 used
+      // for an exec-channel failure or with a real process exit code.
+      exitCode = 124;
+      // Best-effort: ask the remote to kill the runaway process before we drop
+      // the transport, so it can't keep running on the VM after we move on.
+      try {
+        activeChannel?.signal('KILL');
+      } catch {
+        /* server may not support signals — fall through to client.end() */
+      }
       finalize();
     }, COMMAND_TIMEOUT_MS);
 
@@ -95,6 +106,8 @@ export async function executeApprovedCommand(
         finalize();
         return;
       }
+
+      activeChannel = channel;
 
       channel.on('data', (chunk: Buffer) => {
         if (stdoutLen >= OUTPUT_CAP_BYTES) return;

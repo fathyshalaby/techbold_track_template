@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { advance } from '../ai/orchestrator.js';
 import { createRun, getRunById, updateRunPhase } from '../store/runs.js';
-import { getAuditEvents, getActivityDraft } from '../store/audit.js';
+import { getAuditEvents, getActivityDraft, appendObservation } from '../store/audit.js';
 import { getDb, makeJsonlAdapter, setDb } from '../store/db.js';
 import { resolveClientMode, getEnv } from '../env.js';
 import { PhoenixClient, PhoenixAuthError, PhoenixNotFoundError, PhoenixNetworkError } from '../phoenix/client.js';
@@ -29,7 +29,12 @@ function getPendingApproval(runId: string) {
     'SELECT * FROM command_approvals WHERE run_id = ?',
     [runId],
   );
-  const pending = rows.find((r) => r['status'] === 'PENDING');
+  // Pick the MOST RECENT pending approval. Normally only one is pending, but if a
+  // stale row ever lingered, ordering avoids surfacing the wrong command to the UI.
+  const pending = rows
+    .filter((r) => r['status'] === 'PENDING')
+    .sort((a, b) => String(a['created_at'] ?? '').localeCompare(String(b['created_at'] ?? '')))
+    .at(-1);
   if (!pending) return null;
   const parsed = CommandApprovalSchema.safeParse(pending);
   return parsed.success ? parsed.data : null;
@@ -68,6 +73,15 @@ runsRouter.post('/', async (c) => {
   const customerSystemId = `${system.ip}:${system.port}`;
 
   const run = createRun(ticketId, customerSystemId);
+  // Seed the customer's reported SYMPTOM as a 'phoenix'-source observation so
+  // every agent (diagnose/fix/validate) and the activity generator reason about
+  // the actual incident, not just an id. Redacted inside appendObservation.
+  appendObservation(
+    run.id,
+    'phoenix',
+    `Ticket #${ticket.id}: "${ticket.title}" [priority: ${ticket.priority}] for ${ticket.customer_name}. ` +
+      `Reported symptom: ${ticket.description}`,
+  );
   // Transition CREATED → LOADED_CONTEXT synchronously without calling advance()
   // (advance() auto-recurses through LOADED_CONTEXT → TRIAGING → LLM agent call,
   // which violates the PRD §9 201-response contract)
@@ -116,11 +130,16 @@ runsRouter.get('/:runId', async (c) => {
   });
 });
 
+const TERMINAL_RUN_STATUS = new Set(['COMPLETED', 'FAILED', 'ABORTED']);
+
 runsRouter.post('/:runId/next', async (c) => {
   const { runId } = c.req.param();
   const run = getRunById(runId);
   if (!run) {
     return c.json({ error: 'run not found' }, 404);
+  }
+  if (TERMINAL_RUN_STATUS.has(run.status)) {
+    return c.json({ error: 'run has finished', status: run.status }, 409);
   }
 
   const state = await advance(runId);
@@ -138,6 +157,9 @@ runsRouter.post('/:runId/abort', async (c) => {
   const run = getRunById(runId);
   if (!run) {
     return c.json({ error: 'run not found' }, 404);
+  }
+  if (TERMINAL_RUN_STATUS.has(run.status)) {
+    return c.json({ error: 'run has already finished', status: run.status }, 409);
   }
 
   const state = await advance(runId, { type: 'abort' });
