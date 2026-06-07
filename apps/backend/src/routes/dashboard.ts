@@ -25,10 +25,8 @@ import { getPhoenixClient } from "./runs.js";
 export const dashboardRouter = new Hono();
 
 const LimitQuerySchema = z.object({
-  limit: z.preprocess(
-    (value) => (value === undefined ? 20 : Number(value)),
-    z.number().int().min(1).max(50),
-  ),
+  // Query params arrive as strings; coerce, clamp the range, default to 20.
+  limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
 const TERMINAL_RUN_STATUS = new Set(["COMPLETED", "FAILED", "ABORTED"]);
