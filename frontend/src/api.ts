@@ -30,11 +30,21 @@ export interface Health {
   status: string;
   backend: string;
   llm_provider?: string;
+  case_source?: CaseSourceSelection;
+  erp_source?: "real_erp" | "local_or_mock" | "sandbox_cases";
+  sandbox_case_count?: number;
+  sandbox_available?: boolean;
 }
+
+export type CaseSourceSelection = "real_erp" | "sandbox_cases";
 
 export const api = {
   base: BASE,
   health: () => req<Health>("/health"),
+  caseSource: () =>
+    req<Pick<Health, "case_source" | "erp_source" | "sandbox_case_count" | "sandbox_available">>("/api/case-source"),
+  setCaseSource: (source: CaseSourceSelection) =>
+    req<Health>("/api/case-source", { method: "POST", body: JSON.stringify({ source }) }),
   me: () => req<Employee>("/api/me"),
   tickets: (p: { status?: string; priority?: string; sort?: string } = {}) => {
     const q = new URLSearchParams();

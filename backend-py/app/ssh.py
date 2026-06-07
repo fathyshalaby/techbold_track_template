@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass
 import paramiko
 from paramiko.ssh_exception import AuthenticationException, NoValidConnectionsError
 
+from .case_source import selected_case_source
 from .config import settings
 
 _MAX_OUTPUT = 20000  # cap stdout/stderr to keep audit + prompts bounded
@@ -78,16 +79,25 @@ class SSHRunner:
         self._client: paramiko.SSHClient | None = None
 
     def _candidate_keys(self) -> list[str]:
-        # Try the configured key first, then every other *.pem in SSH_KEY_DIR. This avoids
-        # needing to know which of the per-case keys maps to which VM — we just find the one
-        # that authenticates.
+        # Try the sandbox bench key first when local Docker cases are active, then the
+        # configured key, then the real per-case *.pem keys. This avoids switching env files
+        # between rehearsal VMs and local fake VMs.
         cands: list[str] = []
+        if selected_case_source() == "sandbox_cases":
+            sandbox_key = os.path.join(settings.ssh_key_dir, "bench_incident_key")
+            if os.path.exists(sandbox_key):
+                cands.append(sandbox_key)
         if self.key_path:
-            cands.append(self.key_path)
+            if self.key_path not in cands:
+                cands.append(self.key_path)
         try:
-            for p in sorted(glob.glob(os.path.join(settings.ssh_key_dir, "*.pem"))):
-                if p not in cands:
-                    cands.append(p)
+            patterns = ("**/*.pem", "**/*_key", "**/id_*")
+            for pattern in patterns:
+                for p in sorted(glob.glob(os.path.join(settings.ssh_key_dir, pattern), recursive=True)):
+                    if p.endswith(".pub") or not os.path.isfile(p):
+                        continue
+                    if p not in cands:
+                        cands.append(p)
         except Exception:
             pass
         return cands or [self.key_path]

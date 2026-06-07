@@ -1,10 +1,62 @@
 services:
+  # ---- Optional local Docker broken-VM sandbox (disabled by SANDBOX_CASE_COUNT=0) ----
+  sandbox-seed:
+    build:
+      context: .
+      dockerfile: sandbox/Dockerfile.seed
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SANDBOX_CASE_COUNT: ${SANDBOX_CASE_COUNT:-0}
+      SANDBOX_DOCKER_PRIVILEGED: ${SANDBOX_DOCKER_PRIVILEGED:-true}
+      SANDBOX_SSH_HOST: 127.0.0.1
+    working_dir: /workspace
+    command:
+      - bash
+      - -lc
+      - |
+        case "${SANDBOX_CASE_COUNT:-0}" in
+          ''|*[!0-9]*) echo "invalid SANDBOX_CASE_COUNT=${SANDBOX_CASE_COUNT:-}" >&2; exit 2 ;;
+        esac
+        if [ "${SANDBOX_CASE_COUNT:-0}" -gt 0 ]; then
+          bun run sandbox:up
+        else
+          echo "sandbox seed skipped: SANDBOX_CASE_COUNT=0"
+        fi
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: "no"
+
+  sandbox-phoenix:
+    build: ./backend-py
+    env_file:
+      - path: .env
+        required: false
+    working_dir: /workspace
+    command: ["uvicorn", "mocks.phoenix_mock:app", "--host", "0.0.0.0", "--port", "9000"]
+    environment:
+      PHOENIX_MOCK_DATASET: sandbox
+      SANDBOX_CASE_COUNT: ${SANDBOX_CASE_COUNT:-0}
+      SANDBOX_SSH_HOST: host.docker.internal
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./mocks:/workspace/mocks:ro
+      - ./sandbox:/workspace/sandbox:ro
+
   # ---- Python build (FastAPI + paramiko + openai SDK) — port 8000 ----
   backend-py:
     build: ./backend-py
     env_file:
       - path: .env
         required: false   # copy .env.example -> .env; the stack still starts without it
+    depends_on:
+      sandbox-seed:
+        condition: service_completed_successfully
+      sandbox-phoenix:
+        condition: service_started
     environment:
       SHARED_DIR: /shared
     ports:
@@ -13,7 +65,7 @@ services:
       - ./keys:/keys:ro          # your SSH private key(s) — git-ignored
       - ./shared:/shared:ro      # safety rules + prompts (single source of truth)
     extra_hosts:
-      - "host.docker.internal:host-gateway"   # reach a host-run Phoenix mock / local LLM
+      - "host.docker.internal:host-gateway"   # reach host services / local LLM
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
@@ -27,6 +79,11 @@ services:
     env_file:
       - path: .env
         required: false
+    depends_on:
+      sandbox-seed:
+        condition: service_completed_successfully
+      sandbox-phoenix:
+        condition: service_started
     environment:
       SHARED_DIR: /shared
       PORT: "8001"
@@ -36,7 +93,7 @@ services:
       - ./keys:/keys:ro
       - ./shared:/shared:ro
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:host-gateway"   # reach host services / local LLM
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:8001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s

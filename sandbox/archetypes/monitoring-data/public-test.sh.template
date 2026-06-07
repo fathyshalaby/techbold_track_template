@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+curl -fsS --max-time 3 "http://127.0.0.1:__CUSTOMER_APP_PORT__/health" >/dev/null
+curl -fsS --max-time 3 "http://127.0.0.1:__DASHBOARD_PORT__/api/health" >/dev/null
+before="$(curl -fsS --max-time 3 "http://127.0.0.1:__INGEST_PORT__/metrics/count")"
+sleep 6
+after="$(curl -fsS --max-time 3 "http://127.0.0.1:__INGEST_PORT__/metrics/count")"
+test "${after}" -gt "${before}"
+echo "public test ok"

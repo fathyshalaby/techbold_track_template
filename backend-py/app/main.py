@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import runs
+from .case_source import set_case_source, status as case_source_status
 from .config import settings
 from .erp import ERPError, PhoenixClient
 
@@ -41,7 +42,30 @@ def _guard(fn):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "backend": "python", "llm_provider": settings.llm_provider}
+    return {
+        "status": "ok",
+        "backend": "python",
+        "llm_provider": settings.llm_provider,
+        **case_source_status(),
+    }
+
+
+class CaseSourceBody(BaseModel):
+    source: str
+
+
+@app.get("/api/case-source")
+def get_case_source():
+    return case_source_status()
+
+
+@app.post("/api/case-source")
+def update_case_source(body: CaseSourceBody):
+    try:
+        set_case_source(body.source)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"error": {"code": "case_source_error", "message": str(exc)}})
+    return health()
 
 
 @app.get("/api/me")

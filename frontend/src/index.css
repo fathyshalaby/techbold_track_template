@@ -102,6 +102,14 @@ button { font: inherit; }
 .pane-head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
 
 /* ── Ticket queue ─────────────────────────────────────── */
+.queue-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px; border-bottom: 1px solid var(--line); background: #0a101a;
+}
+.source-title { color: var(--ink); font-size: 13px; font-weight: 600; margin-top: 3px; }
+.source-control { min-width: 0; flex: 1; }
+.source-select { margin-top: 4px; font-weight: 600; }
+.pill.mini { font-size: 10.5px; padding: 3px 8px; flex: none; }
 .filters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .filters label { display: block; }
 .filters .micro { margin-bottom: 4px; }

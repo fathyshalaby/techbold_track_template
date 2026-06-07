@@ -1,0 +1,6 @@
+{
+  "name": "monitoring-data",
+  "services": ["__CUSTOMER_APP_SERVICE__", "__DASHBOARD_SERVICE__", "__INGEST_SERVICE__", "__AGENT_SERVICE__"],
+  "validation": "sudo /opt/hackathon/public-test.sh",
+  "symptom": "Health checks are green, but monitoring samples are not increasing."
+}

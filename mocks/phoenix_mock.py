@@ -15,7 +15,10 @@ testable offline, but the SSH/agent part still needs a real reachable VM.
 from __future__ import annotations
 
 import copy
+import json
+import os
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Query
 from pydantic import BaseModel
@@ -28,6 +31,23 @@ def _iso(dt: datetime) -> str:
 
 
 _NOW = datetime(2026, 6, 6, 12, 0, 0, tzinfo=timezone.utc)
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_DATASET = os.getenv("PHOENIX_MOCK_DATASET", "legacy").strip().lower()
+_SANDBOX_SSH_HOST = os.getenv("SANDBOX_SSH_HOST", "127.0.0.1").strip() or "127.0.0.1"
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(0, value)
+
+
+_SANDBOX_CASE_COUNT = _env_int("SANDBOX_CASE_COUNT", 0)
 
 _TICKETS: dict[int, dict] = {
     7001: {
@@ -73,6 +93,25 @@ _SYSTEMS: dict[int, dict] = {
     7002: {"ip": "203.0.113.11", "port": 22, "username": "azureuser", "os": "Ubuntu 22.04 LTS", "notes": "Backup via systemd timer 'backup.service'."},
     7003: {"ip": "203.0.113.12", "port": 22, "username": "azureuser", "os": "Ubuntu 20.04 LTS", "notes": "App writes large logs under /var/log/app."},
 }
+_INITIAL_LEGACY_TICKETS = copy.deepcopy(_TICKETS)
+
+
+def _load_sandbox_dataset() -> tuple[dict[int, dict], dict[int, dict]]:
+    scenarios_path = _REPO_ROOT / "sandbox" / "scenarios" / "scenarios.json"
+    scenarios = json.loads(scenarios_path.read_text(encoding="utf-8"))
+    tickets: dict[int, dict] = {}
+    systems: dict[int, dict] = {}
+    for scenario in scenarios[:_SANDBOX_CASE_COUNT]:
+        ticket = copy.deepcopy(scenario["ticket"])
+        system = copy.deepcopy(scenario["system"])
+        system["ip"] = _SANDBOX_SSH_HOST
+        tickets[int(ticket["id"])] = ticket
+        systems[int(ticket["id"])] = system
+    return tickets, systems
+
+
+_SANDBOX_TICKETS, _SANDBOX_SYSTEMS = _load_sandbox_dataset()
+_INITIAL_SANDBOX_TICKETS = copy.deepcopy(_SANDBOX_TICKETS)
 
 _EMPLOYEE = {"id": 1001, "firstname": "Max", "lastname": "Mustermann", "username": "m.mustermann", "teamname": "Remote Support"}
 
@@ -83,6 +122,25 @@ _PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}
 def _auth(authorization: str | None) -> None:
     if not authorization or not authorization.startswith("Bearer ") or len(authorization) < 8:
         raise HTTPException(status_code=401, detail="Missing or invalid bearer token")
+
+
+def _use_sandbox() -> bool:
+    return _DATASET == "sandbox"
+
+
+def _tickets() -> dict[int, dict]:
+    return _SANDBOX_TICKETS if _use_sandbox() else _TICKETS
+
+
+def _systems() -> dict[int, dict]:
+    return _SANDBOX_SYSTEMS if _use_sandbox() else _SYSTEMS
+
+
+def _reset_ticket_statuses() -> None:
+    active = _tickets()
+    initial = _INITIAL_SANDBOX_TICKETS if _use_sandbox() else _INITIAL_LEGACY_TICKETS
+    for ticket_id, original in initial.items():
+        active[ticket_id]["status"] = original["status"]
 
 
 @app.get("/api/v1/me")
@@ -99,7 +157,7 @@ def list_tickets(
     authorization: str | None = Header(None),
 ):
     _auth(authorization)
-    items = list(_TICKETS.values())
+    items = list(_tickets().values())
     if status:
         items = [t for t in items if t["status"] == status]
     if priority:
@@ -116,18 +174,21 @@ def list_tickets(
 @app.get("/api/v1/tickets/{ticket_id}")
 def get_ticket(ticket_id: int, authorization: str | None = Header(None)):
     _auth(authorization)
-    if ticket_id not in _TICKETS:
+    active = _tickets()
+    if ticket_id not in active:
         raise HTTPException(status_code=404, detail="ticket not found")
-    return copy.deepcopy(_TICKETS[ticket_id])
+    return copy.deepcopy(active[ticket_id])
 
 
 @app.get("/api/v1/tickets/{ticket_id}/customer-system")
 def get_customer_system(ticket_id: int, authorization: str | None = Header(None)):
     _auth(authorization)
-    if ticket_id not in _SYSTEMS:
+    active_tickets = _tickets()
+    active_systems = _systems()
+    if ticket_id not in active_systems:
         raise HTTPException(status_code=404, detail="ticket not found")
-    t = _TICKETS[ticket_id]
-    return {"ticket_id": ticket_id, "customer_id": t["customer_id"], "system": copy.deepcopy(_SYSTEMS[ticket_id])}
+    t = active_tickets[ticket_id]
+    return {"ticket_id": ticket_id, "customer_id": t["customer_id"], "system": copy.deepcopy(active_systems[ticket_id])}
 
 
 class StatusUpdate(BaseModel):
@@ -137,12 +198,13 @@ class StatusUpdate(BaseModel):
 @app.patch("/api/v1/tickets/{ticket_id}/status")
 def set_status(ticket_id: int, body: StatusUpdate, authorization: str | None = Header(None)):
     _auth(authorization)
-    if ticket_id not in _TICKETS:
+    active = _tickets()
+    if ticket_id not in active:
         raise HTTPException(status_code=404, detail="ticket not found")
     if body.status not in ("OPEN", "PENDING", "DONE"):
         raise HTTPException(status_code=422, detail="invalid status")
-    _TICKETS[ticket_id]["status"] = body.status
-    return copy.deepcopy(_TICKETS[ticket_id])
+    active[ticket_id]["status"] = body.status
+    return copy.deepcopy(active[ticket_id])
 
 
 class ActivityCreate(BaseModel):
@@ -160,7 +222,7 @@ class ActivityCreate(BaseModel):
 @app.post("/api/v1/activities/create", status_code=201)
 def create_activity(body: ActivityCreate, authorization: str | None = Header(None)):
     _auth(authorization)
-    if body.ticket_id not in _TICKETS:
+    if body.ticket_id not in _tickets():
         raise HTTPException(status_code=404, detail="ticket not found")
     activity = {
         "id": 9000 + len(_ACTIVITIES) + 1,
@@ -178,6 +240,12 @@ def create_activity(body: ActivityCreate, authorization: str | None = Header(Non
 def reset(authorization: str | None = Header(None)):
     _auth(authorization)
     _ACTIVITIES.clear()
-    for t in _TICKETS.values():
-        t["status"] = "PENDING" if t["id"] == 7003 else "OPEN"
-    return {"message": "reset complete", "detail": {"activities_cleared": True, "vms_rebooted": True}}
+    _reset_ticket_statuses()
+    return {
+        "message": "reset complete",
+        "detail": {
+            "activities_cleared": True,
+            "dataset": "sandbox" if _use_sandbox() else "legacy",
+            "vms_rebooted": False if _use_sandbox() else True,
+        },
+    }

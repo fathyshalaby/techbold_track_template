@@ -99,8 +99,10 @@ cp tb-hackathon-ssh/*.pem keys/    # keys/ is git-ignored; the SSH runner auto-p
 
 | Variable | Meaning |
 |----------|---------|
-| `PHOENIX_API_BASE_URL`, `PHOENIX_API_TOKEN` | The ERP mock + your team token |
-| `SSH_PRIVATE_KEY_PATH`, `SSH_KEY_DIR`, `SSH_USERNAME` | SSH to the VM (`azureuser`); runner tries every `*.pem` in `SSH_KEY_DIR` until one authenticates |
+| `PHOENIX_API_BASE_URL`, `PHOENIX_API_TOKEN` | Real Phoenix ERP base URL + your team token |
+| `SANDBOX_CASE_COUNT` | Number of local Docker fake-VM tickets to generate and expose (`0-5`); default `0` uses real Phoenix |
+| `SANDBOX_DOCKER_PRIVILEGED` | Run the sandbox fake VMs privileged so Ubuntu systemd behaves correctly in Docker |
+| `SSH_PRIVATE_KEY_PATH`, `SSH_KEY_DIR`, `SSH_USERNAME` | SSH to the VM (`azureuser`); runner tries the configured key, then every `*.pem` under `SSH_KEY_DIR` recursively |
 | `LLM_PROVIDER` | `azure` (default) · `openrouter` · `local` |
 | `AZURE_OPENAI_ENDPOINT` / `_API_KEY` / `_API_VERSION` / `_DEPLOYMENT` | Azure OpenAI `gpt-5.4-nano` |
 | `LOCAL_BASE_URL`, `LOCAL_MODEL` | Local fallback (LM Studio `:1234/v1` / Ollama `:11434/v1`, e.g. `qwen3-coder-30b`) |
@@ -116,6 +118,15 @@ cp tb-hackathon-ssh/*.pem keys/    # keys/ is git-ignored; the SSH runner auto-p
 docker compose up --build
 # frontend → http://localhost:5173 · backend-py → :8000/health · backend-node → :8001/health
 ```
+
+By default Compose uses the real Phoenix ERP tickets from `PHOENIX_API_BASE_URL`. To switch into the
+local Docker fake-VM sandbox, set `SANDBOX_CASE_COUNT=1` in `.env` and run `docker compose up`.
+Compose then builds that many broken Ubuntu containers, exposes them on SSH ports starting at `2201`,
+starts a local Phoenix-compatible sandbox ERP, and the UI shows sandbox tickets starting at `7101`.
+Set the count back to `0` to skip the local sandbox.
+
+When sandbox cases are seeded, the ticket queue's **Case Source** dropdown can switch the running
+backend between real Phoenix and Docker sandbox tickets without restarting Compose.
 
 The frontend talks to `backend-py` by default. To demo the **Node** build, set
 `VITE_API_BASE=http://localhost:8001` (compose `frontend.environment`) and restart the frontend.

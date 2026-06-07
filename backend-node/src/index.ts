@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Context } from "hono";
+import { caseSourceStatus, setCaseSource } from "./caseSource";
 import { config } from "./config";
 import { ERPError, erp } from "./erp";
 import * as runs from "./runs";
@@ -24,7 +25,28 @@ async function handle(c: Context, fn: () => Promise<unknown> | unknown) {
   }
 }
 
-app.get("/health", (c) => c.json({ status: "ok", backend: "node", llm_provider: config.llmProvider }));
+app.get("/health", (c) =>
+  c.json({
+    status: "ok",
+    backend: "node",
+    llm_provider: config.llmProvider,
+    ...caseSourceStatus(),
+  }),
+);
+
+app.get("/api/case-source", (c) => c.json(caseSourceStatus()));
+app.post("/api/case-source", (c) =>
+  handle(c, async () => {
+    const body = await c.req.json();
+    setCaseSource(String(body.source || ""));
+    return {
+      status: "ok",
+      backend: "node",
+      llm_provider: config.llmProvider,
+      ...caseSourceStatus(),
+    };
+  }),
+);
 
 // ---- ERP passthrough ----
 app.get("/api/me", (c) => handle(c, () => erp.me()));

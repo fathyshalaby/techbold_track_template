@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     # ---- Phoenix ERP ----
     phoenix_api_base_url: str = ""
     phoenix_api_token: str = ""
+    sandbox_case_count: int = 0
+    sandbox_phoenix_api_base_url: str = "http://sandbox-phoenix:9000"
 
     # ---- SSH ----
     ssh_private_key_path: str = "/keys/case1_key.pem"
