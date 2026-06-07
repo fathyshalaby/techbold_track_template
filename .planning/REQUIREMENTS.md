@@ -24,9 +24,9 @@ Requirements for the current follow-up milestone. Each maps to one roadmap phase
 
 ### Real Integrations
 
-- [ ] **REAL-01**: Operator can validate Phoenix API access with real credentials or record the exact blocker.
-- [ ] **REAL-02**: Operator can validate SSH `.pem` access and passwordless `sudo -n true` against a practice VM or record the exact blocker.
-- [ ] **REAL-03**: Operator can validate the real LLM orchestrator loop or record the exact blocker.
+- [x] **REAL-01**: Operator can validate Phoenix API access with real credentials or record the exact blocker.
+- [x] **REAL-02**: Operator can validate SSH `.pem` access and passwordless `sudo -n true` against a practice VM or record the exact blocker.
+- [x] **REAL-03**: Operator can validate the real LLM orchestrator loop or record the exact blocker.
 
 ### Submission Handoff
 
@@ -74,9 +74,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UAT-01 | Phase 2 | Complete |
 | UAT-02 | Phase 2 | Complete |
 | E2E-01 | Phase 3 | Complete |
-| REAL-01 | Phase 4 | Pending |
-| REAL-02 | Phase 4 | Pending |
-| REAL-03 | Phase 4 | Pending |
+| REAL-01 | Phase 4 | Complete - blocked by placeholder Phoenix token |
+| REAL-02 | Phase 4 | Complete - blocked by missing key and host |
+| REAL-03 | Phase 4 | Complete - blocked by placeholder LLM key |
 | SUBM-01 | Phase 5 | Pending |
 | PLAN-01 | Phase 3 | Complete |
 | PLAN-02 | Phase 5 | Pending |

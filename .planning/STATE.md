@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Professional Skeleton Rescue Follow-up
 status: planning
-last_updated: "2026-06-07T04:21:41Z"
+last_updated: "2026-06-07T04:24:00Z"
 last_activity: 2026-06-07
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 5
-  completed_plans: 3
-  percent: 60
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-07)
 
 **Core value:** Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs, safely and auditably
-**Current focus:** Phase 4 - Real Integration Validation
+**Current focus:** Phase 5 - Submission and Evidence Handoff
 
 ## Current Position
 
-Phase: 4 - Real Integration Validation
+Phase: 5 - Submission and Evidence Handoff
 Plan: -
 Status: Ready to plan
-Last activity: 2026-06-07 - Phase 3 completed
+Last activity: 2026-06-07 - Phase 4 completed
 
 ## Performance Metrics
 
@@ -68,10 +68,11 @@ Recent decisions affecting current work:
 - Phase 1 completed clean-clone Docker Compose validation after fixing backend container startup.
 - Phase 2 completed browser-level UAT after fixing built-in mock agent outputs.
 - Phase 3 completed deterministic vertical-slice coverage and fixed JSONL mock-store query/update drift exposed by that coverage.
+- Phase 4 completed real integration validation as exact blockers: Phoenix placeholder token, missing SSH key/VM host, and placeholder LLM key.
 
 ### Blockers/Concerns
 
-- Real Phoenix/SSH/LLM practice VM validation remains to be run with credentials and keys.
+- Real Phoenix/SSH/LLM practice VM validation remains blocked until credentials, key material, and VM details are provided.
 
 ## Deferred Items
 
@@ -96,4 +97,4 @@ Resume file: .planning/STATE.md
 
 ## Operator Next Steps
 
-- Continue autonomous execution with Phase 4.
+- Continue autonomous execution with Phase 5.

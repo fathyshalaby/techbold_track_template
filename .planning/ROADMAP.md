@@ -13,7 +13,7 @@ Phase numbering is reset for this milestone.
 - [x] **Phase 1: Fresh-Clone Runtime Validation** - completed 2026-06-07
 - [x] **Phase 2: Browser SSE UAT** - completed 2026-06-07
 - [x] **Phase 3: Vertical-Slice Coverage** - completed 2026-06-07
-- [ ] **Phase 4: Real Integration Validation**
+- [x] **Phase 4: Real Integration Validation** - completed 2026-06-07
 - [ ] **Phase 5: Submission and Evidence Handoff**
 
 | # | Phase | Goal | Requirements | Success Criteria |
@@ -21,7 +21,7 @@ Phase numbering is reset for this milestone.
 | 01 | Fresh-Clone Runtime Validation | Prove the skeleton installs and starts from a clean checkout. | LIVE-01, LIVE-02 | Complete |
 | 02 | Browser SSE UAT | Prove the mounted frontend reflects the primary technician flow and SSE lifecycle. | UAT-01, UAT-02 | Complete |
 | 03 | Vertical-Slice Coverage | Add deterministic coverage for the run, approval, SSE, and activity path. | E2E-01, PLAN-01 | Complete |
-| 04 | Real Integration Validation | Validate or precisely block Phoenix, SSH, and LLM live paths. | REAL-01, REAL-02, REAL-03 | 5 |
+| 04 | Real Integration Validation | Validate or precisely block Phoenix, SSH, and LLM live paths. | REAL-01, REAL-02, REAL-03 | Complete |
 | 05 | Submission and Evidence Handoff | Package demo/submission evidence and clean planning docs. | SUBM-01, PLAN-02 | 4 |
 
 ## Phase Details
@@ -85,7 +85,7 @@ Success criteria:
 5. Mock-mode behavior remains available and clearly separated from live-validation claims.
 
 Plans:
-- [ ] 04-01-PLAN.md - Real integration validation
+- [x] 04-01-PLAN.md - Real integration validation
 
 ### Phase 5: Submission and Evidence Handoff
 
