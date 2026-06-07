@@ -38,7 +38,7 @@ safety re-check on the final command string.
 Requires Docker Desktop (or Docker Engine + Compose plugin).
 
 ```bash
-git clone https://github.com/START-Vienna/techbold_track_template.git
+git clone https://github.com/fathyshalaby/techbold_track_template.git
 cd techbold_track_template
 cp .env.example .env        # mock mode by default, no API keys needed
 docker compose up --build
