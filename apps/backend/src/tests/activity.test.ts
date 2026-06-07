@@ -3,7 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentUnavailableError } from "../ai/agents/activity-log-generator.js";
 import { PhoenixNetworkError } from "../phoenix/client.js";
 import { activityRouter } from "../routes/activity.js";
-import { appendAuditEvent, getAuditEvents, saveActivityDraft } from "../store/audit.js";
+import {
+  appendAuditEvent,
+  getActivityDraft,
+  getAuditEvents,
+  saveActivityDraft,
+} from "../store/audit.js";
 import { makeJsonlAdapter, resetDb, setDb } from "../store/db.js";
 import { createRun } from "../store/runs.js";
 import { updateRunPhase } from "../store/runs.js";
@@ -121,6 +126,27 @@ describe("POST /api/runs/:runId/activity/draft", () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("run not found");
+  });
+
+  it("redacts direct activity draft writes before persistence", () => {
+    const run = createRun(1, "10.0.0.1:22");
+
+    saveActivityDraft(run.id, {
+      summary: "summary token=alpha123",
+      rootCause: "root cause password=hunter2",
+      actionsTaken: "actions api_key=sk-test",
+      commandsSummary: "commands Authorization: Bearer abc.def.ghi",
+      validationResult: "validation secret=mysecret",
+    });
+
+    const draft = getActivityDraft(run.id);
+    expect(draft).toBeDefined();
+    const persisted = JSON.stringify(draft);
+    expect(persisted).not.toContain("alpha123");
+    expect(persisted).not.toContain("hunter2");
+    expect(persisted).not.toContain("sk-test");
+    expect(persisted).not.toContain("abc.def.ghi");
+    expect(persisted).not.toContain("mysecret");
   });
 });
 

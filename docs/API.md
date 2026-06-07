@@ -68,7 +68,7 @@ Read-only dashboard aggregate for the primary Next.js dashboard.
 | Field | Meaning |
 |---|---|
 | `generatedAt` | ISO timestamp for when the aggregate was assembled. |
-| `source` | Dashboard data source label, either `Live backend`, `Mock backend`, `Seed data`, or `Deferred`. |
+| `source` | Dashboard data source label: `live-backend`, `mock-backend`, `seed-data`, or `deferred`. |
 | `health` | Backend health summary: `status`, `mode`, store mode, durability, and source. |
 | `tickets.items` | Ticket summaries from Phoenix or the mock Phoenix client. |
 | `tickets.counts` | Open, pending, done, and total ticket counts derived from the returned ticket set. |
@@ -80,7 +80,7 @@ Read-only dashboard aggregate for the primary Next.js dashboard.
 | `memory` | Read-only memory status. Phase 1 returns a deferred status until later memory phases implement live behavior. |
 | `observability` | Read-only observability status. Phase 1 returns a deferred or health-only status until Phase 5 instrumentation lands. |
 
-Source labels come from the shared `@techbold/contracts` `SourceLabel` contract. `live` renders as `Live backend`, `mock` renders as `Mock backend`, `seed` renders as `Seed data`, and `deferred` renders as `Deferred`.
+Source labels come from the shared `@techbold/contracts` `SourceLabel` contract. `live-backend` renders as `Live backend`, `mock-backend` renders as `Mock backend`, `seed-data` renders as `Seed data`, and `deferred` renders as `Deferred`.
 
 The route is read-only. It does not advance runs, create approvals, execute SSH, write audit rows, submit activity, call the LLM, or mutate Phoenix.
 
@@ -115,7 +115,7 @@ Returns run status/phase, the timeline (audit events), any pending approval, the
 | `customerSystemId` | Backend target identifier, stored without secrets. |
 | `ticket` | Safe ticket summary when available. |
 | `target` | Safe target metadata when available: host/ip, port, username, and OS only. |
-| `source` | `live`, `mock`, `seed`, or `deferred` source label. |
+| `source` | `live-backend`, `mock-backend`, `seed-data`, or `deferred` source label. |
 
 ### ✅ `GET /api/runs/:runId/events` — **SSE** stream
 `Content-Type: text/event-stream`. Each event: `{ "type": string, "runId": string, "ts": ISO8601, "payload": object }`. Event types:
@@ -127,8 +127,12 @@ Runs one planning turn; stops at `WAITING_FOR_APPROVAL` (with `pendingApproval`)
 ```jsonc
 // 200 — paused on an approval
 { "status": "WAITING_FOR_APPROVAL",
-  "pendingApproval": { "id": "appr_01H…", "proposedCommand": "systemctl status status-api --no-pager",
-    "purpose": "…", "expectedSignal": "…", "riskLevel": "SAFE_READ_ONLY", "safetyNotes": "…", "isReadOnly": true } }
+  "pendingApproval": { "id": "appr_01H…", "run_id": "run_01H…",
+    "proposed_command": "systemctl status status-api --no-pager", "edited_command": null,
+    "final_command": null, "purpose": "…", "expected_signal": "…",
+    "risk_level": "SAFE_READ_ONLY", "safety_notes": "…", "status": "PENDING",
+    "technician_reason": null, "created_at": "2026-06-07T00:00:00.000Z",
+    "decided_at": null, "executed_at": null } }
 ```
 
 ### ✅ `POST /api/runs/:runId/approvals/:approvalId/approve`
@@ -154,8 +158,8 @@ Approve (optionally edited) → **safety re-check** → execute over SSH.
 ### ✅ `POST /api/runs/:runId/activity/submit` — submit the activity to Phoenix; then optionally PATCH ticket → `DONE`.
 ```jsonc
 // request — all 5 graded fields
-{ "summary": "…", "root_cause": "…", "actions_taken": "…", "commands_summary": "…", "validation_result": "…" }
-// 201 → the created Phoenix Activity object
+{ "summary": "…", "rootCause": "…", "actionsTaken": "…", "commandsSummary": "…", "validationResult": "…" }
+// 200 → the created Phoenix Activity object
 ```
 
 Approval, activity, and SSE endpoints remain backend-owned and unchanged by the dashboard ownership change. The primary dashboard calls these same endpoints instead of introducing a second workflow.
