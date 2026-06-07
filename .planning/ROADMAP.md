@@ -17,7 +17,7 @@ Nine phases derived directly from the locked build-order critical path in docs/T
 - [ ] **Phase 4: SSH Executor** - ssh2 single-command executor with timeout/redaction/output-cap + mock + preflight hardening
 - [ ] **Phase 5: Agent Loop + Orchestrator** - problem_analyzer, problem_solver, validator agents + deterministic state machine
 - [x] **Phase 6: Run API + Approvals + SSE** - Run CRUD routes, approval/reject/edit with safety re-check, SSE event stream (completed 2026-06-06)
-- [ ] **Phase 7: Activity Generation** - activity_log_generator from audit trail only; draft + submit to Phoenix
+- [x] **Phase 7: Activity Generation** - activity_log_generator from audit trail only; draft + submit to Phoenix (completed 2026-06-07)
 - [ ] **Phase 8: Frontend** - Ticket list, run page, approval card, audit timeline, activity editor
 - [ ] **Phase 9: Tests + Submission Polish** - phoenix-client + orchestrator tests; README; MIT license; REPORT.md; demo video; secret scan
 
