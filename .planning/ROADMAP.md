@@ -5,6 +5,16 @@
 - [x] **v1.0 milestone** - Service Desk Autopilot hackathon submission slice (shipped 2026-06-07)
 - [ ] **v1.1 Professional Skeleton Rescue** - skeleton rescue and buildability (in planning)
 
+### Phase 8: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 7
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 8 to break down)
+
 ## Planned Milestone: v1.1
 
 | # | Phase | Goal | Requirements | Success criteria |
@@ -16,6 +26,7 @@
 | 05 | Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline | [To be planned] | TBD | TBD |
 | 06 | Primary vertical slice: make the main demo flow work end to end | [To be planned] | TBD | TBD |
 | 07 | Primary vertical slice: make the main demo flow work end to end | [To be planned] | TBD | TBD |
+| 08 | Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling | [To be planned] | TBD | TBD |
 
 ## Phase Details
 
@@ -84,6 +95,15 @@ Success criteria:
 1. [To be planned]
 
 ### Phase 7: Primary vertical slice: make the main demo flow work end to end
+
+Goal: [To be planned]
+
+Requirements: TBD
+
+Success criteria:
+1. [To be planned]
+
+### Phase 8: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling
 
 Goal: [To be planned]
 
