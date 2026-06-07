@@ -910,7 +910,31 @@ select:disabled {
 }
 
 .report.markdown {
-  margin-top: 14px;
+  max-width: 78ch;
+  margin-top: 0;
+}
+
+.report.markdown h2 {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.report.markdown h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.report.markdown p,
+.report.markdown li {
+  color: var(--ink-body);
+}
+
+.report.markdown code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Phase rail */
@@ -1261,6 +1285,79 @@ select:disabled {
 /* Activity */
 .section-kicker {
   margin-bottom: 10px;
+}
+
+.report-preview {
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: color-mix(in srgb, var(--surface-2) 78%, var(--panel));
+  color: var(--ink);
+}
+
+.report-preview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.report-preview-head h3 {
+  margin: 3px 0 0;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.activity-editor {
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.activity-editor summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 650;
+  list-style: none;
+}
+
+.activity-editor summary::-webkit-details-marker {
+  display: none;
+}
+
+.activity-editor summary::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 140ms ease;
+}
+
+.activity-editor[open] summary::before {
+  transform: rotate(45deg);
+}
+
+.activity-editor summary:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--focus) 32%, transparent);
+}
+
+.activity-editor-body {
+  padding: 0 12px 12px;
 }
 
 .field {

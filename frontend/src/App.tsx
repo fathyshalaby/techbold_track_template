@@ -94,6 +94,19 @@ type ConnectionState = ConnectionCheck | {
   latency_ms?: number;
   message?: string;
 };
+type ActivityPreviewField = {
+  key: keyof ActivityDraft;
+  title: string;
+};
+
+const ACTIVITY_PREVIEW_FIELDS: ActivityPreviewField[] = [
+  { key: "summary", title: "Summary" },
+  { key: "root_cause", title: "Root cause" },
+  { key: "actions_taken", title: "Actions taken" },
+  { key: "commands_summary", title: "Commands summary" },
+  { key: "validation_result", title: "Validation result" },
+  { key: "description", title: "Description" },
+];
 
 export default function App() {
   const [theme, setTheme] = useState<ThemeMode>(START_THEME);
@@ -531,6 +544,7 @@ function StepNode({ step, pending, runId, busy, setRun, guard }: {
 function ActivityPanel({ run, guard, onSubmitted }: { run: Run; guard: Guard; onSubmitted: () => void }) {
   const [draft, setDraft] = useState<ActivityDraft | null>(run.activity_draft ?? null);
   const [submitted, setSubmitted] = useState(false);
+  const preview = draft ? activityPreviewMarkdown(draft) : "";
 
   async function generate() {
     const d = await guard("drafting activity", () => api.draftActivity(run.id));
@@ -560,12 +574,28 @@ function ActivityPanel({ run, guard, onSubmitted }: { run: Run; guard: Guard; on
       {!draft && <button className="btn primary" onClick={generate}>Generate documentation from the trace</button>}
       {draft && (
         <>
-          {field("summary", "Summary")}
-          {field("root_cause", "Root cause (technical)")}
-          {field("actions_taken", "Actions taken (in order)", 3)}
-          {field("commands_summary", "Commands summary (no secrets)")}
-          {field("validation_result", "Validation result (proof)")}
-          {field("description", "Description")}
+          <div className="report-preview">
+            <div className="report-preview-head">
+              <div>
+                <div className="micro">Final report preview</div>
+                <h3>Technician-facing documentation</h3>
+              </div>
+            </div>
+            {preview
+              ? <MarkdownBlock content={preview} className="report" />
+              : <div className="micro list-state">No report fields have content yet.</div>}
+          </div>
+          <details className="activity-editor">
+            <summary>Edit ERP fields</summary>
+            <div className="activity-editor-body">
+              {field("summary", "Summary")}
+              {field("root_cause", "Root cause (technical)")}
+              {field("actions_taken", "Actions taken (in order)", 3)}
+              {field("commands_summary", "Commands summary (no secrets)")}
+              {field("validation_result", "Validation result (proof)")}
+              {field("description", "Description")}
+            </div>
+          </details>
           {submitted
             ? <div className="banner success inline-banner">Activity submitted · ticket set to DONE</div>
             : <button className="btn primary" onClick={submit}>Submit activity to ERP</button>}
@@ -573,6 +603,45 @@ function ActivityPanel({ run, guard, onSubmitted }: { run: Run; guard: Guard; on
       )}
     </div>
   );
+}
+
+function activityPreviewMarkdown(draft: ActivityDraft): string {
+  return ACTIVITY_PREVIEW_FIELDS
+    .map(({ key, title }) => {
+      const body = formatReportField(draft[key]);
+      return body ? `## ${title}\n\n${body}` : "";
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function formatReportField(value: ActivityDraft[keyof ActivityDraft]): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (!trimmed.includes("\n")) return denseNumberedListToMarkdown(trimmed);
+  if (hasMarkdownStructure(trimmed)) return trimmed;
+  return denseNumberedListToMarkdown(trimmed);
+}
+
+function hasMarkdownStructure(value: string): boolean {
+  return /(^|\n)\s*(#{1,6}\s|\*{0,2}\d+[.)]\s|[-*+]\s|>\s|```|\|.+\|)/.test(value);
+}
+
+function denseNumberedListToMarkdown(value: string): string {
+  const matches = Array.from(value.matchAll(/(?:^|\s)(\d+)\)\s+/g));
+  if (matches.length < 2 || matches[0].index !== 0) return value;
+
+  return matches
+    .map((match, index) => {
+      const next = matches[index + 1];
+      const start = (match.index ?? 0) + match[0].length;
+      const end = next?.index ?? value.length;
+      const item = value.slice(start, end).trim();
+      return item ? `${match[1]}. ${item}` : "";
+    })
+    .filter(Boolean)
+    .join("\n");
 }
 
 function EventLog({ audit }: { audit: AuditEntry[] }) {
