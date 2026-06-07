@@ -2,7 +2,7 @@ import { runEventBus } from "../events/run-event-bus.js";
 import { validateCommandAgainstPolicy } from "../safety/command-policy.js";
 import { redactSecrets } from "../safety/redaction.js";
 import { createSshExecutor } from "../ssh/factory.js";
-import type { SshExecutor } from "../ssh/types.js";
+import type { SshExecutor, SshTarget } from "../ssh/types.js";
 import {
   appendAuditEvent,
   appendCommandResult,
@@ -449,6 +449,92 @@ function readPendingKind(runId: string, db: DbAdapter): PendingKind {
   return "diagnostic";
 }
 
+// Build the SSH target from a run's "host:port" customer_system_id. User/key
+// come from env (never hardcoded); env.ts requires the key in real SSH mode.
+function buildSshTarget(customerSystemId: string): SshTarget {
+  const [host, portStr] = customerSystemId.split(":");
+  return {
+    host: host ?? customerSystemId,
+    port: Number.parseInt(portStr ?? "22", 10),
+    username: process.env.SSH_USERNAME ?? "azureuser",
+    privateKeyPath: process.env.SSH_PRIVATE_KEY_PATH ?? "",
+    keyDir: process.env.SSH_KEY_DIR || undefined,
+  };
+}
+
+// Safe reversible process: when a fix fails, automatically PROPOSE its rollback
+// as the next human-approved step (a one-click "undo"). It is NOT auto-executed -
+// it flows through the same approval + safety re-check pipeline as any command, so
+// the per-command human gate (rubric C) is preserved. Returns true if a rollback
+// approval was staged; false (caller falls back to re-diagnosis) if there is no
+// recorded rollback or the rollback itself is unsafe.
+function proposeRollback(runId: string, db: DbAdapter): boolean {
+  const row = db.get<{ rollback_command: string | null }>(
+    "SELECT rollback_command FROM command_approvals WHERE run_id = ? AND status = 'EXECUTED' AND rollback_command IS NOT NULL AND rollback_command != '' ORDER BY executed_at DESC LIMIT 1",
+    [runId],
+  );
+  const rollbackCommand = row?.rollback_command?.trim();
+  if (!rollbackCommand) return false;
+
+  const policyResult = validateCommandAgainstPolicy(rollbackCommand);
+  if (!policyResult.allowed) {
+    // The undo command is itself blocklisted - never stage it; audit and let the
+    // agent re-plan from scratch instead.
+    appendAuditEvent(runId, "fix.rollback_blocked", "system", {
+      reason: policyResult.reason ?? policyResult.matchedRule ?? "blocked",
+    });
+    runEventBus.emit(runId, "fix.rollback_blocked", {});
+    return false;
+  }
+
+  createPendingApproval(runId, {
+    proposedCommand: rollbackCommand,
+    purpose: "Roll back the failed change (restore the prior state)",
+    expectedSignal: "Previous change reverted; system returns to its pre-fix state",
+    riskLevel: policyResult.riskLevel,
+    safetyNotes: policyResult.reason ?? policyResult.matchedRule ?? "",
+  });
+  // After the rollback runs, re-observe (the fix did not hold) rather than validate.
+  writePendingKind(runId, "diagnostic", db);
+  updateRunPhase(runId, "WAITING_FOR_APPROVAL");
+  appendAuditEvent(runId, "fix.rollback_proposed", "system", { command: rollbackCommand });
+  runEventBus.emit(runId, "approval.required", {
+    proposal: { command: rollbackCommand, purpose: "Roll back the failed change" },
+  });
+  runEventBus.emit(runId, "fix.rollback_proposed", {});
+  return true;
+}
+
+// Info-first: gather read-only ground truth (passwordless-sudo capability, PATH /
+// tooling) ONCE at run start so the agents reason from facts, not assumptions.
+// Best-effort - a preflight failure must never block the run.
+async function runPreflightOnce(
+  state: OrchestratorState,
+  db: DbAdapter,
+  sshExecutor?: SshExecutor,
+): Promise<void> {
+  const already = db
+    .all<{ source: string; content: string }>("SELECT * FROM observations WHERE run_id = ?", [
+      state.runId,
+    ])
+    .some((o) => o.source === "ssh" && o.content.startsWith("PREFLIGHT"));
+  if (already) return;
+  try {
+    const exec = sshExecutor ?? createSshExecutor();
+    const pf = await exec.runPreflight(buildSshTarget(state.customerSystemId));
+    const summary = `PREFLIGHT — passwordless sudo: ${
+      pf.sudoAvailable ? "available" : "NOT available"
+    }; PATH: ${pf.path || "(unknown)"}; locale: ${pf.lang}`;
+    appendObservation(state.runId, "ssh", summary);
+    appendAuditEvent(state.runId, "preflight.completed", "system", {
+      sudoAvailable: pf.sudoAvailable,
+    });
+    runEventBus.emit(state.runId, "preflight.completed", { sudoAvailable: pf.sudoAvailable });
+  } catch {
+    // Preflight is advisory; the run proceeds without it.
+  }
+}
+
 export function createInitialState(run: Run): OrchestratorState {
   return {
     runId: run.id,
@@ -498,6 +584,8 @@ function applySideEffects(effects: SideEffect[], _db: DbAdapter): void {
           expectedSignal: isDiagnostic ? proposal.expectedSignal : "Fix applied successfully",
           riskLevel: policyResult.riskLevel,
           safetyNotes: policyResult.reason ?? policyResult.matchedRule ?? "",
+          // Persist the fix's undo command so failure can auto-stage a rollback.
+          rollbackCommand: isDiagnostic ? null : proposal.rollbackCommand,
         });
         break;
       }
@@ -510,12 +598,18 @@ function applySideEffects(effects: SideEffect[], _db: DbAdapter): void {
   }
 }
 
-async function agentDispatch(state: OrchestratorState, db: DbAdapter): Promise<OrchestratorState> {
+async function agentDispatch(
+  state: OrchestratorState,
+  db: DbAdapter,
+  sshExecutor?: SshExecutor,
+): Promise<OrchestratorState> {
   const stepCount = readStepCount(state.runId, db);
   const currentState = { ...state, stepCount };
 
   switch (currentState.phase) {
     case "CREATED": {
+      // Info-first: read-only ground-truth sweep before any agent reasoning.
+      await runPreflightOnce(currentState, db, sshExecutor);
       appendAuditEvent(currentState.runId, "run.started", "system", {
         ticketDescription: readTicketContext(currentState, db),
       });
@@ -527,12 +621,13 @@ async function agentDispatch(state: OrchestratorState, db: DbAdapter): Promise<O
         phase: "TRIAGING",
         status: "RUNNING",
       };
-      return agentDispatch(triagedState, db);
+      return agentDispatch(triagedState, db, sshExecutor);
     }
 
     case "LOADED_CONTEXT": {
+      await runPreflightOnce(currentState, db, sshExecutor);
       updateRunPhase(currentState.runId, "TRIAGING");
-      return agentDispatch({ ...currentState, phase: "TRIAGING" }, db);
+      return agentDispatch({ ...currentState, phase: "TRIAGING" }, db, sshExecutor);
     }
 
     case "TRIAGING": {
@@ -673,6 +768,11 @@ async function agentDispatch(state: OrchestratorState, db: DbAdapter): Promise<O
           result,
         });
         await performSideEffects(sideEffects, db);
+        // A validated-as-NOT_FIXED change should be offered for rollback before
+        // re-diagnosing, so we never leave a known-ineffective change in place.
+        if (result.status === "NOT_FIXED" && proposeRollback(currentState.runId, db)) {
+          return { ...nextState, phase: "WAITING_FOR_APPROVAL" };
+        }
         return nextState;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -804,17 +904,7 @@ export async function advance(
       // injected one. Target host:port comes from the ticket's customer system;
       // SSH user/key come from env (never hardcoded), validated at startup.
       const exec = sshExecutor ?? createSshExecutor();
-      const [host, portStr] = run.customer_system_id.split(":");
-      const target = {
-        host: host ?? run.customer_system_id,
-        port: Number.parseInt(portStr ?? "22", 10),
-        username: process.env.SSH_USERNAME ?? "azureuser",
-        // No placeholder default: env.ts requires SSH_PRIVATE_KEY_PATH in real
-        // SSH mode, so a missing key fails loudly at startup, not silently here.
-        privateKeyPath: process.env.SSH_PRIVATE_KEY_PATH ?? "",
-        // Multi-key fallback dir (defaults to the primary key's directory).
-        keyDir: process.env.SSH_KEY_DIR || undefined,
-      };
+      const target = buildSshTarget(run.customer_system_id);
 
       const cmdResult = await exec.executeApprovedCommand(
         incomingEvent.approvalId,
@@ -885,12 +975,17 @@ export async function advance(
       });
 
       if (fixFailed && postState.phase === "VALIDATING") {
-        updateRunPhase(runId, "TRIAGING");
         appendAuditEvent(runId, "fix.failed", "system", {
           approvalId: incomingEvent.approvalId,
           exitCode: cmdResult.exitCode,
           timedOut: cmdResult.timedOut,
         });
+        // Offer the one-click rollback before re-planning; fall back to TRIAGING
+        // if there is no recorded/safe undo.
+        if (proposeRollback(runId, activeDb)) {
+          return { ...postState, phase: "WAITING_FOR_APPROVAL" };
+        }
+        updateRunPhase(runId, "TRIAGING");
         return { ...postState, phase: "TRIAGING" };
       }
 
@@ -903,5 +998,5 @@ export async function advance(
     return nextState;
   }
 
-  return agentDispatch(state, activeDb);
+  return agentDispatch(state, activeDb, sshExecutor);
 }

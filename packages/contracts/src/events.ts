@@ -6,6 +6,7 @@
 // emissions (apps/backend/src/ai/orchestrator.ts + routes).
 export const SSE_EVENT_TYPES = [
   "run.started",
+  "preflight.completed",
   "agent.unavailable",
   "approval.required",
   "command.approved",
@@ -15,6 +16,8 @@ export const SSE_EVENT_TYPES = [
   "diagnosis.root_cause_found",
   "diagnosis.more_needed",
   "fix.failed",
+  "fix.rollback_proposed",
+  "fix.rollback_blocked",
   "validation.completed",
   "activity.drafted",
   "activity.fields_overridden",

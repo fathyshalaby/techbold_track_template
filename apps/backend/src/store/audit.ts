@@ -182,13 +182,15 @@ export function createPendingApproval(
     expectedSignal: string;
     riskLevel: string;
     safetyNotes: string;
+    rollbackCommand?: string | null;
   },
 ): CommandApproval {
   const db = getDb();
   const id = `appr_${ulid()}`;
   const now = new Date().toISOString();
+  const rollback = proposal.rollbackCommand?.trim() ? proposal.rollbackCommand : null;
   db.run(
-    "INSERT INTO command_approvals (id, run_id, proposed_command, edited_command, final_command, purpose, expected_signal, risk_level, safety_notes, status, technician_reason, created_at, decided_at, executed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO command_approvals (id, run_id, proposed_command, edited_command, final_command, purpose, expected_signal, risk_level, safety_notes, status, technician_reason, rollback_command, created_at, decided_at, executed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     [
       id,
       runId,
@@ -201,6 +203,7 @@ export function createPendingApproval(
       proposal.safetyNotes,
       "PENDING",
       null,
+      rollback,
       now,
       null,
       null,

@@ -5,6 +5,7 @@ import { SOURCE_LABELS, SSE_EVENT_TYPES } from "./index.js";
 // Must match the backend's actually-emitted audit/event types (see events.ts).
 const EXPECTED_SSE_EVENTS = [
   "run.started",
+  "preflight.completed",
   "agent.unavailable",
   "approval.required",
   "command.approved",
@@ -14,6 +15,8 @@ const EXPECTED_SSE_EVENTS = [
   "diagnosis.root_cause_found",
   "diagnosis.more_needed",
   "fix.failed",
+  "fix.rollback_proposed",
+  "fix.rollback_blocked",
   "validation.completed",
   "activity.drafted",
   "activity.fields_overridden",
@@ -29,7 +32,7 @@ const EXPECTED_SSE_EVENTS = [
 describe("shared contracts", () => {
   it("exports the canonical SSE event tuple", () => {
     expect(SSE_EVENT_TYPES).toEqual(EXPECTED_SSE_EVENTS);
-    expect(SSE_EVENT_TYPES).toHaveLength(20);
+    expect(SSE_EVENT_TYPES).toHaveLength(23);
   });
 
   it("exports typed source labels", () => {
