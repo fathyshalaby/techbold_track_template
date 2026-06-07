@@ -30,7 +30,7 @@ Retire the Vite fallback only after all of these criteria are true:
 |---|---|---|
 | Runtime | **Node 22 + pnpm + tsx** | Native fetch/Web Streams; `tsx` = zero-build dev. |
 | HTTP API | **Hono** + `@hono/node-server` | Tiny, Web-Standard, first-class `streamSSE`, `zValidator`, `onError`. Rejected Express (no native streaming helper, older middleware model) and Fastify (heavier, plugin ceremony). Rejected keeping **FastAPI** because the agent/tool/safety code and the frontend are both TS — one language, shared Zod types. |
-| Model/agent | **Vercel AI SDK v5** | Native tool calling, `generateObject`/`Output.object` structured output, `stopWhen`, `ToolLoopAgent`, HITL approval. Rejected **LangChain/LangGraph**: heavier abstractions, slower to debug at 3am, and we want the *backend* to own the loop, not a framework. |
+| Model/agent | **Vercel AI SDK v4** | Native tool calling, `generateObject`/`Output.object` structured output, `stopWhen`, `ToolLoopAgent`, HITL approval. Rejected **LangChain/LangGraph**: heavier abstractions, slower to debug at 3am, and we want the *backend* to own the loop, not a framework. |
 | Schemas | **Zod** | One schema → validation + TS types + AI SDK tool input + structured output. |
 | SSH | **ssh2** | The mature Node SSH client. One command per exec, key auth, timeouts, stdout/stderr/exit-code. Rejected shelling out to system `ssh` (fragile, harder to cap output/timeout). |
 | Persistence | **SQLite via better-sqlite3** (Drizzle optional) | Synchronous, zero-server, single file = durable audit log. **JSONL fallback** if DB setup stalls. Rejected Postgres (server to run, no payoff in 24h). |
@@ -486,7 +486,7 @@ Role-specific system prompts (sketch):
 
 ---
 
-## 10b. Additions folded from `minam` — human control, reliability hardening, diagnostic depth
+## 10b. Human control, reliability hardening, diagnostic depth
 
 These extend §3/§4/§8/§10; full detail in [RELIABILITY.md](./RELIABILITY.md) + [AGENT_PIPELINE.md](./AGENT_PIPELINE.md).
 
@@ -512,7 +512,7 @@ These extend §3/§4/§8/§10; full detail in [RELIABILITY.md](./RELIABILITY.md)
 ## 11. Research notes / sources
 - **Official techbold case brief** — agent names, incident scope (local Linux services only),
   diagnosis-first ranked-hypotheses pattern, two-evaluation structure, core-3 ERP endpoints.
-- Vercel AI SDK v5 (Context7 `/vercel/ai`): `tool({ inputSchema, execute })`, `generateObject`,
+- Vercel AI SDK v4 (Context7 `/vercel/ai`): `tool({ inputSchema, execute })`, `generateObject`,
   `Output.object`, `stopWhen: stepCountIs`, `ToolLoopAgent`, `needsApproval`/`toolApproval`,
   `addToolApprovalResponse`. https://ai-sdk.dev/docs
 - Hono (Context7 `/websites/hono_dev`): `@hono/node-server`, `streamSSE` (`writeSSE`/`onAbort`/

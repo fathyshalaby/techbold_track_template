@@ -277,7 +277,7 @@ A **deterministic** gate runs before any execution — not a prompt, real code:
 
 ### Status: built & proven
 
-<span class="pill ok">254 tests passing</span>
+<span class="pill ok">585 tests passing</span>
 
 Obfuscation variants (`chmod -R 777 ${HOME}`, padded whitespace, quote tricks) are **still blocked**. Targeted ops (`chown azureuser /srv/app/uploads`) are correctly **allowed** with approval.
 
@@ -287,7 +287,7 @@ Obfuscation variants (`chmod -R 777 ${HOME}`, padded whitespace, quote tricks) a
 </div>
 
 <!--
-Speaker (2:55–3:20): "Differentiator two — safety. The rubric has 'hard fails' that zero an incident: deleting a database, chmod 777 on root, disabling the firewall, leaking secrets. Our defense is deterministic code, not a polite prompt. A blocklist catches those patterns — including obfuscated variants — before they ever reach a human to approve. A four-tier classifier ranks everything else, and the model can only raise risk, never lower it. Secrets are redacted everywhere. And this isn't a slide promise — the safety layer and audit store are built and green across 254 tests right now."
+Speaker (2:55–3:20): "Differentiator two — safety. The rubric has 'hard fails' that zero an incident: deleting a database, chmod 777 on root, disabling the firewall, leaking secrets. Our defense is deterministic code, not a polite prompt. A blocklist catches those patterns — including obfuscated variants — before they ever reach a human to approve. A four-tier classifier ranks everything else, and the model can only raise risk, never lower it. Secrets are redacted everywhere. And this isn't a slide promise — the safety layer and audit store are built and green across 585 tests right now."
 -->
 
 ---
@@ -431,7 +431,7 @@ Speaker: "Human control is a first-class surface, not a confirm button. The tech
 | **B** Troubleshooting | 35 | 5 hidden incidents ×7 on fresh VMs: root cause, fix works, **persists**, no regression, summary | Generalising diagnosis-first agent; reboot-safe fixes; minimal-change bias; honest validation |
 | **C** Safety & audit | 20 | full audit trail, no blanket commands, secret protection, minimal change, human control. **Hard-fails zero the incident.** | Deterministic gate **before** execution; mandatory approval; redaction; append-only audit |
 | **D** Technician UX | 10 | overview, detail, visible progress, followable logs, retry/abort | One ticket list + one run page, live SSE timeline, approval card |
-| **E** Engineering | 15 | clean separated modules, real README, runnable tests, error handling/timeouts/retries, sane secrets | Modules mirror the rubric; **254 tests**; mock Phoenix + mock SSH; `.env.example`, keys git-ignored |
+| **E** Engineering | 15 | clean separated modules, real README, runnable tests, error handling/timeouts/retries, sane secrets | Modules mirror the rubric; **585 tests**; mock Phoenix + mock SSH; `.env.example`, keys git-ignored |
 
 <div class="center" style="margin-top:6px"><strong>Tie-breakers:</strong> higher B → higher C → most incidents 7/7 → fewer safety flags → <strong>fewer commands</strong> → shorter time. <span class="small">Our loop is built for exactly this order.</span></div>
 
@@ -446,7 +446,7 @@ Speaker (4:20–4:45): "And we built to the rubric deliberately. 55 of the 100 p
 <div class="grid2">
 <div>
 
-<span class="pill ok">Built & tested · 254 green</span>
+<span class="pill ok">Built & tested · 585 green</span>
 
 - **Zod-validated env** — fails fast on missing config
 - **Phoenix ERP client** — auth, retry-on-5xx, timeouts, typed errors (401/404/422), + in-memory mock
@@ -457,7 +457,7 @@ Speaker (4:20–4:45): "And we built to the rubric deliberately. 55 of the 100 p
 </div>
 <div>
 
-<span class="pill warn">Scaffolded · next</span>
+<span class="pill warn">Built + tested</span>
 
 - **SSH executor** (`bash -lc`, `sudo -n`, output cap)
 - **Agent loop + orchestrator** (the 5 roles)
@@ -471,7 +471,7 @@ Speaker (4:20–4:45): "And we built to the rubric deliberately. 55 of the 100 p
 </div>
 
 <!--
-Speaker (only in the engineering/Q&A cut): "Where we are: the foundation that actually carries the points — the safety layer, the append-only audit store, and the ERP client — is built and green across 254 tests. The SSH executor, agent loop, run API, and UI are scaffolded and next. We deliberately built the hard, point-bearing part first. Mock mode lets the entire loop run offline so the demo can't hard-fail on flaky Wi-Fi."
+Speaker (only in the engineering/Q&A cut): "Where we are: the foundation that actually carries the points — the safety layer, the append-only audit store, and the ERP client — is built and green across 585 tests. The SSH executor, agent loop, run API, and UI are built and covered by the 585-test suite. We deliberately built the hard, point-bearing part first. Mock mode lets the entire loop run offline so the demo can't hard-fail on flaky Wi-Fi."
 -->
 
 ---
@@ -529,7 +529,7 @@ Speaker (4:45–5:10, demo handoff): "Live, we'll load a real ticket, watch the 
 </div>
 </div>
 
-<p class="byline">MIT-licensed · <code>docker compose up</code> · mock mode offline · 254 tests green</p>
+<p class="byline">MIT-licensed · <code>docker compose up</code> · mock mode offline · 585 tests green</p>
 
 <!--
 Speaker (5:10–5:30, close): "To close: the AI can't act on its own, dangerous commands are blocked before they run, diagnosis is evidence-first, the report is the audit log, and nothing is hardcoded. Fifty-five of a hundred points are troubleshooting and safety — and that's exactly where we put the product. Thank you."

@@ -71,7 +71,7 @@ Requires Node 22+ and [Bun](https://bun.sh).
 ```bash
 bun install
 bun run dev:backend     # API on :8000
-bun run dev:frontend    # UI on :5173
+bun run dev:frontend    # Next.js dashboard on :3000
 ```
 
 ### Quality gates

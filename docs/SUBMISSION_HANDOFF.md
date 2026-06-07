@@ -2,7 +2,7 @@
 
 Last updated: 2026-06-07.
 
-Use this document to record or present the project without overstating live validation.
+**TL;DR — Status:** demo-ready in mock mode (the full loop runs offline); live Phoenix / SSH / LLM are wired and reachable, gated only by credentials. Run `docker compose up`, open http://localhost:3000.
 
 ## Demo Checklist
 
@@ -14,7 +14,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-3. Open `http://localhost:5173`.
+3. Open `http://localhost:3000`.
 4. Confirm backend health at `http://localhost:8000/health`.
 5. Start the primary status-api ticket.
 6. Click through the agent steps until the diagnostic approval appears.
@@ -27,6 +27,8 @@ docker compose up --build
 13. Show the audit timeline and final completed run state.
 
 ## Evidence to Cite
+
+_Paths below are internal verification logs kept in the repo (`.planning/`)._
 
 | Claim | Evidence |
 |---|---|

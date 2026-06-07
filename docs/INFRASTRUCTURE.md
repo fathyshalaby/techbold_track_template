@@ -131,7 +131,7 @@ Every external dependency has an in-process mock: **Phoenix** (`backend/src/phoe
 
 For honesty and to save a confused reader time:
 - **`STACK.md`** (an early planning doc) proposes Next.js 15, "AI SDK 6", and Anthropic Claude. The implemented stack is **Vite + React + a Hono backend, AI SDK v4, OpenAI provider** — `STACK.md` now carries a banner pointing here and to `ARCHITECTURE.md`.
-- **`ARCHITECTURE.md` / `PRD.md`** say "Vercel AI SDK v5". The lockfile resolves **`ai@4.3.19`**. The APIs the design relies on (`generateObject`, `Output.object`, `tool({ inputSchema })`, `stopWhen: stepCountIs`) are present in v4; the version label is cosmetic, the design holds.
+- **`ARCHITECTURE.md` / `PRD.md`** say "Vercel AI SDK v4". The lockfile resolves **`ai@4.3.19`**. The APIs the design relies on (`generateObject`, `Output.object`, `tool({ inputSchema })`, `stopWhen: stepCountIs`) are present in v4; the version label is cosmetic, the design holds.
 - **The auto-generated stack/conventions block in `CLAUDE.md`** originally described the *deleted* Python/FastAPI skeleton; it has been corrected to the Node/Hono reality.
 
 ## 10. System requirements

@@ -157,7 +157,7 @@ that actually guarantees safety — the prompt is advisory.
 
 ---
 
-## 8b. Additions folded from `minam` (net-new)
+## 8b. Human control & reliability hardening
 
 - **Human-typed commands go through the same gate** (G1). A command the technician types via
   `manual-command` is classified/redacted/audited identically to an agent proposal — a DENY pattern is

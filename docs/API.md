@@ -88,7 +88,7 @@ The route is read-only. It does not advance runs, create approvals, execute SSH,
 
 ## Run lifecycle endpoints
 
-These follow [PRD.md §9](PRD.md). The route files exist as stubs today; behaviour below is the contract they implement.
+These follow [PRD.md §9](PRD.md). These routes are implemented and covered by the backend test suite (585 tests).
 
 ### ✅ `POST /api/runs` — create a troubleshooting run
 ```jsonc
