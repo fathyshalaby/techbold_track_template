@@ -1,0 +1,6 @@
+{
+  "name": "erp-write-path",
+  "database": "__DATABASE_NAME__",
+  "validation": "sudo /opt/hackathon/public-test.sh",
+  "symptom": "The application role can read orders but cannot create a new order."
+}

@@ -1,0 +1,6 @@
+{
+  "name": "document-upload",
+  "service": "__SERVICE_NAME__",
+  "validation": "sudo /opt/hackathon/public-test.sh",
+  "symptom": "Portal health works, but document uploads return an error."
+}

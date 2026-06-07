@@ -1,0 +1,14 @@
+[Unit]
+Description=Sandbox __CUSTOMER_APP_SERVICE__
+After=network.target
+
+[Service]
+Type=simple
+User=azureuser
+Environment=SERVICE_PORT=__CUSTOMER_APP_PORT__
+ExecStart=/usr/bin/python3 /opt/__CUSTOMER_APP_SERVICE__/customer_app.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

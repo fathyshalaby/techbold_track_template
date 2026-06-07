@@ -1,0 +1,14 @@
+[Unit]
+Description=Sandbox __PARTNER_SERVICE__
+After=network.target
+
+[Service]
+Type=simple
+User=azureuser
+Environment=PARTNER_PORT=__PARTNER_PORT__
+ExecStart=/usr/bin/python3 /opt/__PARTNER_SERVICE__/partner_api.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

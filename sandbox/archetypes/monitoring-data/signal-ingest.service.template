@@ -1,0 +1,15 @@
+[Unit]
+Description=Sandbox __INGEST_SERVICE__
+After=network.target
+
+[Service]
+Type=simple
+User=azureuser
+Environment=SERVICE_PORT=__INGEST_PORT__
+Environment=COUNT_FILE=/var/lib/__INGEST_SERVICE__/count.txt
+ExecStart=/usr/bin/python3 /opt/__INGEST_SERVICE__/signal_ingest.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

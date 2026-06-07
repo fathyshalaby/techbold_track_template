@@ -1,0 +1,17 @@
+[Unit]
+Description=Sandbox __SYNC_SERVICE__
+After=network.target __PARTNER_SERVICE__.service
+Wants=__PARTNER_SERVICE__.service
+
+[Service]
+Type=simple
+User=azureuser
+Environment=PARTNER_HOST=__PARTNER_HOST__
+Environment=PARTNER_PORT=__PARTNER_PORT__
+Environment=STATUS_PATH=__STATUS_PATH__
+ExecStart=/usr/bin/python3 /opt/__SYNC_SERVICE__/order_relay.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

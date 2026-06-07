@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+curl -fsS --max-time 3 "http://127.0.0.1:__SERVICE_PORT__/health" >/dev/null
+curl -fsS --max-time 3 -X POST --data-binary "sandbox upload probe" "http://127.0.0.1:__SERVICE_PORT__/upload" >/dev/null
+test -f __EXISTING_DIR__/welcome.txt
+echo "public test ok"

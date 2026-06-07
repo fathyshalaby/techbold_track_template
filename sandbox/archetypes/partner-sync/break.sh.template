@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+awk '$2 != "__PARTNER_HOST__" { print }' /etc/hosts > /tmp/sandbox-hosts
+printf '%s %s\n' '__BAD_IP__' '__PARTNER_HOST__' >> /tmp/sandbox-hosts
+cat /tmp/sandbox-hosts > /etc/hosts
+rm -f /tmp/sandbox-hosts
+systemctl restart __SYNC_SERVICE__.service
+echo "Injected fault: __PARTNER_HOST__ points at __BAD_IP__."

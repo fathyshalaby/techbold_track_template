@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+chown root:root __UPLOAD_DIR__
+chmod 0755 __UPLOAD_DIR__
+systemctl restart __SERVICE_NAME__.service
+echo "Injected fault: __UPLOAD_DIR__ is not writable by __SERVICE_USER__."

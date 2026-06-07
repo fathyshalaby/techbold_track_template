@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+systemctl is-active --quiet __PARTNER_SERVICE__.service
+systemctl is-active --quiet __SYNC_SERVICE__.service
+curl -fsS --max-time 3 "http://__PARTNER_HOST__:__PARTNER_PORT__/ping" | grep -q '^pong'
+sleep 6
+grep -q '"partner_reachable": true' __STATUS_PATH__
+echo "public test ok"

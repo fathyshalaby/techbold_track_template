@@ -1,0 +1,16 @@
+{
+  "name": "@techbold/sandbox",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./scenarios": "./scenarios/registry.ts",
+    "./scenarios/types": "./scenarios/types.ts"
+  },
+  "scripts": {
+    "up": "bun run seed.ts up",
+    "down": "bun run seed.ts down",
+    "reset": "bun run seed.ts reset",
+    "test": "bun test"
+  }
+}

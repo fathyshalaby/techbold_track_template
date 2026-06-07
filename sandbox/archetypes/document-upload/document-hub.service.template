@@ -1,0 +1,15 @@
+[Unit]
+Description=Sandbox __SERVICE_NAME__ upload service
+After=network.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+Environment=SERVICE_PORT=__SERVICE_PORT__
+Environment=UPLOAD_DIR=__UPLOAD_DIR__
+ExecStart=/usr/bin/python3 /opt/__SERVICE_NAME__/service.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d __DATABASE_NAME__ -c "REVOKE USAGE, SELECT ON SEQUENCE __SEQUENCE_NAME__ FROM __APP_ROLE__;"
+echo "Injected fault: __APP_ROLE__ can read __TABLE_NAME__ but cannot use __SEQUENCE_NAME__."

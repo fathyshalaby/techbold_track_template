@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+systemctl disable --now __SERVICE_NAME__.service
+systemctl reset-failed __SERVICE_NAME__.service || true
+echo "Injected fault: __SERVICE_NAME__ is disabled and stopped."
