@@ -1,7 +1,10 @@
 import { runEventBus } from "../events/run-event-bus.js";
 import { retrieveSimilarStructured } from "../memory/retrieve.js";
 import { formatSimilarSolutions } from "../memory/store.js";
-import { validateCommandAgainstPolicy } from "../safety/command-policy.js";
+import {
+  normalizeCommandForCompare,
+  validateCommandAgainstPolicy,
+} from "../safety/command-policy.js";
 import { redactSecrets } from "../safety/redaction.js";
 import { createSshExecutor } from "../ssh/factory.js";
 import { resolveSshKeyPaths } from "../ssh/keys.js";
@@ -32,6 +35,7 @@ import type {
 import { runProblemAnalyzer, runProblemAnalyzerObserve } from "./agents/problem-analyzer.js";
 import { runProblemSolver } from "./agents/problem-solver.js";
 import { runValidator } from "./agents/validator.js";
+import { latestObservationDisprovesUnitHypothesis } from "./observe-guard.js";
 import type { DiagnosticProposal, FixProposal, ValidationResult } from "./types.js";
 
 export type { DiagnosticProposal, FixProposal, ValidationResult };
@@ -417,6 +421,28 @@ function readAgentObservations(runId: string, db: DbAdapter): string[] {
     .map((o) => o.content);
 }
 
+type AttemptedCommand = { command: string; exit_code: number };
+
+function readAttemptedCommands(runId: string, db: DbAdapter): AttemptedCommand[] {
+  return db.all<AttemptedCommand>(
+    "SELECT command, exit_code FROM command_results WHERE run_id = ? ORDER BY created_at ASC",
+    [runId],
+  );
+}
+
+function formatAttemptedCommands(attempts: AttemptedCommand[]): string {
+  if (attempts.length === 0) return "";
+  return attempts.map((a) => `$ ${a.command} (exit ${a.exit_code})`).join("\n");
+}
+
+function isDuplicateFailedCommand(runId: string, command: string, db: DbAdapter): boolean {
+  const normalized = normalizeCommandForCompare(command);
+  return readAttemptedCommands(runId, db).some(
+    (attempt) =>
+      attempt.exit_code !== 0 && normalizeCommandForCompare(attempt.command) === normalized,
+  );
+}
+
 export function setStepCountForTest(runId: string, count: number, db: DbAdapter): void {
   writeMetadata(runId, STEP_COUNT_TYPE, count, db);
 }
@@ -520,6 +546,14 @@ function proposeCommand(
   proposal: DiagnosticProposal | FixProposal,
   db: DbAdapter,
 ): OrchestratorState {
+  if (isDuplicateFailedCommand(state.runId, proposal.command, db)) {
+    appendAuditEvent(state.runId, "command.duplicate_blocked", "system", {
+      command: proposal.command,
+    });
+    runEventBus.emit(state.runId, "command.duplicate_blocked", { command: proposal.command });
+    return state;
+  }
+
   const policyResult = validateCommandAgainstPolicy(proposal.command);
   if (!policyResult.allowed) {
     return applyReduce(state, blockedEvent(policyResult, proposal.command));
@@ -580,6 +614,9 @@ async function agentDispatch(state: OrchestratorState, db: DbAdapter): Promise<O
       try {
         const ticketDescription = readTicketContext(currentState, db);
         const observations = readAgentObservations(currentState.runId, db);
+        const attemptedCommands = formatAttemptedCommands(
+          readAttemptedCommands(currentState.runId, db),
+        );
         const recalled = await retrieveSimilarStructured(ticketDescription, observations);
         if (recalled.length > 0) {
           const memoryPayload = {
@@ -600,6 +637,7 @@ async function agentDispatch(state: OrchestratorState, db: DbAdapter): Promise<O
           ticketDescription,
           observations,
           similarSolutions: formatSimilarSolutions(recalled),
+          ...(attemptedCommands ? { attemptedCommands } : {}),
         });
         return proposeCommand(currentState, "diagnostic", proposal, db);
       } catch (err) {
@@ -612,9 +650,13 @@ async function agentDispatch(state: OrchestratorState, db: DbAdapter): Promise<O
         return applyReduce(currentState, { type: "fix_proposal_ready", proposal: CAPPED_FIX });
       }
       try {
+        const attemptedCommands = formatAttemptedCommands(
+          readAttemptedCommands(currentState.runId, db),
+        );
         const proposal = await runProblemSolver({
           ticketDescription: readTicketContext(currentState, db),
           observations: readAgentObservations(currentState.runId, db),
+          ...(attemptedCommands ? { attemptedCommands } : {}),
         });
         return proposeCommand(currentState, "fix", proposal, db);
       } catch (err) {
@@ -638,9 +680,14 @@ async function agentDispatch(state: OrchestratorState, db: DbAdapter): Promise<O
 
     case "OBSERVING": {
       try {
+        const observations = readAgentObservations(currentState.runId, db);
+        const latestObservation = observations[observations.length - 1] ?? "";
+        if (latestObservationDisprovesUnitHypothesis(latestObservation)) {
+          return applyReduce(currentState, { type: "more_diagnosis_needed" });
+        }
         const observation = await runProblemAnalyzerObserve({
           ticketDescription: readTicketContext(currentState, db),
-          observations: readAgentObservations(currentState.runId, db),
+          observations,
         });
         const top = observation.hypotheses.reduce((a, b) => (b.confidence > a.confidence ? b : a));
         const hasEvidence = typeof top.evidence === "string" && top.evidence.trim().length > 0;

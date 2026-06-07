@@ -17,6 +17,7 @@ export type ProblemAnalyzerInput = {
   ticketDescription: string;
   observations: string[];
   similarSolutions?: string;
+  attemptedCommands?: string;
 };
 
 export const MOCK_DIAGNOSTIC_PROPOSAL = {
@@ -43,7 +44,12 @@ export type ObserveResult = z.infer<typeof ObserveResultSchema>;
 
 const OBSERVE_SYSTEM_PROMPT = `${PROBLEM_ANALYZER_SYSTEM_PROMPT}
 
-You are re-evaluating hypotheses after a diagnostic command ran. Return ONLY updated hypotheses with cause, evidence, and confidence. Do not propose a new command.`;
+You are re-evaluating hypotheses after a diagnostic command ran. Return ONLY updated hypotheses with cause, evidence, and confidence. Do not propose a new command.
+
+If the latest observation shows exit_code 4 or messages like "not found", "does not exist", or \
+"could not be found" for a systemd unit you named in the command, that DISPROVES any hypothesis \
+that treats that unit as the root cause. Drop its confidence below 0.5 and pivot to discovery \
+(find what actually listens on the reported port or which units exist).`;
 
 export async function runProblemAnalyzerObserve(
   input: ProblemAnalyzerInput,
@@ -67,6 +73,7 @@ export async function runProblemAnalyzerObserve(
         observations: input.observations,
         ...(runbook ? { runbook } : {}),
         ...(similarSolutions ? { similarSolutions } : {}),
+        ...(input.attemptedCommands ? { attemptedCommands: input.attemptedCommands } : {}),
       }),
       maxTokens: 512,
     });
@@ -98,6 +105,7 @@ export async function runProblemAnalyzer(
         observations: input.observations,
         ...(runbook ? { runbook } : {}),
         ...(similarSolutions ? { similarSolutions } : {}),
+        ...(input.attemptedCommands ? { attemptedCommands: input.attemptedCommands } : {}),
       }),
       maxTokens: 1024,
     });

@@ -44,6 +44,7 @@ describe("formatSimilarSolutions", () => {
     expect(formatted).toContain("nginx 502");
     expect(formatted).toContain("score 0.91");
     expect(formatted).toContain("restart upstream");
+    expect(formatted).toContain("PRIOR ART (generic)");
   });
 });
 

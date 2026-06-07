@@ -139,6 +139,28 @@ const CREATE_TABLES = `
   END;
 `;
 
+// Columns added after a table's original CREATE statement. `CREATE TABLE IF NOT
+// EXISTS` never alters a table that already exists, so a volume created by an
+// older schema keeps the old columns and `SELECT *` yields `undefined` for the
+// new ones (which the Zod row schemas reject). Reconcile on every boot so a
+// stale data volume self-heals instead of crashing the dashboard.
+const COLUMN_MIGRATIONS: Record<string, { name: string; ddl: string }[]> = {
+  command_approvals: [{ name: "rollback_command", ddl: "TEXT" }],
+};
+
+function runColumnMigrations(db: import("better-sqlite3").Database): void {
+  for (const [table, columns] of Object.entries(COLUMN_MIGRATIONS)) {
+    const existing = new Set(
+      (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name),
+    );
+    for (const col of columns) {
+      if (!existing.has(col.name)) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${col.name} ${col.ddl}`);
+      }
+    }
+  }
+}
+
 const require = createRequire(import.meta.url);
 
 export function makeJsonlAdapter(): DbAdapter {
@@ -291,6 +313,7 @@ export function getDb(dbPath?: string): DbAdapter {
     const db: Database = new BetterSqlite3(resolvedPath);
     db.pragma("journal_mode = WAL");
     db.exec(CREATE_TABLES);
+    runColumnMigrations(db);
 
     adapter = {
       mode: "sqlite",

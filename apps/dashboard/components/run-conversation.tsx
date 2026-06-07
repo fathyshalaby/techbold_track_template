@@ -53,6 +53,7 @@ export function RunConversation({ initialRun }: { initialRun: RunDetail }) {
   const pumpRef = useRef(false);
   const draftedRef = useRef(Boolean(initialRun.activityDraft));
   const runRef = useRef(initialRun);
+  const autoOpenedResolutionRef = useRef(false);
 
   const blocks = useMemo(
     () => timelineToBlocks(run.timeline, run.phase),
@@ -67,12 +68,22 @@ export function RunConversation({ initialRun }: { initialRun: RunDetail }) {
     Boolean(run.activityDraft?.submitted) ||
     run.phase !== "WAITING_FOR_ACTIVITY_REVIEW";
 
+  // Background refreshes (SSE, polling, pump) must never throw: the backend can
+  // blip for a moment (container restart, brief network drop) and an uncaught
+  // rejection here surfaces as a fatal "Failed to fetch" runtime overlay. On
+  // failure we mark the connection as dropped and keep the last known run.
   const refreshRun = useCallback(async () => {
-    const refreshed = await getRun(runRef.current.runId);
-    runRef.current = refreshed;
-    setRun(refreshed);
-    if (refreshed.activityDraft) draftedRef.current = true;
-    return refreshed;
+    try {
+      const refreshed = await getRun(runRef.current.runId);
+      runRef.current = refreshed;
+      setRun(refreshed);
+      if (refreshed.activityDraft) draftedRef.current = true;
+      return refreshed;
+    } catch (err) {
+      console.warn("[run] refresh failed; keeping last known run", err);
+      setConnected(false);
+      return runRef.current;
+    }
   }, []);
 
   const pump = useCallback(async () => {
@@ -156,11 +167,33 @@ export function RunConversation({ initialRun }: { initialRun: RunDetail }) {
     return () => clearInterval(interval);
   }, [pumping, refreshRun]);
 
+  // Auto-open the resolution panel once when the run enters review. Closing it
+  // must stick, so this does not depend on `artifact` (which would re-fire and
+  // reopen the panel on every close). The ref resets when the run leaves the
+  // review phase, so a later re-entry opens it again.
   useEffect(() => {
-    if (run.phase === "WAITING_FOR_ACTIVITY_REVIEW" && run.activityDraft && !artifact) {
+    const inReview = run.phase === "WAITING_FOR_ACTIVITY_REVIEW" && Boolean(run.activityDraft);
+    if (!inReview) {
+      autoOpenedResolutionRef.current = false;
+      return;
+    }
+    if (!autoOpenedResolutionRef.current) {
+      autoOpenedResolutionRef.current = true;
       setArtifact({ kind: "resolution" });
     }
-  }, [run.phase, run.activityDraft, artifact]);
+  }, [run.phase, run.activityDraft]);
+
+  // The desktop artifact panel is a plain aside (not a dialog), so wire Escape
+  // to close it. The mobile Sheet handles Escape on its own; a redundant close
+  // there is harmless.
+  useEffect(() => {
+    if (!artifact) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setArtifact(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [artifact]);
 
   // Pump when pause conditions clear for this run instance.
   // biome-ignore lint/correctness/useExhaustiveDependencies: initialRun.runId scopes auto-run to one conversation mount

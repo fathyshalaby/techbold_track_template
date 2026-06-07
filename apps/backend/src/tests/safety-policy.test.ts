@@ -372,4 +372,26 @@ describe("safety - policy and classifier", () => {
       expect(validateCommandAgainstPolicy(cmd).riskLevel).not.toBe(RiskLevel.HIGH_RISK_BLOCKED);
     });
   });
+
+  describe("blocklist - interactive TUIs", () => {
+    it.each([
+      "sudo systemctl edit myapp.service",
+      "crontab -e",
+      "visudo",
+      "vi /etc/nginx/nginx.conf",
+      "nano /etc/hosts",
+      "less /var/log/syslog",
+      "man systemctl",
+      "top",
+    ])('blocks "%s"', (cmd) => {
+      const result = validateCommandAgainstPolicy(cmd);
+      expect(result.allowed).toBe(false);
+      expect(result.riskLevel).toBe(RiskLevel.HIGH_RISK_BLOCKED);
+      expect(result.matchedRule).toBe("interactive-tui");
+    });
+
+    it.each(["top -b -n1 | head -20"])('allows non-interactive "%s"', (cmd) => {
+      expect(validateCommandAgainstPolicy(cmd).allowed).toBe(true);
+    });
+  });
 });

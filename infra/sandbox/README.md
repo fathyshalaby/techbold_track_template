@@ -1,6 +1,18 @@
 # Sandbox Incident Harness
 
-Local Docker-backed "fake VMs" for developing the troubleshooting loop without burning the real practice VMs.
+Part of [Sphinx](../README.md). Local Docker-backed "fake VMs" for developing the troubleshooting loop without burning the real practice VMs. Also the source of truth for model training data.
+
+## Archetypes
+
+| Archetype | Ticket | SSH port | Symptom |
+| --------- | ------ | -------- | ------- |
+| service-health | 7101 | 2201 | Status endpoint down after restart |
+| document-upload | 7102 | 2202 | Document upload server error |
+| partner-sync | 7103 | 2203 | Order sync cannot reach partner |
+| erp-write-path | 7104 | 2204 | ERP order creation fails, reads work |
+| monitoring-data | 7105 | 2205 | Dashboard shows stale monitoring data |
+
+Scenario definitions: [`scenarios/scenarios.json`](scenarios/scenarios.json).
 
 ## Commands
 

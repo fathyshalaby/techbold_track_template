@@ -2,6 +2,7 @@
 
 import {
   type Icon,
+  IconClipboardCheck,
   IconDashboard,
   IconDatabase,
   IconListDetails,
@@ -46,6 +47,7 @@ const sidebarItems: SidebarItem[] = [
   { label: "Tickets", href: "/dashboard/tickets", icon: IconListDetails },
   { label: "Runs", href: "/dashboard/runs", icon: IconPlayerPlay },
   { label: "Approvals", href: "/dashboard/approvals", icon: IconShieldCheck },
+  { label: "Resolutions", href: "/dashboard/resolutions", icon: IconClipboardCheck },
   { label: "Memory", href: "/dashboard/memory", icon: IconDatabase },
 ];
 

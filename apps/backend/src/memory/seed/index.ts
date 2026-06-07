@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { getEnv, memoryConfigured } from "../../env.js";
 import { inMemoryTruncate, isInMemorySeeded, markInMemorySeeded } from "../in-memory-store.js";
 import { ensureMemorySchema, getMemoryPool } from "../pg.js";
+import { sanitizeRunbookPlaceholders } from "../sanitize-placeholders.js";
 import { stats as getMemoryStats, upsertSolution } from "../store.js";
 import type { SolutionDoc, SolutionSource } from "../types.js";
 
@@ -114,14 +115,17 @@ function chunkRunbook(content: string, sourceId: string): SolutionDoc[] {
     .map((section, index) => (index === 0 ? section : `## ${section}`))
     .filter((section) => section.trim().length > 80);
 
-  return sections.map((section, index) => ({
-    source: "runbook",
-    symptom: section.slice(0, 240),
-    rootCause: "See runbook section for common root causes in this symptom class",
-    fix: "See runbook section for durable fix guidance",
-    commands: section.slice(0, 1200),
-    tags: ["runbook", sourceId, `chunk-${index}`],
-  }));
+  return sections.map((section, index) => {
+    const sanitized = sanitizeRunbookPlaceholders(section);
+    return {
+      source: "runbook",
+      symptom: sanitized.slice(0, 240),
+      rootCause: "See runbook section for common root causes in this symptom class",
+      fix: "See runbook section for durable fix guidance",
+      commands: sanitized.slice(0, 1200),
+      tags: ["runbook", sourceId, `chunk-${index}`],
+    };
+  });
 }
 
 function loadRunbooks(): SolutionDoc[] {

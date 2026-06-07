@@ -1,6 +1,14 @@
 # TechBold Hackathon Model Sidecar
 
-This folder is the optional training and local-serving sidecar for the TechBold MSP troubleshooting adapter. Its job is to produce an offline-capable support model that can help diagnose sandbox incidents, propose safe checks, draft remediation, and emit structured outputs that the backend can consume through the Vercel AI SDK.
+Part of [Sphinx](../../README.md). Optional training and local-serving sidecar for the MSP troubleshooting adapter.
+
+| Item | Value |
+| ---- | ----- |
+| Dashboard model id | `techbold/msp-autopilot` |
+| Served MLX base | `mlx-community/Qwen2.5-1.5B-Instruct-4bit` |
+| OpenAI-compatible URL | `http://127.0.0.1:8011/v1` |
+
+Its job is to produce an offline-capable support model that can help diagnose sandbox incidents, propose safe checks, draft remediation, and emit structured outputs that the backend can consume through the Vercel AI SDK.
 
 The model proposes. The backend owns safety validation, approval, execution, audit logging, and final activity records. Normal app startup does not depend on training or local model serving.
 

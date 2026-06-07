@@ -1109,6 +1109,125 @@ describe("orchestrator driver - integration", () => {
     expect(state.phase).toBe("TRIAGING"); // not PLANNING_FIX - unsupported high confidence is rejected
   });
 
+  it("Test 11c - OBSERVING + unit-not-found exit 4 -> keep diagnosing (deterministic backstop)", async () => {
+    const { advance } = await import("../ai/orchestrator.js");
+    const { createRun } = await import("../store/runs.js");
+    const { getDb } = await import("../store/db.js");
+    type SshExecutor = import("../ssh/types.js").SshExecutor;
+
+    const run = createRun(1, "10.0.0.1:22");
+    await advance(run.id);
+    const db = getDb();
+    const pending = db
+      .all<{ id: string; status: string }>("SELECT * FROM command_approvals WHERE run_id = ?", [
+        run.id,
+      ])
+      .find((a) => a.status === "PENDING");
+
+    const exec = {
+      executeApprovedCommand: vi.fn().mockResolvedValue({
+        stdout: "",
+        stderr: "Failed to get unit file state of myapp.service: No such file or directory",
+        exitCode: 4,
+        durationMs: 5,
+        timedOut: false,
+      }),
+      runPreflight: vi.fn(),
+    } as unknown as SshExecutor;
+
+    await advance(
+      run.id,
+      {
+        type: "command_approved",
+        approvalId: pending!.id,
+        finalCommand: "systemctl is-enabled myapp",
+      },
+      undefined,
+      exec,
+    );
+
+    const { runProblemAnalyzerObserve } = await import("../ai/agents/problem-analyzer.js");
+    (runProblemAnalyzerObserve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      hypotheses: [
+        {
+          cause: "Service myapp is not enabled on boot",
+          evidence: "is-enabled returned disabled",
+          confidence: 0.95,
+        },
+      ],
+    });
+
+    const state = await advance(run.id);
+    expect(state.phase).toBe("TRIAGING");
+    const { getAuditEvents } = await import("../store/audit.js");
+    expect(getAuditEvents(run.id).some((e) => e.type === "diagnosis.more_needed")).toBe(true);
+    expect(runProblemAnalyzerObserve).not.toHaveBeenCalled();
+  });
+
+  it("Test 11d - duplicate failed command is blocked without burning a step", async () => {
+    const { runProblemAnalyzer } = await import("../ai/agents/problem-analyzer.js");
+    const failedCmd = "sudo systemctl enable myapp";
+    (runProblemAnalyzer as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...MOCK_DIAGNOSTIC,
+      command: failedCmd,
+    });
+
+    const { advance } = await import("../ai/orchestrator.js");
+    const { createRun } = await import("../store/runs.js");
+    const { getDb } = await import("../store/db.js");
+    const { getAuditEvents } = await import("../store/audit.js");
+    type SshExecutor = import("../ssh/types.js").SshExecutor;
+
+    const run = createRun(1, "10.0.0.1:22");
+    await advance(run.id);
+    const db = getDb();
+    const pending = db
+      .all<{ id: string; status: string }>("SELECT * FROM command_approvals WHERE run_id = ?", [
+        run.id,
+      ])
+      .find((a) => a.status === "PENDING");
+
+    const exec = {
+      executeApprovedCommand: vi.fn().mockResolvedValue({
+        stdout: "",
+        stderr: "Failed to enable unit: Unit file myapp.service does not exist.",
+        exitCode: 1,
+        durationMs: 5,
+        timedOut: false,
+      }),
+      runPreflight: vi.fn(),
+    } as unknown as SshExecutor;
+
+    await advance(
+      run.id,
+      {
+        type: "command_approved",
+        approvalId: pending!.id,
+        finalCommand: failedCmd,
+      },
+      undefined,
+      exec,
+    );
+
+    const { runProblemAnalyzerObserve } = await import("../ai/agents/problem-analyzer.js");
+    (runProblemAnalyzerObserve as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      hypotheses: [{ cause: "unknown", evidence: "enable failed", confidence: 0.4 }],
+    });
+    await advance(run.id);
+
+    const approvalsBefore = db.all("SELECT * FROM command_approvals WHERE run_id = ?", [
+      run.id,
+    ]).length;
+
+    const state = await advance(run.id);
+    expect(state.phase).toBe("TRIAGING");
+    expect(getAuditEvents(run.id).some((e) => e.type === "command.duplicate_blocked")).toBe(true);
+    const approvalsAfter = db.all("SELECT * FROM command_approvals WHERE run_id = ?", [
+      run.id,
+    ]).length;
+    expect(approvalsAfter).toBe(approvalsBefore);
+  });
+
   // OBSERVATION FIDELITY: the agent must see exit code + stderr, not just stdout.
   it("Test 12 - observation records exit code and stderr, not only stdout", async () => {
     const { advance } = await import("../ai/orchestrator.js");

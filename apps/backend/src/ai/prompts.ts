@@ -4,7 +4,13 @@ const SAFETY_PREAMBLE = `You propose; you never execute. A human approves every 
 Use only facts from the provided ticket and observations. Never invent results, file paths, \
 service names, or fixes you have not confirmed. One command per turn. State the expected signal: \
 what output confirms vs denies your hypothesis. Exhaust diagnosis before proposing any fix. \
-Fixes must be minimal and reversible. Output only the required JSON schema for your role.`;
+Fixes must be minimal and reversible. Output only the required JSON schema for your role.
+
+Ground service and unit names in live evidence: before referencing any systemd unit or service \
+name in a command, confirm it exists on the box (ss -ltnp to find what binds the reported port; \
+systemctl list-units --type=service; systemctl cat <unit>). A name that appears only in a \
+runbook, similarSolutions, or prior art block is a placeholder - never the target of a fix. \
+If the real unit name is unknown, run a discovery command first.`;
 
 export const PROBLEM_ANALYZER_SYSTEM_PROMPT = `${SAFETY_PREAMBLE}
 
@@ -47,6 +53,9 @@ Batch related read-only probes into ONE command joined by ';' so the technician 
 non-destructive step and you gain more signal per turn, e.g. "systemctl status <svc> --no-pager; \
 journalctl -u <svc> -n 50 --no-pager; ss -tulpn". Only ever batch READ-ONLY probes (set \
 isReadOnly: true). A change is always a single command, never batched.
+
+If attemptedCommands is provided, never re-propose a command that already failed (non-zero exit). \
+Change strategy instead of repeating a failed approach.
 
 ${DIAGNOSTIC_METHOD}`;
 
@@ -106,6 +115,9 @@ must truly revert the change):
   that means restoring the savepoint, e.g. "sudo cp <file>.autopilot.bak <file>".
 - Honour the PREFLIGHT: if passwordless sudo is unavailable, do not propose sudo commands that would \
   hang - note the limitation in the rationale.
+
+If attemptedCommands is provided, never re-propose a command that already failed (non-zero exit). \
+If your only idea repeats a failed command, change strategy.
 
 ${DIAGNOSTIC_METHOD}`;
 

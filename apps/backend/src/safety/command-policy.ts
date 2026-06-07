@@ -335,6 +335,39 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
     pattern: /\bkill\s+(-\d+\s+)?1\b/,
     reason: "Killing PID 1 (init) is forbidden",
   },
+
+  // ── Interactive editors / TUIs (non-interactive SSH) ─────────────────────
+  {
+    ruleName: "interactive-tui",
+    pattern: /\bsystemctl\s+edit\b(?!.*--stdin)/i,
+    reason:
+      "systemctl edit opens an interactive editor; write a drop-in under /etc/systemd/system/ with tee instead",
+  },
+  {
+    ruleName: "interactive-tui",
+    pattern: /\bcrontab\s+-e\b/i,
+    reason: "crontab -e is interactive; use a file under /etc/cron.d/ instead",
+  },
+  {
+    ruleName: "interactive-tui",
+    pattern: /\bvisudo\b/i,
+    reason: "visudo is interactive",
+  },
+  {
+    ruleName: "interactive-tui",
+    pattern: /\b(vi|vim|nano|emacs)\b/i,
+    reason: "Interactive editors cannot run over non-interactive SSH",
+  },
+  {
+    ruleName: "interactive-tui",
+    pattern: /\b(less|more|man)\b/i,
+    reason: "Interactive pagers cannot run over non-interactive SSH",
+  },
+  {
+    ruleName: "interactive-tui",
+    pattern: /\btop\b(?!\s+-b\b)/i,
+    reason: "Interactive top cannot run over non-interactive SSH; use top -b -n1",
+  },
 ];
 
 function splitSegments(cmd: string): string[] {
@@ -360,6 +393,10 @@ function normalizeCommand(cmd: string): string {
   }
 
   return result;
+}
+
+export function normalizeCommandForCompare(command: string): string {
+  return normalizeCommand(command);
 }
 
 export function validateCommandAgainstPolicy(command: string): PolicyResult {

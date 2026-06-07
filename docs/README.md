@@ -1,11 +1,13 @@
-# Documentation
+# Sphinx documentation
+
+Project overview and quick start: [README.md](../README.md).
 
 ## Start here
 
 | Reader | Documents |
 |--------|-----------|
 | Judge / reviewer | [../REPORT.md](../REPORT.md), [pitch/PITCH_DECK.md](pitch/PITCH_DECK.md), [SUBMISSION_HANDOFF.md](SUBMISSION_HANDOFF.md), [RESULTS.md](RESULTS.md), [LIMITATIONS.md](LIMITATIONS.md) |
-| Developer | [../README.md](../README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [API.md](API.md) |
+| Developer | [../README.md](../README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [API.md](API.md), [AGENT_PIPELINE.md](AGENT_PIPELINE.md) |
 | Operator | [SAFETY_POLICY.md](SAFETY_POLICY.md), [SECURITY.md](SECURITY.md), [SUBMISSION_HANDOFF.md](SUBMISSION_HANDOFF.md) |
 
 ## Local commands

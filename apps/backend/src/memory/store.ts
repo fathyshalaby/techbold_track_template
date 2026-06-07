@@ -248,14 +248,18 @@ export async function listRecent(limit = 20): Promise<SimilarSolution[]> {
   }));
 }
 
+const PRIOR_ART_HEADER =
+  "PRIOR ART (generic): service names, paths, and ports below are placeholders from runbooks or past incidents. Verify targets on the live system before using them.";
+
 export function formatSimilarSolutions(results: SimilarSolution[]): string {
   if (results.length === 0) return "";
-  return results
+  const body = results
     .map(
       (item, index) =>
         `[${index + 1}] (${item.source}, score ${item.score.toFixed(2)})\nSymptom: ${item.symptom}\nRoot cause: ${item.rootCause}\nFix: ${item.fix}${item.commands ? `\nCommands: ${item.commands}` : ""}`,
     )
     .join("\n\n");
+  return `${PRIOR_ART_HEADER}\n\n${body}`;
 }
 
 type RawEmbeddingRow = {

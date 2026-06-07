@@ -17,6 +17,7 @@ export type ProblemSolverInput = {
   ticketDescription: string;
   observations: string[];
   similarSolutions?: string;
+  attemptedCommands?: string;
 };
 
 export const MOCK_FIX_PROPOSAL: FixProposal = {
@@ -51,6 +52,7 @@ export async function runProblemSolver(
         observations: input.observations,
         ...(runbook ? { runbook } : {}),
         ...(similarSolutions ? { similarSolutions } : {}),
+        ...(input.attemptedCommands ? { attemptedCommands: input.attemptedCommands } : {}),
       }),
       maxTokens: 1024,
     });

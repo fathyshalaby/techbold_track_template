@@ -9,28 +9,28 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { getDashboard } from "@/lib/api";
-import { IconActivity } from "@tabler/icons-react";
+import { IconClipboardCheck } from "@tabler/icons-react";
 import Link from "next/link";
 
-export default async function ActivityPage() {
+export default async function ResolutionsPage() {
   try {
     const dashboard = await getDashboard();
     const states = dashboard.activityStates;
     return (
       <DashboardShell
-        title="Activity"
+        title="Resolutions"
         sourceLabel={undefined}
         healthLabel={dashboard.health.status}
       >
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Activity</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Resolutions</h1>
           <p className="text-sm text-muted-foreground">
-            Drafted and submitted activity write-ups generated from runs.
+            Drafted and submitted resolution write-ups generated from runs.
           </p>
         </div>
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-            <CardTitle className="text-base">Activity states</CardTitle>
+            <CardTitle className="text-base">Resolutions</CardTitle>
             <Badge variant="outline">{states.length}</Badge>
           </CardHeader>
           <CardContent>
@@ -38,11 +38,11 @@ export default async function ActivityPage() {
               <Empty className="border-0 py-10">
                 <EmptyHeader>
                   <EmptyMedia variant="icon">
-                    <IconActivity />
+                    <IconClipboardCheck />
                   </EmptyMedia>
                   <EmptyTitle>Nothing here yet</EmptyTitle>
                   <EmptyDescription>
-                    Activity drafts and submissions appear after run progress.
+                    Resolution drafts and submissions appear after run progress.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -57,7 +57,7 @@ export default async function ActivityPage() {
                     <div className="min-w-0">
                       <div className="font-medium">Ticket #{state.ticketId}</div>
                       <div className="mt-0.5 text-sm text-muted-foreground">
-                        {state.summary ?? "No activity summary yet"}
+                        {state.summary ?? "No resolution summary yet"}
                       </div>
                       {state.validationResult && (
                         <p className="mt-1.5 text-sm">{state.validationResult}</p>
