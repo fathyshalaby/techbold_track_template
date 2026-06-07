@@ -34,7 +34,7 @@ export function getModel(): LanguageModel {
   if (endpoint.includes("services.ai.azure.com") || endpoint.includes("/api/projects/")) {
     // Azure AI Foundry project endpoint — OpenAI-compatible v1 surface
     // ({endpoint}/openai/v1/chat/completions), NOT classic deployment URLs + api-version.
-    const baseURL = endpoint.endsWith("/openai/v1") ? endpoint : `${endpoint}/openai/v1`;
+    const baseURL = azureFoundryBase(endpoint);
     const provider = createOpenAICompatible({
       name: "azure-foundry",
       baseURL,
@@ -51,4 +51,12 @@ export function getModel(): LanguageModel {
     useDeploymentBasedUrls: true,
   });
   return azure(config.azureDeployment);
+}
+
+function azureFoundryBase(value: string): string {
+  let endpoint = value.replace(/\/+$/, "");
+  for (const suffix of ["/responses", "/chat/completions"]) {
+    if (endpoint.endsWith(suffix)) endpoint = endpoint.slice(0, -suffix.length);
+  }
+  return endpoint.endsWith("/openai/v1") ? endpoint : `${endpoint}/openai/v1`;
 }

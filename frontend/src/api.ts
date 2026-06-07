@@ -38,9 +38,26 @@ export interface Health {
 
 export type CaseSourceSelection = "real_erp" | "sandbox_cases";
 
+export interface ModelOption {
+  id: string;
+  provider: string;
+  label: string;
+  model: string;
+  configured: boolean;
+  active: boolean;
+}
+
+export interface ModelSelection {
+  active: { provider: string; model: string; id: string };
+  models: ModelOption[];
+}
+
 export const api = {
   base: BASE,
   health: () => req<Health>("/health"),
+  models: () => req<ModelSelection>("/api/models"),
+  selectModel: (provider: string, model: string) =>
+    req<ModelSelection>("/api/models/select", { method: "POST", body: JSON.stringify({ provider, model }) }),
   caseSource: () =>
     req<Pick<Health, "case_source" | "erp_source" | "sandbox_case_count" | "sandbox_available">>("/api/case-source"),
   setCaseSource: (source: CaseSourceSelection) =>

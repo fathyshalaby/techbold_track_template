@@ -31,7 +31,7 @@ agent spec ([`shared/agent-spec.md`](shared/agent-spec.md)).
 ```
 frontend/  (React + Vite)  ──HTTP──▶  backend-py (:8000)  ──▶  Phoenix ERP (tickets/activities)
    ticket list · detail · run view             OR             ──▶  Customer VM over SSH
-   approve/edit/reject · audit · activity   backend-node (:8001) ──▶  Azure OpenAI gpt-5.4-nano
+   approve/edit/reject · audit · activity   backend-node (:8001) ──▶  Azure OpenAI gpt-5.4 / gpt-5.4-nano
 
 shared/   api-contract.md · safety-rules.json · agent-spec.md · tests/   (single source of truth)
 ```
@@ -87,7 +87,7 @@ Rules live once in `shared/safety-rules.json` and are validated in **both** Pyth
 
 You need **Docker** (or Python 3.11+ and Node 20+ for local dev), plus, from Builder Base:
 - the **Phoenix** base URL + your team **API token**,
-- your **Azure OpenAI** endpoint/key/deployment for `gpt-5.4-nano`,
+- your **Azure OpenAI** endpoint/key/deployments for `gpt-5.4` and `gpt-5.4-nano`,
 - the SSH **`.pem`** key(s) for the customer VMs.
 
 ```bash
@@ -106,8 +106,9 @@ cp tb-hackathon-ssh/*.pem keys/    # keys/ is git-ignored; the SSH runner auto-p
 | `SANDBOX_DOCKER_PRIVILEGED` | Run the sandbox fake VMs privileged so Ubuntu systemd behaves correctly in Docker |
 | `SSH_PRIVATE_KEY_PATH`, `SSH_KEY_DIR`, `SSH_USERNAME` | SSH to the VM (`azureuser`); runner tries the configured key, then every `*.pem` under `SSH_KEY_DIR` recursively |
 | `LLM_PROVIDER` | `azure` (default) · `openrouter` · `local` |
-| `AZURE_OPENAI_ENDPOINT` / `_API_KEY` / `_API_VERSION` / `_DEPLOYMENT` | Azure OpenAI `gpt-5.4-nano` |
-| `LOCAL_BASE_URL`, `LOCAL_MODEL` | Local fallback (LM Studio `:1234/v1` / Ollama `:11434/v1`, e.g. `qwen3-coder-30b`) |
+| `AZURE_OPENAI_ENDPOINT` / `_API_KEY` / `_API_VERSION` / `_DEPLOYMENT` / `_ALLOWED_DEPLOYMENTS` | Azure OpenAI `gpt-5.4` and `gpt-5.4-nano` |
+| `OPENROUTER_API_KEY`, `OPENROUTER_ALLOWED_MODELS` | Optional OpenRouter models shown in the frontend selector when configured |
+| `LOCAL_BASE_URL`, `LOCAL_MODEL` | Optional local fallback (LM Studio `:1234/v1` / Ollama `:11434/v1`) shown only when configured |
 | `VITE_API_BASE` | Which backend the browser calls (`:8000` python · `:8001` node) |
 
 ---
@@ -175,7 +176,7 @@ cd frontend && npm run build
 
 - One incident per ticket; the customer VM is reachable over SSH from where the backend runs.
 - Customer system is a local Linux service problem solvable over the shell (no kernel/bootloader/cloud-net).
-- `gpt-5.4-nano` (Azure) is a small model: tool defs are simple, tool-call JSON is validated, and
+- Azure `gpt-5.4` / `gpt-5.4-nano` are selectable from the UI: tool defs are simple, tool-call JSON is validated, and
   documentation uses structured output. A local model is a fallback, not the primary brain.
 - Runs are kept **in-memory** (single-user hackathon demo). Swap the run store for a DB to persist.
 - The 5 per-case SSH keys are interchangeably tried; the runner uses whichever authenticates.

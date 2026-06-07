@@ -5,6 +5,7 @@ import type { Context } from "hono";
 import { caseSourceStatus, setCaseSource } from "./caseSource";
 import { config } from "./config";
 import { ERPError, erp } from "./erp";
+import * as models from "./models";
 import * as runs from "./runs";
 import { SSHRunner } from "./ssh";
 
@@ -46,6 +47,14 @@ app.post("/api/case-source", (c) =>
       llm_provider: config.llmProvider,
       ...caseSourceStatus(),
     };
+  }),
+);
+
+app.get("/api/models", (c) => c.json(models.listModels()));
+app.post("/api/models/select", (c) =>
+  handle(c, async () => {
+    const body = await c.req.json();
+    return models.selectModel(String(body.provider || ""), String(body.model || ""));
   }),
 );
 

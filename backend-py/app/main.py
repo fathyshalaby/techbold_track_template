@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from . import runs
+from . import models, runs
 from .case_source import set_case_source, status as case_source_status
 from .config import settings
 from .erp import ERPError, PhoenixClient
@@ -60,6 +60,11 @@ class CaseSourceBody(BaseModel):
     source: str
 
 
+class ModelSelectionBody(BaseModel):
+    provider: str
+    model: str
+
+
 @app.get("/api/case-source")
 def get_case_source():
     return case_source_status()
@@ -72,6 +77,19 @@ def update_case_source(body: CaseSourceBody):
     except ValueError as exc:
         raise HTTPException(status_code=422, detail={"error": {"code": "case_source_error", "message": str(exc)}})
     return health()
+
+
+@app.get("/api/models")
+def get_models():
+    return models.list_models()
+
+
+@app.post("/api/models/select")
+def select_model(body: ModelSelectionBody):
+    try:
+        return models.select_model(body.provider, body.model)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"error": {"code": "model_error", "message": str(exc)}})
 
 
 @app.get("/api/me")

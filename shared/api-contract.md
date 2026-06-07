@@ -32,6 +32,8 @@ and are never exposed to the browser.
 | GET | `/api/tickets/{id}/system` | SSH target metadata (`SystemInfo`, no secrets) | `GET /api/v1/tickets/{id}/customer-system` |
 | GET | `/api/tickets/{id}/connection` | Backend-only SSH reachability check (`ConnectionCheck`, no secrets) | `GET /api/v1/tickets/{id}/customer-system` + SSH connect |
 | POST | `/api/reset` | Dev: clear activities + reboot VMs | `POST /api/v1/me/reset` |
+| GET | `/api/models` | Configured LLM model selector metadata | — |
+| POST | `/api/models/select` | `{ provider, model }` switches future LLM calls | — |
 
 - `status` ∈ `OPEN | PENDING | DONE` · `sort` ∈ `date | priority | status` (default `date`).
 - `Ticket`, `Employee`, `SystemInfo` mirror `docs/phoenix-openapi.yaml` exactly.
@@ -119,6 +121,21 @@ in the ERP (rubric D: review; rubric A: complete activity).
   "commands_summary": "Relevant commands / command classes — no secret output.",
   "validation_result": "Concrete proof the customer benefit is restored.",
   "description": "Longer free-text (Phoenix requires `description`)."
+}
+
+// Model selector — only configured backends are returned; API keys never leave the backend.
+{
+  "active": { "provider": "azure", "model": "gpt-5.4", "id": "azure:gpt-5.4" },
+  "models": [
+    {
+      "id": "azure:gpt-5.4",
+      "provider": "azure",
+      "label": "Azure · gpt-5.4",
+      "model": "gpt-5.4",
+      "configured": true,
+      "active": true
+    }
+  ]
 }
 
 // RunEvent (SSE `data:` payloads)

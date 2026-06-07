@@ -21,6 +21,20 @@ class LLMError(Exception):
     pass
 
 
+def reset_client() -> None:
+    global _client, _model
+    _client = None
+    _model = None
+
+
+def _azure_foundry_base(endpoint: str) -> str:
+    endpoint = endpoint.rstrip("/")
+    for suffix in ("/responses", "/chat/completions"):
+        if endpoint.endswith(suffix):
+            endpoint = endpoint[: -len(suffix)]
+    return endpoint if endpoint.endswith("/openai/v1") else endpoint + "/openai/v1"
+
+
 def _build() -> tuple[Any, str]:
     global _client, _model
     if _client is not None and _model is not None:
@@ -31,7 +45,7 @@ def _build() -> tuple[Any, str]:
         if "services.ai.azure.com" in endpoint or "/api/projects/" in endpoint:
             # Azure AI Foundry project endpoint — OpenAI-compatible v1 surface
             # ({endpoint}/openai/v1/chat/completions), NOT classic deployment URLs + api-version.
-            base = endpoint if endpoint.endswith("/openai/v1") else endpoint + "/openai/v1"
+            base = _azure_foundry_base(endpoint)
             _client = OpenAI(
                 base_url=base,
                 api_key=settings.azure_openai_api_key,
