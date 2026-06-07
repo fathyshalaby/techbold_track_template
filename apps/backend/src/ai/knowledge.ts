@@ -17,12 +17,18 @@ Loop: TRIAGE -> ISOLATE (USE) -> ROOT CAUSE (5 Whys) -> DURABLE FIX -> VALIDATE 
   the first Error found is often the cause; saturation usually hurts before utilization hits 100%.
 - Root cause != symptom: "restarted the service" is mitigation, not a cause. Keep going until ONE
   hypothesis is confirmed by a specific evidence line and the cause is technical (WHY it failed).
+- PARTIAL failure = bisect by OPERATION, not by service up/down: when one action works and a related
+  one fails (reads succeed but writes/INSERTs fail; health 200 but a feature errors; service active but
+  the customer test fails; a process runs but emits stale/no data), the service is NOT down - the fault
+  is a specific permission, privilege, config value, or dependency on the FAILING path. Reproduce the
+  exact failing customer action, read its specific error, and fix that path - do not restart blindly.
 - DURABLE fix: a runtime-only change (start without enable, /run drop-in, in-memory) does NOT survive
   reboot. Durable = on-disk config under /etc + enable the unit + daemon-reload. Minimal & reversible:
   a targeted one-line / one-path change - never blanket or recursive changes on system roots.
-- VALIDATE with a customer-benefit functional test (an endpoint returns the expected code, a DB accepts
-  a connection, a job completes) AND a persistence check (restart the unit, re-run the test). A process
-  showing "active" alone is NOT proof of customer benefit.
+- VALIDATE the EXACT customer operation the ticket describes (the failing endpoint returns the expected
+  code, the write/INSERT now succeeds, the dependency is reachable, the data is fresh/increasing) AND
+  persistence: the unit is is-enabled and the fix survives a restart/reboot, AND existing customer data
+  was preserved (never destroyed to "fix" a permission). A process showing "active" alone is NOT proof.
 - If a RUNBOOK block is provided in the input, use its diagnose commands, root-cause list, durable-fix
   vs anti-pattern, and "avoid" guidance for this symptom class - but still verify on the live box.
 `.trim();
@@ -54,21 +60,31 @@ const RUNBOOKS: readonly Runbook[] = [
       "restart",
       "timer",
       "enable",
+      "enabled",
+      "disabled",
       ".service",
       "boot",
+      "override",
+      "drop-in",
+      "environment",
+      "stale",
     ],
-    digest: `RUNBOOK systemd & service lifecycle (won't start, crash-loop, masked, deps, timers):
+    digest: `RUNBOOK systemd & service lifecycle (won't start, crash-loop, masked, deps, DISABLED, bad drop-in):
 Diagnose: systemctl --failed; systemctl status UNIT --no-pager -l; systemctl is-enabled/is-active UNIT;
-journalctl -xeu UNIT -n 100 --no-pager; systemctl cat UNIT (effective merged unit incl. drop-ins);
-systemctl show UNIT -p Result,ExecMainStatus,ExecMainCode,NRestarts. Field tells: LoadState=masked->blocked;
-Result=exit-code->app exited non-zero; Result=start-limit-hit->rate-limited (cause is UPSTREAM, the limiter is
-just the brake); Result=oom-kill->OOM; ActiveState=activating(auto-restart)->crash-looping.
-Root causes: bad ExecStart path / binary not executable; non-zero app exit (config error, missing dep/file/port);
-unit masked; failed dependency; OOM-killed.
-Durable fix: correct on-disk unit/config under /etc (or a drop-in /etc/systemd/system/UNIT.d/override.conf) +
-systemctl daemon-reload + systemctl enable --now UNIT; systemctl unmask if masked. NOT durable: 'start' alone,
+journalctl -xeu UNIT -n 100 --no-pager; systemctl cat UNIT (effective MERGED unit incl. drop-ins - read it carefully);
+systemctl show UNIT -p Result,ExecMainStatus,ExecMainCode,NRestarts,Environment. Field tells: LoadState=masked->blocked;
+is-enabled=disabled->won't start on boot (the fault may simply be a stopped+disabled unit); Result=exit-code->app exited
+non-zero; Result=start-limit-hit->rate-limited (cause is UPSTREAM); Result=oom-kill->OOM; activating(auto-restart)->crash-loop.
+Root causes: unit stopped AND disabled (won't come back after reboot); bad ExecStart path / binary not executable;
+non-zero app exit (config error, missing dep/file/port); unit masked; failed dependency; OOM-killed;
+*** BAD DROP-IN OVERRIDE *** - the vendor unit is fine but an override injects a wrong value: 'systemctl cat UNIT' shows
+a [Service] line (Environment=/ExecStart=/User=) that came from /etc/systemd/system/UNIT.d/*.conf or /run/.../UNIT.d/*.conf;
+the service runs but mis-behaves (points at the wrong endpoint/path) -> the override IS the cause.
+Durable fix: for a disabled unit, systemctl enable --now UNIT. For a bad override, correct or REMOVE the offending drop-in
+file then systemctl daemon-reload + restart. Otherwise fix the on-disk unit/config under /etc (or add a correct
+/etc/systemd/system/UNIT.d/override.conf) + daemon-reload + enable --now; unmask if masked. NOT durable: 'start' alone,
 /run drop-ins, set-environment.
-Validate: systemctl is-active && is-enabled UNIT; the service's functional test passes; restart UNIT and re-test.
+Validate: systemctl is-active AND is-enabled UNIT; the service's functional test passes; restart UNIT and re-test.
 Avoid: editing vendor units in /lib (use an /etc drop-in); masking to "fix"; restarting unrelated units.`,
   },
   {
@@ -99,18 +115,29 @@ Avoid: editing vendor units in /lib (use an /etc drop-in); masking to "fix"; res
       "connection",
       "timeout",
       "unreachable",
+      "hosts",
+      "/etc/hosts",
+      "resolution",
+      "upstream",
+      "partner",
+      "dependency",
+      "reach",
     ],
-    digest: `RUNBOOK networking / web / TLS (ports, bind, firewall, DNS, 502/504, certs):
+    digest: `RUNBOOK networking / web / TLS / name-resolution (ports, bind, firewall, DNS, /etc/hosts, 502/504, certs):
 Diagnose: ss -ltnp (is it listening, on which address:port, which pid); curl -sS -o /dev/null -w '%{http_code}'
-http://localhost:PORT/ (test locally, bypass the proxy); ufw status / iptables -S (firewall); resolvectl status
-or getent hosts NAME (DNS); journalctl -u <proxy>; nginx -t / apachectl configtest (config syntax);
-openssl x509 -enddate -noout -in <cert> (expiry); openssl s_client -connect HOST:443 (chain).
-Root causes: bound to 127.0.0.1 only (not 0.0.0.0); firewall blocking the port; wrong/expired cert or missing
-intermediate; upstream down -> 502; upstream slow/timeout -> 504; DNS failure; config syntax error.
-Durable fix: correct the listen/bind directive in the on-disk config + reload (nginx -t then nginx -s reload);
-ufw allow <port> (targeted - NEVER disable the firewall); renew/replace cert + reload; fix the upstream.
-Validate: curl the real endpoint returns the expected status from the intended interface; restart and re-test.
-Avoid: ufw disable / iptables -F (hard-fail); chmod 777 on web roots; swapping certs without a reload.`,
+http://localhost:PORT/ (test locally, bypass the proxy); ufw status / iptables -S (firewall);
+*** NAME RESOLUTION *** getent hosts NAME (shows the EFFECTIVE answer incl. /etc/hosts, which wins over DNS via nsswitch);
+cat /etc/hosts (a wrong or stale 'IP  hostname' line silently routes a dependency to the wrong/black-hole IP);
+resolvectl status / dig NAME (DNS proper); then curl/nc the dependency by name AND by expected IP to localise the break.
+journalctl -u <proxy/client svc>; nginx -t / apachectl configtest; openssl x509 -enddate -noout -in <cert> (expiry).
+Root causes: bound to 127.0.0.1 only (not 0.0.0.0); firewall blocking the port; *** wrong /etc/hosts entry pointing a
+dependency hostname at a bad IP ***; DNS failure; wrong/expired cert; upstream/dependency down -> 502; slow -> 504.
+Durable fix: for a bad /etc/hosts line, correct it to the right IP (or remove the stale override so DNS resolves);
+correct the listen/bind directive + reload (nginx -t then nginx -s reload); ufw allow <port> (targeted - NEVER disable
+the firewall); renew/replace cert + reload; bring up/repair the dependency.
+Validate: resolve the name to the correct IP (getent hosts NAME) AND curl the dependency endpoint succeeds from the
+client service; the customer feature works end-to-end; restart and re-test.
+Avoid: ufw disable / iptables -F (hard-fail); chmod 777 on web roots; blanket-rewriting /etc/hosts; swapping certs without a reload.`,
   },
   {
     id: "resource-exhaustion",
@@ -175,19 +202,36 @@ Avoid: rm -rf on /var/log or system dirs (hard-fail; wipes the audit trail); tru
       "5432",
       "3306",
       "socket",
+      "grant",
+      "revoke",
+      "privilege",
+      "sequence",
+      "insert",
+      "write",
+      "role",
+      "upload",
+      "writable",
     ],
-    digest: `RUNBOOK data / access / scheduling (DBs, file perms, sudo, cron-timers, app config, AppArmor/SELinux):
-Diagnose: (db) systemctl status postgresql|mysql; sudo -u postgres psql -c '\\l' or mysqladmin ping; tail the db log;
-ss -ltnp | grep -E '5432|3306'. (perms) ls -ld <path>; namei -l <path>; id <svc-user> - compare ownership to the
-service user. (sudo) sudo -n true. (cron) systemctl list-timers; journalctl -u <timer>; crontab -l. (MAC) aa-status
-or getenforce; journalctl | grep -iE 'apparmor|denied|avc'. (config) the app's own config file + its error log.
-Root causes: db not listening / wrong auth (pg_hba.conf); file/dir owned by the wrong user -> 'permission denied';
-AppArmor/SELinux denial; cron/timer not enabled or wrong schedule/path; app config pointing at the wrong host/port/socket.
-Durable fix: targeted chown <svc-user>:<grp> <specific path> / chmod with a least-privilege mode (never recursive 777
-on system roots); fix pg_hba/my.cnf + reload; systemctl enable --now UNIT.timer; correct the on-disk app config; add a
-specific MAC rule (do not blanket-disable AppArmor/SELinux).
-Validate: the access succeeds AS the service user; the scheduled job runs on time; functional test passes; survives restart.
-Avoid: chmod -R 777 or blanket chown on /; dropping/altering customer DBs or data (hard-fail); disabling AppArmor/SELinux.`,
+    digest: `RUNBOOK data / access / scheduling (DB privileges, file perms, sudo, cron-timers, app config, AppArmor/SELinux):
+Diagnose: (db up?) systemctl status postgresql|mysql; sudo -u postgres psql -c '\\l' or mysqladmin ping; tail the db log;
+ss -ltnp | grep -E '5432|3306'. (auth) pg_hba.conf. (*** DB PRIVILEGES - reads work but writes fail ***) connect AS the
+app role and reproduce the failing statement to read the exact error; in psql: \\dp <table> and \\z <table> show table
+grants, \\ds shows sequences. An INSERT into a SERIAL/identity column needs USAGE,SELECT on the OWNING SEQUENCE, not just
+INSERT on the table - so SELECT can succeed while INSERT fails with 'permission denied for sequence'. Check the role's
+grants on BOTH the table and its sequence(s). (perms) ls -ld <path>; namei -l <path>; id <svc-user> - compare ownership/mode
+to the service user; for an upload/data dir the service user must be able to WRITE. (sudo) sudo -n true. (cron) systemctl
+list-timers; journalctl -u <timer>; crontab -l. (MAC) aa-status/getenforce; journalctl | grep -iE 'apparmor|denied|avc'.
+Root causes: db not listening / wrong auth; *** role missing privilege on the write path (sequence USAGE for INSERT, or
+table INSERT/UPDATE) ***; file/dir owned by the wrong user or wrong mode -> 'permission denied' on write; MAC denial;
+cron/timer not enabled or wrong schedule; app config pointing at the wrong host/port/socket.
+Durable fix: GRANT the minimal missing privilege to the role (e.g. GRANT USAGE, SELECT ON SEQUENCE <seq> TO <role>; and/or
+GRANT INSERT ON <table> TO <role>;) - consider ALTER DEFAULT PRIVILEGES for future objects; targeted chown <svc-user>:<grp>
+<specific path> + least-privilege chmod (NEVER recursive 777, and preserve existing files); fix pg_hba/my.cnf + reload;
+systemctl enable --now UNIT.timer; correct the on-disk app config; add a specific MAC rule.
+Validate: connect AS the app role and the failing statement (INSERT/UPDATE) now succeeds; the service user can write the dir
+AND existing data is intact; the scheduled job runs; functional test passes; survives restart.
+Avoid: GRANT ALL / superuser as a shortcut; chmod -R 777 or blanket chown; deleting/recreating data or dropping the DB to
+"fix" a permission (hard-fail - destroys customer data); disabling AppArmor/SELinux.`,
   },
 ];
 
