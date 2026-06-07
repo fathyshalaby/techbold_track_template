@@ -39,12 +39,21 @@ services:
       # any host-absolute SSH_PRIVATE_KEY_DIR left in .env (the env block wins
       # over env_file). The executor tries every *.pem in it until one auths.
       SSH_PRIVATE_KEY_DIR: ${SSH_PRIVATE_KEY_DIR_CONTAINER:-/keys}
+      SSH_PRIVATE_KEY_PATH: ${SSH_PRIVATE_KEY_PATH_CONTAINER:-/keys/bench_incident_key}
+      # Dashboard VM generator: talk to the host Docker daemon, publish SSH on
+      # 127.0.0.1, connect back via host.docker.internal from this container.
+      SANDBOX_SSH_HOST: ${SANDBOX_SSH_HOST:-host.docker.internal}
+      SANDBOX_PUBLISH_HOST: ${SANDBOX_PUBLISH_HOST:-127.0.0.1}
+      SANDBOX_DOCKER_PRIVILEGED: ${SANDBOX_DOCKER_PRIVILEGED:-true}
       # Trained MLX adapter on the Mac host (bun run model:serve, :8011).
       CUSTOM_MODEL_BASE_URL: ${CUSTOM_MODEL_BASE_URL:-http://host.docker.internal:8011/v1}
       CUSTOM_MODEL_SERVED_ID: ${CUSTOM_MODEL_SERVED_ID:-mlx-community/Qwen2.5-1.5B-Instruct-4bit}
     ports:
       - "8000:8000"
+    user: "0:0"
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./infra/sandbox:/app/infra/sandbox:ro
       - ./keys:/keys:ro
       - autopilot-data:/app/apps/backend/data
     extra_hosts:

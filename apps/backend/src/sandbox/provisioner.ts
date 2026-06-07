@@ -10,7 +10,7 @@ const execFileAsync = promisify(execFile);
 const sandboxModuleDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(sandboxModuleDir, "../../../..");
 const sandboxDir = resolve(repoRoot, "infra/sandbox");
-const publicKeyPath = resolve(repoRoot, "keys/bench_incident_key.pub");
+const publicKeyName = "bench_incident_key.pub";
 const baseDockerfile = resolve(sandboxDir, "Dockerfile.base");
 const baseImageTag = "sda-sandbox-base:latest";
 const labelKey = "techbold.sandbox";
@@ -62,13 +62,36 @@ function privilegedEnabled(): boolean {
   return process.env.SANDBOX_DOCKER_PRIVILEGED?.trim().toLowerCase() !== "false";
 }
 
+// Docker -p bind address on the daemon host (always 127.0.0.1). system.ip is the
+// SSH connect target (host.docker.internal from inside compose, 127.0.0.1 on host).
+function sandboxPublishHost(): string {
+  return process.env.SANDBOX_PUBLISH_HOST?.trim() || "127.0.0.1";
+}
+
+// The bench public key lives next to its private keypair. On the host that is
+// <repoRoot>/keys; in the backend container the repo keys/ dir is mounted at the
+// path in SSH_PRIVATE_KEY_DIR (compose pins it to /keys), so <repoRoot>/keys
+// (i.e. /app/keys) does not exist there. Check the configured key dir first,
+// then fall back to the repo-relative path. Never generate a new key.
+function benchPublicKeyCandidates(): string[] {
+  const candidates: string[] = [];
+  const configuredDir = (process.env.SSH_PRIVATE_KEY_DIR ?? "").trim();
+  if (configuredDir !== "") {
+    candidates.push(resolve(configuredDir, publicKeyName));
+  }
+  candidates.push(resolve(repoRoot, "keys", publicKeyName));
+  return candidates;
+}
+
 export function readBenchPublicKey(): string {
-  if (!existsSync(publicKeyPath)) {
+  const candidates = benchPublicKeyCandidates();
+  const found = candidates.find((path) => existsSync(path));
+  if (!found) {
     throw new Error(
-      `Missing ${publicKeyPath}. Reuse keys/bench_incident_key.pub; do not generate or commit a new key.`,
+      `Missing ${candidates.join(" or ")}. Reuse keys/${publicKeyName}; do not generate or commit a new key.`,
     );
   }
-  return readFileSync(publicKeyPath, "utf8").trim();
+  return readFileSync(found, "utf8").trim();
 }
 
 async function imageExists(tag: string): Promise<boolean> {
@@ -198,7 +221,7 @@ export async function runScenarioContainer(scenario: Scenario): Promise<void> {
     "-v",
     cgroupMount,
     "-p",
-    `${scenario.system.ip}:${scenario.system.port}:22`,
+    `${sandboxPublishHost()}:${scenario.system.port}:22`,
   ];
   if (privileged) args.push("--privileged");
   if (scenario.archetype === "partner-sync") {

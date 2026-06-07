@@ -15,7 +15,10 @@ COPY apps/dashboard/package.json apps/dashboard/
 COPY packages/contracts/package.json packages/contracts/
 RUN bun install --frozen-lockfile --filter techbold-track-backend
 
+FROM docker:27-cli AS docker-cli
+
 FROM node:22-slim
+COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 # Bun uses an isolated store (node_modules/.bun) plus per-package symlink trees.
@@ -31,7 +34,7 @@ COPY apps/backend/src ./apps/backend/src
 # Backend imports @techbold/contracts at runtime; the node_modules symlink resolves
 # to this workspace source, so it must ship in the runtime image.
 COPY packages/contracts ./packages/contracts
-RUN mkdir -p /app/apps/backend/data && chown -R node:node /app
+RUN mkdir -p /app/apps/backend/data /app/infra/sandbox && chown -R node:node /app
 USER node
 WORKDIR /app/apps/backend
 EXPOSE 8000
