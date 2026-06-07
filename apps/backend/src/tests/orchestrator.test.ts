@@ -1335,4 +1335,36 @@ describe("orchestrator driver - integration", () => {
       .find((a) => a.status === "PENDING");
     expect(pending?.proposed_command).toBe(MOCK_FIX.rollbackCommand);
   });
+
+  // Info-first batching: a single read-only baseline sweep gathers ground truth
+  // in one non-destructive step at run start, stored as one observation.
+  it("Test 17 - baseline sweep batches read-only ground truth at run start", async () => {
+    const { advance } = await import("../ai/orchestrator.js");
+    const { createRun } = await import("../store/runs.js");
+    const { getDb } = await import("../store/db.js");
+    const { getAuditEvents } = await import("../store/audit.js");
+    type SshExecutor = import("../ssh/types.js").SshExecutor;
+    const exec = {
+      executeApprovedCommand: vi.fn().mockResolvedValue({
+        stdout: "== failed units ==\nstatus-api.service failed",
+        stderr: "",
+        exitCode: 0,
+        durationMs: 2,
+        timedOut: false,
+      }),
+      runPreflight: vi.fn(),
+    } as unknown as SshExecutor;
+
+    const run = createRun(1, "10.0.0.1:22");
+    await advance(run.id, undefined, undefined, exec); // first /next runs the sweep
+
+    const sweep = getDb()
+      .all<{ source: string; content: string }>("SELECT * FROM observations WHERE run_id = ?", [
+        run.id,
+      ])
+      .find((o) => o.source === "ssh" && o.content.startsWith("BASELINE SWEEP"));
+    expect(sweep).toBeDefined();
+    expect(sweep?.content).toContain("status-api.service failed");
+    expect(getAuditEvents(run.id).some((e) => e.type === "baseline.completed")).toBe(true);
+  });
 });

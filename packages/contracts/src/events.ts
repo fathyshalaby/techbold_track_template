@@ -7,6 +7,7 @@
 export const SSE_EVENT_TYPES = [
   "run.started",
   "preflight.completed",
+  "baseline.completed",
   "agent.unavailable",
   "approval.required",
   "command.approved",

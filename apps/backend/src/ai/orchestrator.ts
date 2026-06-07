@@ -535,6 +535,52 @@ async function runPreflightOnce(
   }
 }
 
+// Info-first + batching: a single, fixed, READ-ONLY ground-truth sweep run as ONE
+// non-destructive step at run start. Batching the canonical baseline probes into
+// one command (one SSH round-trip, one observation) gives the agent rich context
+// immediately — instead of spending several approval round-trips rediscovering it
+// — and enforces a consistent "gather data first" order. Developer-authored and
+// read-only (never mutates), so it is system-run like the preflight, not gated.
+const BASELINE_SWEEP_COMMAND = [
+  "echo '== failed units =='",
+  "systemctl --failed --no-pager 2>&1 | head -n 40",
+  "echo '== recent errors =='",
+  "journalctl -p err -n 30 --no-pager 2>&1 | tail -n 30",
+  "echo '== listening sockets =='",
+  "ss -tulpn 2>&1 | head -n 40",
+  "echo '== disk =='",
+  "df -h 2>&1",
+  "echo '== memory =='",
+  "free -m 2>&1",
+].join("; ");
+
+async function runBaselineSweepOnce(
+  state: OrchestratorState,
+  db: DbAdapter,
+  sshExecutor?: SshExecutor,
+): Promise<void> {
+  const already = db
+    .all<{ source: string; content: string }>("SELECT * FROM observations WHERE run_id = ?", [
+      state.runId,
+    ])
+    .some((o) => o.source === "ssh" && o.content.startsWith("BASELINE SWEEP"));
+  if (already) return;
+  try {
+    const exec = sshExecutor ?? createSshExecutor();
+    const result = await exec.executeApprovedCommand(
+      "baseline:sweep",
+      BASELINE_SWEEP_COMMAND,
+      buildSshTarget(state.customerSystemId),
+    );
+    const body = redactSecrets(result.stdout || result.stderr || "(no output)");
+    appendObservation(state.runId, "ssh", `BASELINE SWEEP (read-only ground truth)\n${body}`);
+    appendAuditEvent(state.runId, "baseline.completed", "system", {});
+    runEventBus.emit(state.runId, "baseline.completed", {});
+  } catch {
+    // Best-effort; the run proceeds without the baseline.
+  }
+}
+
 export function createInitialState(run: Run): OrchestratorState {
   return {
     runId: run.id,
@@ -608,8 +654,9 @@ async function agentDispatch(
 
   switch (currentState.phase) {
     case "CREATED": {
-      // Info-first: read-only ground-truth sweep before any agent reasoning.
+      // Info-first: read-only ground-truth gathering before any agent reasoning.
       await runPreflightOnce(currentState, db, sshExecutor);
+      await runBaselineSweepOnce(currentState, db, sshExecutor);
       appendAuditEvent(currentState.runId, "run.started", "system", {
         ticketDescription: readTicketContext(currentState, db),
       });
@@ -626,6 +673,7 @@ async function agentDispatch(
 
     case "LOADED_CONTEXT": {
       await runPreflightOnce(currentState, db, sshExecutor);
+      await runBaselineSweepOnce(currentState, db, sshExecutor);
       updateRunPhase(currentState.runId, "TRIAGING");
       return agentDispatch({ ...currentState, phase: "TRIAGING" }, db, sshExecutor);
     }

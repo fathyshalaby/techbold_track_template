@@ -6,6 +6,7 @@ import { SOURCE_LABELS, SSE_EVENT_TYPES } from "./index.js";
 const EXPECTED_SSE_EVENTS = [
   "run.started",
   "preflight.completed",
+  "baseline.completed",
   "agent.unavailable",
   "approval.required",
   "command.approved",
@@ -32,7 +33,7 @@ const EXPECTED_SSE_EVENTS = [
 describe("shared contracts", () => {
   it("exports the canonical SSE event tuple", () => {
     expect(SSE_EVENT_TYPES).toEqual(EXPECTED_SSE_EVENTS);
-    expect(SSE_EVENT_TYPES).toHaveLength(23);
+    expect(SSE_EVENT_TYPES).toHaveLength(24);
   });
 
   it("exports typed source labels", () => {
