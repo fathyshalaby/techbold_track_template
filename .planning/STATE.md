@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "06-03 complete — SSE events route (createSseStream, eventsRouter, audit↔bus symmetry test)"
-last_updated: "2026-06-07T00:56:35Z"
-last_activity: 2026-06-07 -- Phase 06 Plan 03 complete (SSE events route)
+stopped_at: "07-03 complete — activityRouter mounted in app.ts; full test suite green (473 tests, 20 files)"
+last_updated: "2026-06-07T02:28:30Z"
+last_activity: 2026-06-07 -- Phase 07 Plan 03 complete (phase complete)
 progress:
   total_phases: 9
-  completed_phases: 5
-  total_plans: 24
-  completed_plans: 22
-  percent: 56
+  completed_phases: 6
+  total_plans: 27
+  completed_plans: 24
+  percent: 67
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-06)
 
 **Core value:** Win B+C (55 pts) — solve hidden Linux-service incidents on fresh VMs, safely and auditably
-**Current focus:** Phase 06 — run-api-approvals-sse
+**Current focus:** Phase 07 — activity-generation
 
 ## Current Position
 
-Phase: 06 (run-api-approvals-sse) — EXECUTING
-Plan: 4 of 4
-Status: Ready to execute
-Last activity: 2026-06-07 -- Phase 06 Plan 01 complete (run lifecycle routes)
+Phase: 07 (activity-generation) — EXECUTING
+Plan: 3 of 3 (complete)
+Status: Phase 07 complete — ready for Phase 08
+Last activity: 2026-06-07 -- Plan 07-03 complete
 
 Progress: [██░░░░░░░░] 25%
 

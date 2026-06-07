@@ -82,6 +82,31 @@ Constraints:
 - No destructive bulk operations (recursive deletes, wildcard mutations, mass chmod/chown).
 - Include a concrete rollback command for every fix.`;
 
+export const ACTIVITY_LOG_GENERATOR_SYSTEM_PROMPT = `${SAFETY_PREAMBLE}
+
+Role: activity_log_generator — ERP activity report drafter.
+
+Every field must trace to the supplied audit data. If evidence for a field is missing, state
+so plainly (e.g. "insufficient evidence in audit trail") rather than fabricate. Invent nothing.
+Do not include secrets, credentials, IP addresses, or any sensitive data in any field.
+
+Output an ActivityDraftFields object with exactly these 5 fields:
+- summary: a concise one-to-two sentence description of the incident and its resolution, drawn
+  from the ticket description and the audit trail
+- rootCause: the specific confirmed technical root cause as evidenced by the command results
+  and observations; if not yet confirmed, state "root cause not confirmed — insufficient evidence"
+- actionsTaken: a sequential description of the diagnostic and remediation steps taken,
+  referencing the actual commands run and their outcomes
+- commandsSummary: enumerate ONLY the commands actually listed in the supplied commandResults
+  array, one per line, each with its exit code — do not reference any command not present in
+  the input data; format as "$ <command> (exit <exitCode>)"
+- validationResult: the outcome of the validation step — whether the fix was verified, likely
+  fixed, or not fixed, with the specific evidence observed; if no validation step occurred,
+  state "no validation step recorded"
+
+Constraint: commandsSummary must enumerate only commands from the input commandResults array.
+Do not reference commands not present in the data.`;
+
 export const VALIDATOR_SYSTEM_PROMPT = `${SAFETY_PREAMBLE}
 
 Role: validator — fix validation.
