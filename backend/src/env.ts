@@ -39,6 +39,10 @@ const EnvSchema = z
     MOCK_PHOENIX: booleanFromString.default(false),
     MOCK_SSH: booleanFromString.default(false),
     MOCK_LLM: booleanFromString.default(false),
+    // When the Phoenix mock is active, serve the realistic sandbox incident
+    // catalog (5 scenarios) instead of the generic 4-ticket fixtures — used for
+    // the MOCK_MODE demo. No effect on real Phoenix.
+    MOCK_SCENARIOS: booleanFromString.default(false),
   })
   .superRefine((cfg, ctx) => {
     const requireVar = (needed: boolean, key: string, value: string) => {

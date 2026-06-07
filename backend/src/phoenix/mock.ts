@@ -1,5 +1,6 @@
 import type { Activity, ActivityCreate, CustomerSystem, Employee, Ticket, TicketStatus } from './types.js';
 import { PhoenixNotFoundError } from './client.js';
+import { scenarioTickets, scenarioCustomerSystems } from '../sandbox/registry.js';
 
 export const MOCK_TICKETS: Ticket[] = [
   {
@@ -51,15 +52,38 @@ export const MOCK_CUSTOMER_SYSTEMS: Record<number, CustomerSystem> = {
   4: { ticket_id: 4, customer_id: 1004, system: { ip: '10.0.0.4', port: 22, username: 'azureuser', os: 'Ubuntu 22.04 LTS' } },
 };
 
+// Realistic-incident dataset from the sandbox scenario catalog. Module-level and
+// mutable so per-request mock clients share state (a status change persists).
+// Opt-in via the constructor (MOCK_SCENARIOS env) so the fixtures above stay the
+// deterministic 4-ticket set the unit tests pin.
+export const SCENARIO_TICKETS: Ticket[] = scenarioTickets() as Ticket[];
+export const SCENARIO_CUSTOMER_SYSTEMS: Record<number, CustomerSystem> = scenarioCustomerSystems();
+
 const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
+export interface MockPhoenixOptions {
+  // When true, serve the realistic sandbox incident catalog instead of the
+  // generic 4-ticket fixture set (used for the MOCK_MODE demo).
+  seedScenarios?: boolean;
+}
+
 export default class MockPhoenixClient {
+  private readonly tickets: Ticket[];
+  private readonly customerSystems: Record<number, CustomerSystem>;
+
+  constructor(opts?: MockPhoenixOptions) {
+    // Hold the shared module-level arrays by reference so setStatus mutations
+    // persist across per-request client instances (matches prior behaviour).
+    this.tickets = opts?.seedScenarios ? SCENARIO_TICKETS : MOCK_TICKETS;
+    this.customerSystems = opts?.seedScenarios ? SCENARIO_CUSTOMER_SYSTEMS : MOCK_CUSTOMER_SYSTEMS;
+  }
+
   async listTickets(query?: {
     status?: TicketStatus;
     priority?: string;
     sort?: 'date' | 'priority' | 'status';
   }): Promise<Ticket[]> {
-    let result = [...MOCK_TICKETS];
+    let result = [...this.tickets];
 
     if (query?.status !== undefined) {
       result = result.filter((t) => t.status === query.status);
@@ -81,14 +105,14 @@ export default class MockPhoenixClient {
 
   async getTicket(ticketId: number): Promise<Ticket> {
     this.validateTicketId(ticketId);
-    const ticket = MOCK_TICKETS.find((t) => t.id === ticketId);
+    const ticket = this.tickets.find((t) => t.id === ticketId);
     if (!ticket) throw new PhoenixNotFoundError(`Ticket ${ticketId} not found`);
     return Promise.resolve(ticket);
   }
 
   async getCustomerSystem(ticketId: number): Promise<CustomerSystem> {
     this.validateTicketId(ticketId);
-    const cs = MOCK_CUSTOMER_SYSTEMS[ticketId];
+    const cs = this.customerSystems[ticketId];
     if (!cs) throw new PhoenixNotFoundError(`CustomerSystem for ticket ${ticketId} not found`);
     return Promise.resolve(cs);
   }
@@ -117,10 +141,10 @@ export default class MockPhoenixClient {
 
   async setStatus(ticketId: number, status: TicketStatus): Promise<Ticket> {
     this.validateTicketId(ticketId);
-    const idx = MOCK_TICKETS.findIndex((t) => t.id === ticketId);
+    const idx = this.tickets.findIndex((t) => t.id === ticketId);
     if (idx === -1) throw new PhoenixNotFoundError(`Ticket ${ticketId} not found`);
-    MOCK_TICKETS[idx] = { ...MOCK_TICKETS[idx], status };
-    return Promise.resolve({ ...MOCK_TICKETS[idx] });
+    this.tickets[idx] = { ...this.tickets[idx], status };
+    return Promise.resolve({ ...this.tickets[idx] });
   }
 
   private validateTicketId(ticketId: number): void {

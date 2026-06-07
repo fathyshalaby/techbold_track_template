@@ -15,7 +15,7 @@ const ListQuerySchema = z.object({
 
 function getClient() {
   if (resolveClientMode('phoenix') === 'mock') {
-    return new MockPhoenixClient();
+    return new MockPhoenixClient({ seedScenarios: getEnv().MOCK_SCENARIOS });
   }
   const env = getEnv();
   return new PhoenixClient(env.PHOENIX_API_BASE_URL, env.PHOENIX_API_TOKEN);
