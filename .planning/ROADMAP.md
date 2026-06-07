@@ -5,6 +5,16 @@
 - [x] **v1.0 milestone** - Service Desk Autopilot hackathon submission slice (shipped 2026-06-07)
 - [ ] **v1.1 Professional Skeleton Rescue** - skeleton rescue and buildability (in planning)
 
+### Phase 6: Primary vertical slice: make the main demo flow work end to end
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 5
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 6 to break down)
+
 ## Planned Milestone: v1.1
 
 | # | Phase | Goal | Requirements | Success criteria |
@@ -14,6 +24,7 @@
 | 03 | Tooling Baseline Alignment | Make backend/frontend/container/CI package and script strategy deterministic | TOOL-01, TOOL-02, TOOL-03 | 4 |
 | 04 | Store Mode Clarity | Clarify and enforce persistent store behavior under runtime fallback and startup | STOR-01, STOR-02 | 3 |
 | 05 | Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline | [To be planned] | TBD | TBD |
+| 06 | Primary vertical slice: make the main demo flow work end to end | [To be planned] | TBD | TBD |
 
 ## Phase Details
 
@@ -64,6 +75,15 @@ Success criteria:
 3. Logs include clear warnings when non-persistent behavior is active.
 
 ### Phase 5: Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline
+
+Goal: [To be planned]
+
+Requirements: TBD
+
+Success criteria:
+1. [To be planned]
+
+### Phase 6: Primary vertical slice: make the main demo flow work end to end
 
 Goal: [To be planned]
 
