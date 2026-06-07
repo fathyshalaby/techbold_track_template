@@ -55,6 +55,7 @@ Recent decisions affecting current work:
 
 - Phase 5 added: Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline
 - Phase 6 added: Primary vertical slice: make the main demo flow work end to end
+- Phase 7 added: Primary vertical slice: make the main demo flow work end to end
 
 ### Pending Todos
 
