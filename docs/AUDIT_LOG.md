@@ -538,6 +538,59 @@ A from-scratch review of all of `main` (ignoring the per-phase history above): 4
 
 ---
 
+## Exhaustive branch re-audit — every branch, every capability accounted for
+
+Goal: crawl **every** branch and guarantee each capability is either better-in-main or absorbed.
+Method: 3 parallel read-only agents (one per branch group) inventoried each branch's unique commits +
+files vs `origin/main` (then at `858d4fc`) and classified every capability. Branch divergence at audit:
+`gsd/phase-01..07` = 0 ahead (merged); `gsd/phase-08-frontend` +18; `feat/ai-service-desk-autopilot`
++13; `feat/backend-node` +6 (subset); `claude/festive-hamilton-NgEDu` +3; `julian` +2; `minam` +5.
+
+### Verdict per capability
+**Already absorbed (prior turns):** LLM input guard · config-test read-only classify · safety corpus ·
+Azure/OpenAI-compatible model · offline scenario catalog · live Docker sandbox · demo pipeline · shared
+specs · pitch deck + reference docs · REPORT.md (already on main). No action.
+
+**Better/equivalent in main (deliberate — not absorbed):**
+- **Run state & lifecycle** — `feat`'s in-memory `Run`/5-status map vs main's durable SQLite + 14-phase
+  orchestrator reducer + cross-audited trail. Main is strictly richer.
+- **Case-source runtime toggle** (`feat/caseSource.ts`) — superseded by main's `MOCK_MODE` +
+  `MOCK_SCENARIOS` (offline scenario demo already wired). Equivalent capability, simpler surface.
+- **Agent/ERP/SSH/activity/config modules** (`feat/backend-node/src/*`) — each maps to a main module
+  that is equal-or-richer (orchestrator agents, phoenix/client retry, ssh/client multi-key, env Zod
+  validation). Confirmed file-by-file.
+- **`julian`/`minam` `.planning/*` resets + `.env.example` simplification** — these reset STATE to
+  "0% / planning" and strip the `MOCK_*` toggles. Applying them to a COMPLETED main would *regress*
+  accurate planning state and *break* MOCK_MODE (the toggles are load-bearing in code). Correctly declined.
+- **Second Python backend (`backend-py`)** — adds no missing capability; redundant vs the node backend
+  and against the node-only architecture. Declined (as before).
+
+**Deliberate non-absorptions with a documented reason (the only genuine gaps):**
+1. **Tiered/selective approval gate** (`feat` `AUTO_RUN_READONLY`; `julian`/`minam` SAFETY_POLICY
+   "manual→safe→guarded"). Auto-executes SAFE_READ_ONLY diagnostics to allow *unattended* operation.
+   **Not absorbed** because: main's "a human approves EVERY command" is a deliberate, *stronger* C-score
+   guarantee; the need is **R0-gated** (only matters if grading runs unattended — the source teams
+   themselves marked it "confirm with mentors"); and it's a change to the most safety-critical, most-
+   tested file at freeze on a concurrently-pushed `main`. If R0 confirms unattended grading, it's a
+   ~1–2h **opt-in** addition (default = full HITL) — `APPROVAL_MODE` env + a gate in the driver after
+   `createPendingApproval`. Recorded as a ready-to-pull lever, intentionally not pulled.
+2. **Modular/tested/styled frontend** (`gsd/phase-08-frontend`, +18: components + hooks + typed `api.ts`
+   + 534-line `index.css` + Vitest). Genuinely more capable than main's monolithic `App.tsx`. **Not
+   force-absorbed** because: (a) its **SSE event-type contract is stale** — it expects
+   `activity.drafted`/`validation.completed`/`run.completed`, but main's backend emits
+   `activity.draft_ready`/`validation.complete`/`command.approved`/`diagnosis.*`, so a wholesale swap
+   would **break the live trace** (correctness is better in main); (b) `App.tsx` is being **actively
+   edited by a concurrent session** (the `858d4fc` audit-trail UI) — a competing rewrite would collide
+   and drop their work; (c) the branch is 19 commits behind. Recommendation for the frontend owner:
+   cherry-pick the CSS + component split + Vitest setup, **remapping SSE event names to main's actual
+   emitter** first. Endpoint paths already match (`/api/tickets`, `/api/runs/*`).
+
+**Conclusion:** after the exhaustive crawl, `main` is a superset-or-better on every branch capability;
+the only two non-absorbed items are intentional, justified, and reversible (one R0-gated, one owned by
+the concurrent frontend work). Nothing valuable is silently left behind.
+
+---
+
 ## Branch capability absorption (commits `fada044` · `cef32b3` · `b14cb4e`)
 
 Follow-on to the capability scan: "absorb any and all capabilities we are missing." Each branch
