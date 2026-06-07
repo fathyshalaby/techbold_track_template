@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import queue
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +20,7 @@ from . import runs
 from .case_source import set_case_source, status as case_source_status
 from .config import settings
 from .erp import ERPError, PhoenixClient
+from .ssh import SSHRunner
 
 app = FastAPI(title="techbold AI Service Desk Autopilot — backend-py")
 
@@ -96,6 +98,36 @@ def get_ticket_system(ticket_id: int):
     data = _guard(lambda: erp.get_customer_system(ticket_id))
     # Connection metadata only — the private key never leaves the backend.
     return data.get("system", data)
+
+
+@app.get("/api/tickets/{ticket_id}/connection")
+def get_ticket_connection(ticket_id: int):
+    data = _guard(lambda: erp.get_customer_system(ticket_id))
+    system = data.get("system", data)
+    runner = SSHRunner(
+        host=system.get("ip"),
+        port=int(system.get("port") or 22),
+        username=system.get("username"),
+    )
+    started = datetime.now(timezone.utc)
+    try:
+        runner.connect()
+        return {
+            "status": "connected",
+            "reachable": True,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "latency_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
+        }
+    except Exception:
+        return {
+            "status": "unreachable",
+            "reachable": False,
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "latency_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
+            "message": "SSH is not reachable or authentication failed.",
+        }
+    finally:
+        runner.close()
 
 
 @app.post("/api/reset")

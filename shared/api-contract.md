@@ -30,6 +30,7 @@ and are never exposed to the browser.
 | GET | `/api/tickets?status=&priority=&sort=` | Ticket list (`Ticket[]`) | `GET /api/v1/me/tickets` |
 | GET | `/api/tickets/{id}` | One ticket (`Ticket`) | `GET /api/v1/tickets/{id}` |
 | GET | `/api/tickets/{id}/system` | SSH target metadata (`SystemInfo`, no secrets) | `GET /api/v1/tickets/{id}/customer-system` |
+| GET | `/api/tickets/{id}/connection` | Backend-only SSH reachability check (`ConnectionCheck`, no secrets) | `GET /api/v1/tickets/{id}/customer-system` + SSH connect |
 | POST | `/api/reset` | Dev: clear activities + reboot VMs | `POST /api/v1/me/reset` |
 
 - `status` ∈ `OPEN | PENDING | DONE` · `sort` ∈ `date | priority | status` (default `date`).
@@ -64,6 +65,9 @@ in the ERP (rubric D: review; rubric A: complete activity).
 ```jsonc
 // SystemInfo — SSH target metadata, NO secrets (key stays on backend)
 { "ip": "10.0.0.5", "port": 22, "username": "azureuser", "os": "Ubuntu 22.04 LTS", "notes": "" }
+
+// ConnectionCheck — SSH reachability result, NO key/path details
+{ "status": "connected | unreachable", "reachable": true, "checked_at": "...", "latency_ms": 120, "message": "..." }
 
 // Run
 {

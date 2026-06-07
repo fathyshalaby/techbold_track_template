@@ -23,6 +23,14 @@ export interface SystemInfo {
   notes?: string;
 }
 
+export interface ConnectionCheck {
+  status: "connected" | "unreachable";
+  reachable: boolean;
+  checked_at: string;
+  latency_ms?: number;
+  message?: string;
+}
+
 export interface StepResult {
   exit_code: number;
   stdout: string;

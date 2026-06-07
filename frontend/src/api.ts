@@ -1,4 +1,4 @@
-import type { ActivityDraft, Employee, Run, SystemInfo, Ticket } from "./types";
+import type { ActivityDraft, ConnectionCheck, Employee, Run, SystemInfo, Ticket } from "./types";
 
 const BASE = (import.meta.env.VITE_API_BASE as string) || "http://localhost:8000";
 
@@ -56,6 +56,7 @@ export const api = {
   },
   ticket: (id: number) => req<Ticket>(`/api/tickets/${id}`),
   system: (id: number) => req<SystemInfo>(`/api/tickets/${id}/system`),
+  connection: (id: number) => req<ConnectionCheck>(`/api/tickets/${id}/connection`),
   reset: () => req<{ message: string }>("/api/reset", { method: "POST" }),
   createRun: (ticket_id: number) =>
     req<Run>("/api/runs", { method: "POST", body: JSON.stringify({ ticket_id }) }),

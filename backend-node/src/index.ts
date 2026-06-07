@@ -6,6 +6,7 @@ import { caseSourceStatus, setCaseSource } from "./caseSource";
 import { config } from "./config";
 import { ERPError, erp } from "./erp";
 import * as runs from "./runs";
+import { SSHRunner } from "./ssh";
 
 // Node build of the AI Service Desk Autopilot backend.
 // Implements the SAME contract as backend-py — see ../../shared/api-contract.md.
@@ -60,6 +61,33 @@ app.get("/api/tickets/:id/system", (c) =>
   handle(c, async () => {
     const data: any = await erp.getCustomerSystem(Number(c.req.param("id")));
     return data.system || data;
+  }),
+);
+app.get("/api/tickets/:id/connection", (c) =>
+  handle(c, async () => {
+    const data: any = await erp.getCustomerSystem(Number(c.req.param("id")));
+    const system = data.system || data;
+    const started = Date.now();
+    const runner = new SSHRunner(system.ip, system.username, Number(system.port || 22));
+    try {
+      await runner.connect();
+      return {
+        status: "connected",
+        reachable: true,
+        checked_at: new Date().toISOString(),
+        latency_ms: Date.now() - started,
+      };
+    } catch {
+      return {
+        status: "unreachable",
+        reachable: false,
+        checked_at: new Date().toISOString(),
+        latency_ms: Date.now() - started,
+        message: "SSH is not reachable or authentication failed.",
+      };
+    } finally {
+      runner.close();
+    }
   }),
 );
 app.post("/api/reset", (c) => handle(c, () => erp.reset()));
