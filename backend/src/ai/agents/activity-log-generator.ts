@@ -1,6 +1,6 @@
 import { generateObject } from 'ai';
 import type { LanguageModelV1 } from 'ai';
-import { getModel } from '../model.js';
+import { getModel, isBuiltInMockModel } from '../model.js';
 import { ACTIVITY_LOG_GENERATOR_SYSTEM_PROMPT } from '../prompts.js';
 import { ActivityDraftFieldsSchema } from '../types.js';
 import type { ActivityDraftFields } from '../types.js';
@@ -19,11 +19,11 @@ export type ActivityLogGeneratorInput = {
 };
 
 export const MOCK_ACTIVITY_DRAFT: ActivityDraftFields = {
-  summary: 'The nginx service was found stopped due to a port conflict on port 80. The service was restarted and verified operational.',
-  rootCause: 'Port 80 was already bound by a conflicting process, preventing nginx from starting.',
-  actionsTaken: 'Ran systemctl status nginx to confirm service failure, identified port conflict via ss -tulpn, terminated the conflicting process, and restarted nginx.',
-  commandsSummary: '$ systemctl status nginx (exit 1)\n$ ss -tulpn (exit 0)\n$ systemctl restart nginx (exit 0)',
-  validationResult: 'Service verified running after restart; curl localhost returned HTTP 200.',
+  summary: 'The status-api service was found failed after restart and was restarted through systemd.',
+  rootCause: 'The service did not recover after reboot and required an operator-approved restart.',
+  actionsTaken: 'Checked status-api service status, restarted the service, and validated the endpoint response.',
+  commandsSummary: '$ systemctl status status-api --no-pager (exit 3)\n$ sudo systemctl restart status-api (exit 0)',
+  validationResult: 'Service verified running after restart; curl localhost:8080 returned HTTP 200.',
 };
 
 export async function runActivityLogGenerator(
@@ -31,6 +31,9 @@ export async function runActivityLogGenerator(
   model?: LanguageModelV1,
 ): Promise<ActivityDraftFields> {
   const resolvedModel = model ?? getModel();
+  if (isBuiltInMockModel(resolvedModel)) {
+    return MOCK_ACTIVITY_DRAFT;
+  }
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const result = await Promise.race([
@@ -49,7 +52,7 @@ export async function runActivityLogGenerator(
   } catch {
     throw new AgentUnavailableError('agent unavailable: activity-log-generator');
   } finally {
-    // Cancel the timeout once the race settles — no orphan 30s timer left pending
+    // Cancel the timeout once the race settles. No orphan 30s timer remains pending
     // after the model resolves (avoids keeping the loop alive / late rejections).
     if (timer) clearTimeout(timer);
   }

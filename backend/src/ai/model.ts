@@ -28,7 +28,7 @@ export interface ResolvedModelConfig {
 // Pure, testable resolution of the provider wiring from env. Azure AI Foundry
 // project/resource endpoints expose an OpenAI-compatible v1 surface at
 // `{endpoint}/openai/v1`, so all three providers are served by createOpenAI with
-// a baseURL — no extra provider package needed (keeps the v4 dep tree intact).
+// a baseURL. No extra provider package needed, which keeps the v4 dep tree intact.
 export function resolveModelConfig(env: EnvConfig): ResolvedModelConfig {
   const provider = effectiveLlmProvider(env);
   if (provider === 'azure') {
@@ -49,8 +49,8 @@ export function getModel(): LanguageModelV1 {
   const env = getEnv();
   const cfg = resolveModelConfig(env);
   if (cfg.provider === 'azure') {
-    // Azure Foundry authenticates with an `api-key` header; createOpenAI also
-    // sends Authorization: Bearer — harmless and keeps both surfaces happy.
+    // Azure Foundry authenticates with an `api-key` header. createOpenAI also
+    // sends Authorization: Bearer, which is harmless and keeps both surfaces happy.
     const azure = createOpenAI({
       baseURL: cfg.baseURL,
       apiKey: env.AZURE_API_KEY,
@@ -63,4 +63,8 @@ export function getModel(): LanguageModelV1 {
     ...(cfg.baseURL ? { baseURL: cfg.baseURL } : {}),
   });
   return openai(cfg.modelId);
+}
+
+export function isBuiltInMockModel(model: LanguageModelV1): boolean {
+  return model.provider === MOCK_MODEL.provider && model.modelId === MOCK_MODEL.modelId;
 }

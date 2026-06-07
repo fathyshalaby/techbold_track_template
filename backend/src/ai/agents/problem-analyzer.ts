@@ -1,6 +1,6 @@
 import { generateObject } from 'ai';
 import type { LanguageModelV1 } from 'ai';
-import { getModel } from '../model.js';
+import { getModel, isBuiltInMockModel } from '../model.js';
 import { DiagnosticProposalSchema } from '../types.js';
 import { PROBLEM_ANALYZER_SYSTEM_PROMPT } from '../prompts.js';
 import { selectRunbooks } from '../knowledge.js';
@@ -24,14 +24,14 @@ export type ProblemAnalyzerInput = {
 export const MOCK_DIAGNOSTIC_PROPOSAL = {
   hypotheses: [
     {
-      cause: 'nginx service failed to start due to misconfigured port binding',
-      evidence: 'service reports active (exited) or failed in systemctl status',
+      cause: 'status-api service failed because another process is already bound to port 8080',
+      evidence: 'systemctl status and journal entries point to service startup failure after restart',
       confidence: 0.8,
     },
   ],
-  command: 'systemctl status nginx --no-pager',
-  purpose: 'Confirm nginx service state and surface the exact error message',
-  expectedSignal: 'Output shows "failed" or "active (exited)" with an error code',
+  command: 'systemctl status status-api --no-pager',
+  purpose: 'Confirm status-api service state and surface the exact error message',
+  expectedSignal: 'Output shows the status-api unit failed and includes the exit status',
   riskNotes: 'Read-only; no changes to system state',
   isReadOnly: true,
 };
@@ -41,7 +41,10 @@ export async function runProblemAnalyzer(
   model?: LanguageModelV1,
 ): Promise<import('../types.js').DiagnosticProposal> {
   const resolvedModel = model ?? getModel();
-  // Route the relevant runbook slice by symptom (ticket + observations) — the
+  if (isBuiltInMockModel(resolvedModel)) {
+    return MOCK_DIAGNOSTIC_PROPOSAL;
+  }
+  // Route the relevant runbook slice by symptom (ticket + observations). The
   // method lives in the system prompt; the matched runbook is per-incident context.
   const runbook = selectRunbooks(
     `${input.ticketDescription} ${input.observations.join(' ')}`,

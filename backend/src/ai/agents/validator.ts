@@ -1,6 +1,6 @@
 import { generateObject } from 'ai';
 import type { LanguageModelV1 } from 'ai';
-import { getModel } from '../model.js';
+import { getModel, isBuiltInMockModel } from '../model.js';
 import { VALIDATOR_SYSTEM_PROMPT } from '../prompts.js';
 import { ValidationResultSchema } from '../types.js';
 import type { ValidationResult } from '../types.js';
@@ -19,9 +19,9 @@ export type ValidatorInput = {
 
 export const MOCK_VALIDATION_RESULT_LIKELY: ValidationResult = {
   status: 'LIKELY_FIXED',
-  benefitCheck: 'curl -s -o /dev/null -w "%{http_code}" localhost:80 returned 200',
+  benefitCheck: 'curl -s -o /dev/null -w "%{http_code}" localhost:8080 returned 200',
   persistenceCheck: null,
-  evidence: ['nginx service is active', 'HTTP 200 returned from localhost:80'],
+  evidence: ['status-api service is active', 'HTTP 200 returned from localhost:8080'],
 };
 
 export async function runValidator(
@@ -29,6 +29,9 @@ export async function runValidator(
   model?: LanguageModelV1,
 ): Promise<ValidationResult> {
   const resolvedModel = model ?? getModel();
+  if (isBuiltInMockModel(resolvedModel)) {
+    return MOCK_VALIDATION_RESULT_LIKELY;
+  }
   try {
     const result = await Promise.race([
       generateObject({
