@@ -9,18 +9,19 @@
     "bun": ">=1.1"
   },
   "scripts": {
-    "build": "bun run --filter techbold-track-frontend build",
+    "build": "bun run --filter @techbold/contracts typecheck && bun run --filter techbold-track-dashboard build && bun run --filter techbold-track-frontend build",
     "check": "bun run lint && bun run typecheck && bun run test && bun run build",
     "dev:dashboard": "bun run --filter techbold-track-dashboard dev",
     "dev:backend": "bun run --filter techbold-track-backend dev",
-    "dev:frontend": "bun run --filter techbold-track-frontend dev",
+    "dev:frontend": "bun run --filter techbold-track-dashboard dev",
+    "dev:vite": "bun run --filter techbold-track-frontend dev",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "prepare": "husky",
-    "test": "bun run --filter techbold-track-backend test && bun run --filter techbold-track-frontend test",
-    "typecheck": "bun run --filter techbold-track-backend typecheck && bun run --filter techbold-track-frontend typecheck"
+    "test": "bun run --filter @techbold/contracts test && bun run --filter techbold-track-backend test && bun run --filter techbold-track-dashboard test && bun run --filter techbold-track-frontend test",
+    "typecheck": "bun run --filter @techbold/contracts typecheck && bun run --filter techbold-track-backend typecheck && bun run --filter techbold-track-dashboard typecheck && bun run --filter techbold-track-frontend typecheck"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
