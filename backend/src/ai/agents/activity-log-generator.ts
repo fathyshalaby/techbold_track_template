@@ -30,6 +30,7 @@ export async function runActivityLogGenerator(
   model?: LanguageModelV1,
 ): Promise<ActivityDraftFields> {
   const resolvedModel = model ?? getModel();
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const result = await Promise.race([
       generateObject({
@@ -39,12 +40,16 @@ export async function runActivityLogGenerator(
         prompt: JSON.stringify(input),
         maxTokens: 2048,
       }),
-      new Promise<never>((_, rej) =>
-        setTimeout(() => rej(new Error('timeout')), 30_000),
-      ),
+      new Promise<never>((_, rej) => {
+        timer = setTimeout(() => rej(new Error('timeout')), 30_000);
+      }),
     ]);
     return result.object;
   } catch {
     throw new AgentUnavailableError('agent unavailable: activity-log-generator');
+  } finally {
+    // Cancel the timeout once the race settles — no orphan 30s timer left pending
+    // after the model resolves (avoids keeping the loop alive / late rejections).
+    if (timer) clearTimeout(timer);
   }
 }

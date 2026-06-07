@@ -163,9 +163,12 @@ describe('runActivityLogGenerator', () => {
     };
 
     const promise = runActivityLogGenerator(SAMPLE_INPUT, neverModel);
+    // Attach the rejection handler BEFORE advancing fake timers. Otherwise the
+    // promise rejects *during* advanceTimersByTimeAsync while no handler is yet
+    // attached → a transient unhandled rejection that CI's timing flags.
+    const assertion = expect(promise).rejects.toBeInstanceOf(AgentUnavailableError);
     await vi.advanceTimersByTimeAsync(31_000);
-
-    await expect(promise).rejects.toBeInstanceOf(AgentUnavailableError);
+    await assertion;
     vi.useRealTimers();
   });
 

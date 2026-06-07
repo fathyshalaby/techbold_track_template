@@ -122,6 +122,12 @@ activityRouter.post('/:runId/activity/submit', async (c) => {
     return c.json({ error: 'run not found' }, 404);
   }
 
+  // Idempotency: a submitted run is COMPLETED. Refuse a second submit so a
+  // double-click can't create duplicate ERP activities for one incident.
+  if (run.status === 'COMPLETED') {
+    return c.json({ error: 'activity already submitted' }, 409);
+  }
+
   const rawBody = await c.req.json().catch(() => ({}));
   const parsed = SubmitBodySchema.safeParse(rawBody);
   const overrides = parsed.success ? parsed.data : {};
@@ -172,11 +178,16 @@ activityRouter.post('/:runId/activity/submit', async (c) => {
   appendAuditEvent(runId, 'activity.submitted', 'system', { activityId: activity.id });
   runEventBus.emit(runId, 'activity.submitted', { activityId: activity.id });
 
-  const now = new Date().toISOString();
-  getDb().run(
-    'UPDATE activity_drafts SET submitted = 1, submitted_at = ? WHERE run_id = ? ORDER BY created_at DESC LIMIT 1',
-    [now, runId],
-  );
+  // Mark the specific draft submitted. UPDATE … ORDER BY … LIMIT is non-portable
+  // (only some SQLite builds support it, and the JSONL adapter can't parse it),
+  // so target the draft by id — works on every backend.
+  if (draft) {
+    const now = new Date().toISOString();
+    getDb().run(
+      'UPDATE activity_drafts SET submitted = 1, submitted_at = ? WHERE id = ?',
+      [now, draft.id],
+    );
+  }
 
   markRunCompleted(runId);
 

@@ -161,6 +161,22 @@ describe('POST /api/runs/:runId/activity/submit', () => {
     expect(body['ticket_id']).toBe(1);
   });
 
+  it('Test 6b (idempotency): a second submit returns 409 (no duplicate ERP activity)', async () => {
+    const run = createRun(1, '10.0.0.1:22');
+    updateRunPhase(run.id, 'WAITING_FOR_ACTIVITY_REVIEW');
+    saveActivityDraft(run.id, {
+      summary: 's', rootCause: 'rc', actionsTaken: 'a', commandsSummary: 'c', validationResult: 'v',
+    });
+
+    const opts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' };
+    const first = await testApp.request(`/api/runs/${run.id}/activity/submit`, opts);
+    expect(first.status).toBe(200); // run is now COMPLETED
+
+    const second = await testApp.request(`/api/runs/${run.id}/activity/submit`, opts);
+    expect(second.status).toBe(409);
+    expect((await second.json() as Record<string, unknown>)['error']).toBe('activity already submitted');
+  });
+
   it('Test 7 (field overrides): uses technician-edited summary when provided', async () => {
     const runsModule = await import('../routes/activity.js');
     // Use the test app which has activityRouter mounted; spy on phoenix client via runs module
