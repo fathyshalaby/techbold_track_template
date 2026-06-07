@@ -4,11 +4,23 @@
 
 **Latest shipped milestone:** v1.2 Professional Skeleton Rescue Follow-up
 
-**Status:** Skeleton is clean, connected, buildable, and documented for team handoff.
+**Status:** v1.3 planning is open for product dashboard, RAG memory, and observability work.
 
 **Primary verified path:** mock-mode demo and deterministic backend vertical slice.
 
 **Real integration status:** blocked by missing external inputs, recorded in `.planning/milestones/v1.2-MILESTONE-AUDIT.md`.
+
+## Current Milestone: v1.3 Product Dashboard, RAG Memory, and Observability
+
+**Goal:** Turn the cleaned skeleton into a real product foundation with an operational dashboard, Postgres-backed memory, pgvector retrieval, and vendor-neutral observability.
+
+**Target features:**
+
+- Next.js dashboard foundation based on shadcn dashboard-01, rewritten around project-specific operational data.
+- Postgres replacement for SQLite on the main path, with pgvector enabled for embedding storage and retrieval.
+- RAG memory loop for error fingerprinting, embedding, top-k retrieval, accepted-solution persistence, and dashboard visibility.
+- Observability baseline for pipeline runs, RAG retrieval, embedding calls, database operations, structured logs, and correlation IDs.
+- Integration and verification pass that connects dashboard, pipeline, database, RAG memory, observability, seed data, smoke checks, and docs.
 
 ## What This Is
 
@@ -87,7 +99,23 @@ Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs
 
 - Real Phoenix, SSH, sudo, and LLM validation after credentials and key material are available.
 - Demo recording and external submission execution using `docs/SUBMISSION_HANDOFF.md`.
-- Product expansion only after real integration blockers are cleared or explicitly deferred.
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `$gsd-transition`):
+1. Requirements invalidated? Move to Out of Scope with reason
+2. Requirements validated? Move to Validated with phase reference
+3. New requirements emerged? Add to Active
+4. Decisions to log? Add to Key Decisions
+5. "What This Is" still accurate? Update if drifted
+
+**After each milestone** (via `$gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check: still the right priority?
+3. Audit Out of Scope: reasons still valid?
+4. Update Context with current state
 
 ---
-*Last updated: 2026-06-07 after v1.2 archive*
+*Last updated: 2026-06-07 after v1.3 milestone start*
