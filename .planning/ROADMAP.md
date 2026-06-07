@@ -238,7 +238,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 08-05-PLAN.md — ActivityView + CSS finalization
+- [x] 08-05-PLAN.md — ActivityView + CSS finalization
 
 **UI hint**: yes
 
@@ -272,5 +272,5 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 | 5. Agent Loop + Orchestrator | 4/5 | In Progress|  |
 | 6. Run API + Approvals + SSE | 4/4 | Complete   | 2026-06-06 |
 | 7. Activity Generation | 3/3 | Complete   | 2026-06-07 |
-| 8. Frontend | 4/5 | In Progress|  |
+| 8. Frontend | 5/5 | Complete   | 2026-06-07 |
 | 9. Tests + Submission Polish | 0/TBD | Not started | - |
