@@ -538,6 +538,52 @@ A from-scratch review of all of `main` (ignoring the per-phase history above): 4
 
 ---
 
+## Branch capability absorption (commits `fada044` · `cef32b3` · `b14cb4e`)
+
+Follow-on to the capability scan: "absorb any and all capabilities we are missing." Each branch
+capability was ported **adapted to main's hardened architecture**, not blind-copied. Three batches,
+each tested + pushed + CI-green.
+
+### Absorbed & integrated into the tested backend
+1. **LLM input guard** (`ai/input-guard.ts`, `fada044`) — `guardModelInput()` redacts secrets/PII from
+   EVERY outbound model payload (the Phoenix ticket text + assembled prompt) before it reaches the
+   provider, via the same `redactSecrets()` used at the sink. Main only redacted command *output*; this
+   closes the *inbound* gap (a credential pasted into a ticket no longer reaches the LLM). Wired into all
+   five agents. Per-field redaction so the 16 KB cap can't truncate a valid prompt. (+4 tests)
+2. **Config-test read-only classification** (`safety/classifier.ts`, `fada044`) — the safety corpus
+   revealed main classified `nginx -t` / `apachectl configtest` / `sshd -t` / `--version` as MEDIUM.
+   These are genuinely read-only; now SAFE_READ_ONLY → smoother diagnostics, gate not weakened.
+3. **Data-driven safety corpus** (`tests/fixtures/safety-cases.json` + `safety-corpus.test.ts`,
+   `fada044`) — 25-case B+C regression net asserting the safety-critical direction (every blocked case
+   blocks; every read-only case is recognised; no review-case is auto-safe).
+4. **Multi-provider model / Azure AI Foundry** (`env.ts` + `ai/model.ts`, `cef32b3`) — `LLM_PROVIDER`
+   ∈ {openai, azure, openai-compatible}; `effectiveLlmProvider()` + `resolveModelConfig()` (pure,
+   tested). Azure Foundry served via `createOpenAI` baseURL `{endpoint}/openai/v1` — **no new deps**
+   (kept the AI SDK v4 tree). superRefine now requires only the selected provider's credentials. (+11)
+5. **Offline scenario catalog** (`backend/src/sandbox/`, `b14cb4e`) — 5 Phoenix-shaped incident
+   archetypes + registry; drives a realistic full-loop demo/test under MOCK_MODE without a live VM.
+   Tested against the real Phoenix schemas. Generic seed data, **not** agent logic (generalisation intact).
+
+### Absorbed as opt-in reference capability (top-level, not workspace packages → zero CI/lockfile impact)
+- `sandbox/` — the **live Docker broken-VM archetypes** + seed (build real incidents to test against).
+- `shared/` — agent-spec, api-contract, `safety-rules.json` + cross-language safety test corpus.
+- `demo/` — **Playwright + Remotion demo-video pipeline**.
+- `docs/` — **pitch deck** (`docs/pitch/PITCH_DECK.html`) + reference docs (API, DATA_MODEL, GLOSSARY,
+  INFRASTRUCTURE, LIMITATIONS, RESULTS, SECURITY) + `REPORT.md`. Main's own hardened docs left untouched.
+
+### Deliberately NOT absorbed (with reason)
+- **`backend-py` (the second Python backend)** — adds **no missing capability**; it's a redundant
+  reimplementation of what main already does in Node, and the architecture (`docs/ARCHITECTURE.md`) fixes
+  a deliberate node-only decision. Importing it would create dead, competing code. Excluded by design.
+- The branch's `safety.ts` (regex-rules-from-JSON classifier) — **weaker** than main's hardened
+  `command-policy.ts` + classifier; not adopted. Its rule *data* was harvested as the corpus instead.
+
+**Verified:** backend **552 tests pass** (475 → +77 across knowledge + absorption) · tsc clean · all
+three CI runs green. The integrated absorptions strengthen B (config-test diagnostics, scenario catalog)
+and C (input guard, safety corpus) — the 55-point core.
+
+---
+
 ## Knowledge ingestion · dead-stub verdict · branch capability scan (commit `eacd287`)
 
 Three-part request: (a) understand/rebuild the deleted tool stubs if useful, (b) ingest & encode
