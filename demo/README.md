@@ -24,12 +24,17 @@ node record.mjs            # opens a browser, drives ticket #7001, records to de
 ## 2. Polish (Remotion) → the final `.mp4`
 
 ```bash
-cd demo/remotion
+cd demo && ./build-audio.sh               # VO (macOS say) + ambient bed → public/{vo,music}.mp3 + manifest
+# premium voice: VOICE=Daniel ./build-audio.sh   ·   or drop in an ElevenLabs / your own vo.mp3
+cd remotion
 cp ../recording/<id>.webm public/recording.webm
 npm install
-npx remotion studio                       # preview + tweak caption timings live
+npx remotion studio                       # preview live; tweak recordingSeconds + caption cues
 npx remotion render SphinxDemo out/sphinx-demo.mp4
 ```
+
+The composition auto-composites the **voiceover + ducked background music** and time-fits your recording
+to the narration (~73s total). `out/test.mp4` (rendered with a placeholder clip) previews the VO + music + branding right now.
 
 **Edit to match your recording** — in `src/DemoVideo.tsx` `DEFAULT_PROPS` (or live in Studio's props panel):
 

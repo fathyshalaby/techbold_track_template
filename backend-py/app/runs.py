@@ -205,6 +205,7 @@ def _advance(run: Run) -> None:
             run.log("agent", "validated", note=safety.redact(run.conclusion.get("validation_result", "")))
             if run._ssh:
                 run._ssh.close()
+            run.emit()
             return
 
         if atype == "run_command":
@@ -249,6 +250,7 @@ def _advance(run: Run) -> None:
             step.status = "pending_approval"
             run.pending_step_id = step.id
             run.status = "awaiting_approval"
+            run.emit()
             return
 
         # No tool call -> nudge the model back to the tools.
@@ -274,6 +276,7 @@ def _execute(run: Run, step: Step, command: str, auto: bool) -> None:
         step.result = {"exit_code": 255, "stdout": "", "stderr": str(exc), "duration_ms": 0, "truncated": False}
         run.log("system", "error", step_id=step.id, note=f"ssh error: {exc}")
         run.messages.append(agent.tool_result_message(step.tool_call_id, f"SSH ERROR: {exc}"))
+        run.emit()
         return
     step.ran_at = _now()
     redacted = {
@@ -288,6 +291,7 @@ def _execute(run: Run, step: Step, command: str, auto: bool) -> None:
     run.log("system", "executed", step_id=step.id, command=safety.redact(command), exit_code=result.exit_code)
     tool_content = f"exit_code={result.exit_code}\nstdout:\n{redacted['stdout']}\nstderr:\n{redacted['stderr']}"
     run.messages.append(agent.tool_result_message(step.tool_call_id, tool_content[:8000]))
+    run.emit()
 
 
 def approve_step(run_id: str, step_id: str, edited_command: Optional[str] = None) -> Run:
