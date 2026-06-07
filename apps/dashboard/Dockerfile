@@ -1,6 +1,8 @@
 FROM oven/bun:1 AS deps
 WORKDIR /app
 COPY package.json bun.lock tsconfig.base.json ./
+COPY apps/backend/package.json apps/backend/
+COPY apps/frontend/package.json apps/frontend/
 COPY packages/contracts/package.json packages/contracts/
 COPY apps/dashboard/package.json apps/dashboard/
 RUN bun install --frozen-lockfile --filter techbold-track-dashboard
