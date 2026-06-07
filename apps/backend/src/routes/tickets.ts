@@ -17,6 +17,7 @@ import {
 import MockPhoenixClient from "../phoenix/mock.js";
 import { TicketStatusSchema } from "../phoenix/types.js";
 import { createSshExecutor } from "../ssh/factory.js";
+import { resolveSshKeyPaths } from "../ssh/keys.js";
 
 export const ticketsRouter = new Hono();
 
@@ -110,8 +111,7 @@ ticketsRouter.get("/:id/connection", async (c) => {
       host: cs.system.ip,
       port: cs.system.port,
       username: cs.system.username,
-      privateKeyPath: env.SSH_PRIVATE_KEY_PATH,
-      keyDir: env.SSH_KEY_DIR || undefined,
+      privateKeyPaths: resolveSshKeyPaths(env),
     });
     return c.json(result, 200);
   } catch (err) {

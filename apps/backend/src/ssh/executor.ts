@@ -1,7 +1,14 @@
 import type { ClientChannel } from "ssh2";
 import { REDACTION_CAP_BYTES } from "../safety/redaction.js";
+import { openSshConnection } from "./client.js";
 import { acquireConnection, dropConnection } from "./pool.js";
-import type { CommandResult, PreflightResult, SshExecutor, SshTarget } from "./types.js";
+import type {
+  CommandResult,
+  ConnectionTestResult,
+  PreflightResult,
+  SshExecutor,
+  SshTarget,
+} from "./types.js";
 
 export const COMMAND_TIMEOUT_MS = 30_000;
 const OUTPUT_CAP_BYTES = REDACTION_CAP_BYTES;
@@ -128,6 +135,17 @@ export async function runPreflight(target: SshTarget): Promise<PreflightResult> 
   };
 }
 
+export async function testSshConnection(target: SshTarget): Promise<ConnectionTestResult> {
+  const startedAt = Date.now();
+  try {
+    const client = await openSshConnection(target);
+    client.end();
+    return { reachable: true, latencyMs: Date.now() - startedAt };
+  } catch {
+    return { reachable: false, latencyMs: Date.now() - startedAt };
+  }
+}
+
 export class RealSshExecutor implements SshExecutor {
   executeApprovedCommand(
     approvalId: string,
@@ -139,6 +157,10 @@ export class RealSshExecutor implements SshExecutor {
 
   runPreflight(target: SshTarget): Promise<PreflightResult> {
     return runPreflight(target);
+  }
+
+  testConnection(target: SshTarget): Promise<ConnectionTestResult> {
+    return testSshConnection(target);
   }
 }
 

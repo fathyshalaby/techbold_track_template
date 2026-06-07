@@ -2,10 +2,6 @@ export interface SshTarget {
   host: string;
   port: number;
   username: string;
-  // Candidate private keys, tried in order until one authenticates. Each VM in
-  // the fleet has its own keypair, and at execution time we only know the host
-  // (from the ticket), not which key matches - so we offer all of them and let
-  // the server accept the right one. A single-element list is the common case.
   privateKeyPaths: string[];
 }
 
@@ -21,6 +17,11 @@ export interface PreflightResult {
   sudoAvailable: boolean;
   lang: string;
   path: string;
+}
+
+export interface ConnectionTestResult {
+  reachable: boolean;
+  latencyMs: number;
 }
 
 export class SshConnectionError extends Error {
@@ -43,4 +44,5 @@ export interface SshExecutor {
     target: SshTarget,
   ): Promise<CommandResult>;
   runPreflight(target: SshTarget): Promise<PreflightResult>;
+  testConnection(target: SshTarget): Promise<ConnectionTestResult>;
 }

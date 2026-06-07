@@ -160,6 +160,9 @@ export function memoryConfigured(config: EnvConfig = getEnv()): boolean {
   return config.DATABASE_URL.trim() !== "";
 }
 
-export function isSandboxProvisionerEnabled(config: EnvConfig = getEnv()): boolean {
-  return config.SANDBOX_PROVISIONER_ENABLED;
+export function isSandboxProvisionerEnabled(config?: EnvConfig): boolean {
+  if (config) return config.SANDBOX_PROVISIONER_ENABLED;
+  const raw = process.env.SANDBOX_PROVISIONER_ENABLED;
+  if (raw === undefined || raw.trim() === "") return true;
+  return ["true", "1", "yes", "on"].includes(raw.trim().toLowerCase());
 }

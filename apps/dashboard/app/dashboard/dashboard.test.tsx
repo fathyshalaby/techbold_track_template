@@ -65,11 +65,9 @@ describe("dashboard shell and data mapping", () => {
     render(await DashboardPage());
 
     expect(screen.getByText("Technician Dashboard")).toBeInTheDocument();
-    expect(screen.getByText("Open tickets")).toBeInTheDocument();
-    expect(screen.getByText("Pending tickets")).toBeInTheDocument();
-    expect(screen.getByText("Done tickets")).toBeInTheDocument();
-    expect(screen.getByText("Active runs")).toBeInTheDocument();
-    expect(screen.getByText("Approvals waiting")).toBeInTheDocument();
+    expect(screen.getAllByText("Tickets").length).toBeGreaterThan(0);
+    expect(screen.getByText("Pending approvals")).toBeInTheDocument();
+    expect(screen.getByText("Runs in progress")).toBeInTheDocument();
     expect(screen.getAllByText("Email service degraded").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Runs").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Live").length).toBeGreaterThan(0);
