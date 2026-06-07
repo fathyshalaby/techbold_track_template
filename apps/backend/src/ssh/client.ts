@@ -45,6 +45,13 @@ function connectWithKey(target: SshTarget, privateKey: Buffer | undefined): Prom
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      // Close the failed connection so multi-key fallback doesn't leak one ssh2
+      // Client per rejected key.
+      try {
+        client.end();
+      } catch {
+        /* connection may not be open */
+      }
       // Message names the failure only - never the key path or value (G-secret).
       reject(new SshConnectionError("SSH connection failed", err));
     });

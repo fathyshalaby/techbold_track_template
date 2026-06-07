@@ -111,7 +111,14 @@ Output an ActivityDraftFields object with exactly these 5 fields:
   state "no validation step recorded"
 
 Constraint: commandsSummary must enumerate only commands from the input commandResults array.
-Do not reference commands not present in the data.`;
+Do not reference commands not present in the data.
+
+Quality bar (a senior technician must trust it; a junior must learn from it):
+- rootCause states WHY it failed (the technical cause), not WHAT broke (the symptom).
+- actionsTaken is numbered and sequential (1., 2., 3.) - diagnosis steps then the fix.
+- validationResult cites the concrete customer-benefit proof AND whether it survives a
+  restart/reboot (persistence), e.g. "endpoint returned 200; still 200 after service restart".
+- Be specific and concise; no filler, no marketing, no invented detail.`;
 
 export const VALIDATOR_SYSTEM_PROMPT = `${SAFETY_PREAMBLE}
 

@@ -4,6 +4,30 @@ Technician-controlled AI troubleshooting for the techbold START Hack Vienna trac
 
 The AI never executes on its own.
 
+## Status
+
+- **Demo-ready (mock mode): ✓** — the full ticket → diagnose → approve → fix → validate → activity flow runs offline, no credentials.
+- **Live integrations (Phoenix / SSH / LLM):** wired and verified reachable; gated by **credentials**, not code. Drop your team token + an LLM key into `.env` and a key into `keys/`. See [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
+- **Built for the rubric:** 55 of 100 points are **B (troubleshooting) + C (safety & audit)** — see [docs/scoring.md](docs/scoring.md). The design optimizes for those, not UI polish alone.
+
+## How it works
+
+```
+Phoenix ERP ──tickets──▶ Backend (Hono)
+                            │  ai/agents propose ONE command + ranked hypotheses
+                            ▼
+                       Safety gate (deterministic blocklist + classifier)  ──blocks dangerous──▶ ✗
+                            │  proposal
+                            ▼
+                       Technician: approve / edit / reject / abort   ◀── human confirms EVERY command
+                            │  approved + re-checked
+                            ▼
+                       SSH executor (one command, timeout, output cap, redacted)
+                            │  observe → iterate → minimal reversible fix → validate (survives reboot)
+                            ▼
+                       Append-only audit trail ──▶ ERP activity (5 fields, drafted only from the trail)
+```
+
 ## Stack
 
 | Layer | Technology |
@@ -16,12 +40,14 @@ The AI never executes on its own.
 ## Layout
 
 ```
-apps/backend/       Hono API, orchestrator, safety, SSH, Phoenix, store
-apps/frontend/      Technician workspace (src/App.tsx)
+apps/backend/       Hono API, orchestrator, safety, SSH, Phoenix, store (PRIMARY)
+apps/backend-py/    FastAPI mirror (secondary; auto-drive variant, node parity)
+apps/dashboard/     Technician workspace — Next.js (PRIMARY UI, :3000)
+apps/frontend/      Vite workspace (fallback UI, :5173)
 apps/model/         Python LoRA training sidecar
 packages/contracts/ API and safety reference contracts
 infra/sandbox/      Docker VM archetypes
-docs/               Architecture, API, safety, scoring
+docs/               Architecture, API, safety, scoring, DEMO_SCRIPT
 docs/knowledge/     Runbooks (encoded into backend agents)
 ```
 
@@ -32,7 +58,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
-- Workspace: http://localhost:5173
+- Workspace (primary): http://localhost:3000  (Next.js dashboard — use this for the demo)
+- Workspace (fallback): http://localhost:5173  (Vite; start with `docker compose --profile fallback up`)
 - Health: http://localhost:8000/health
 
 `.env.example` sets `MOCK_MODE=true` (mock Phoenix, SSH, and LLM). Demo the full flow offline.
