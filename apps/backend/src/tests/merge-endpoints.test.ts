@@ -41,4 +41,12 @@ describe("merged endpoints (multi-key SSH preflight + reset)", () => {
     const body = (await res.json()) as { message?: string };
     expect(body.message).toBeDefined();
   });
+
+  it("GET /api/me returns the logged-in technician (Phoenix parity)", async () => {
+    const res = await app.request("/api/me");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: number; username: string };
+    expect(body.id).toBeGreaterThan(0);
+    expect(typeof body.username).toBe("string");
+  });
 });
