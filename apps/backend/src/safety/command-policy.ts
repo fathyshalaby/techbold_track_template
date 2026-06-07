@@ -92,8 +92,17 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
 
   {
     ruleName: "broad-chmod-chown",
-    pattern: /\bchmod\b[^;&|]*\b777\b/i,
+    // World-writable (the `7` "other" triad) is never a correct fix. Match 777 with
+    // any octal prefix (0777, 1777 sticky, 2777/4777/6777 setuid/setgid) so
+    // `chmod 0777` cannot slip the `\b777\b` boundary.
+    pattern: /\bchmod\b[^;&|]*\b[0-7]{0,2}777\b/i,
     reason: "chmod 777 (world-writable) is forbidden - use a least-privilege mode",
+  },
+  {
+    ruleName: "broad-chmod-chown",
+    // Symbolic world-writable forms (chmod a+rwx, o+w, ugo+rwx, +rwx).
+    pattern: /\bchmod\b[^;&|]*\b(?:a|o|ugo)?\+(?:rwx|w)\b/i,
+    reason: "chmod granting world-write (symbolic +w/+rwx) is forbidden",
   },
   {
     ruleName: "broad-chmod-chown",
@@ -125,8 +134,21 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
   },
   {
     ruleName: "disable-security",
-    pattern: /\biptables\s+-F\b/i,
-    reason: "Flushing iptables rules is forbidden",
+    // Flush the firewall ruleset (any table): iptables -F / --flush / -t nat -F, ip6tables.
+    pattern: /\bip6?tables\b[^;&|]*\s(?:-F|--flush)\b/i,
+    reason: "Flushing firewall rules is forbidden",
+  },
+  {
+    ruleName: "disable-security",
+    // Default-ACCEPT policy effectively disables filtering.
+    pattern: /\bip6?tables\b[^;&|]*-P\s+\w+\s+ACCEPT\b/i,
+    reason: "Setting a firewall chain policy to ACCEPT (disabling filtering) is forbidden",
+  },
+  {
+    ruleName: "disable-security",
+    // nftables: `nft flush ruleset` / `nft flush table …`.
+    pattern: /\bnft\b[^;&|]*\bflush\b/i,
+    reason: "Flushing the nftables ruleset is forbidden",
   },
   {
     ruleName: "disable-security",
@@ -135,7 +157,9 @@ export const BLOCKLIST: ReadonlyArray<BlocklistRule> = [
   },
   {
     ruleName: "disable-security",
-    pattern: /\bsystemctl\s+(stop|disable|mask)\s+(auditd|firewalld|ufw|apparmor|fail2ban|aide)\b/i,
+    // Flag-tolerant: `systemctl disable --now ufw`, `systemctl stop -f firewalld`, etc.
+    pattern:
+      /\bsystemctl\b[^;&|]*\b(?:stop|disable|mask)\b[^;&|]*\b(auditd|firewalld|ufw|nftables|iptables|apparmor|fail2ban|aide)\b/i,
     reason: "Stopping or masking security services is forbidden",
   },
 

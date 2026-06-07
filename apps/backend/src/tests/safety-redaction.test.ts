@@ -230,4 +230,24 @@ describe("safety - redaction", () => {
       expect(redactSecrets(input)).toBe(redactSecrets(input));
     });
   });
+
+  // ─── Regression: inline CLI credential flags (command-line secret leak) ─────
+  describe("inline credential flags are redacted", () => {
+    it("redacts an attached mysql -p password", () => {
+      const out = redactSecrets("mysql -uroot -pHUNTER2 mydb");
+      expect(out).not.toContain("HUNTER2");
+      expect(out).toContain("«redacted»");
+    });
+    it("redacts redis-cli -a <secret>", () => {
+      expect(redactSecrets("redis-cli -a mysecret123 ping")).not.toContain("mysecret123");
+    });
+    it("redacts --password=<value>", () => {
+      expect(redactSecrets("psql --password=topsecret -h db")).not.toContain("topsecret");
+    });
+    it("leaves a numeric -p port / benign -a intact", () => {
+      expect(redactSecrets("psql -p 5432 -h db")).toBe("psql -p 5432 -h db");
+      expect(redactSecrets("ssh -p 2222 host")).toBe("ssh -p 2222 host");
+      expect(redactSecrets("ls -a /etc")).toBe("ls -a /etc");
+    });
+  });
 });

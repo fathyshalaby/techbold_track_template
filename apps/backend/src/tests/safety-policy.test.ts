@@ -394,4 +394,36 @@ describe("safety - policy and classifier", () => {
       expect(validateCommandAgainstPolicy(cmd).allowed).toBe(true);
     });
   });
+
+  // ─── Regression: chmod-octal & firewall-disable bypasses (full-project audit) ─
+  describe("audit regression - chmod octal & firewall-disable bypasses", () => {
+    it.each([
+      "chmod 0777 /var/www/html/x", // 4-digit octal slipped \b777\b
+      "sudo chmod 0777 /home/u/app/f",
+      "chmod 1777 /srv/x",
+      "chmod 2777 /srv/x",
+      "chmod a+rwx /srv/x", // symbolic world-write
+      "chmod o+w /etc/app/x",
+      "systemctl disable --now ufw", // intervening flag
+      "systemctl stop -f firewalld",
+      "iptables -P INPUT ACCEPT", // default-accept = disable filtering
+      "iptables --flush",
+      "iptables -t nat -F",
+      "nft flush ruleset",
+    ])('blocks "%s"', (cmd) => {
+      const result = validateCommandAgainstPolicy(cmd);
+      expect(result.allowed).toBe(false);
+      expect(result.riskLevel).toBe(RiskLevel.HIGH_RISK_BLOCKED);
+    });
+
+    it.each([
+      "chmod 755 /srv/app/uploads",
+      "chmod 644 /etc/app/x.conf",
+      "chmod 775 /var/www/uploads",
+      "systemctl status ufw --no-pager",
+      "iptables -L -n",
+    ])('does not over-block "%s"', (cmd) => {
+      expect(validateCommandAgainstPolicy(cmd).riskLevel).not.toBe(RiskLevel.HIGH_RISK_BLOCKED);
+    });
+  });
 });

@@ -52,12 +52,12 @@
     },
     {
       "id": "firewall_disable",
-      "pattern": "\\b(ufw\\s+disable|iptables\\s+-F|ip6tables\\s+-F|nft\\s+flush\\s+ruleset|systemctl\\s+(stop|disable)\\s+\\S*(ufw|firewalld|nftables))",
+      "pattern": "\\bufw\\b[^;&|]*\\bdisable\\b|\\bip6?tables\\b[^;&|]*\\s(?:-F|--flush)\\b|\\bip6?tables\\b[^;&|]*-P\\s+\\w+\\s+ACCEPT\\b|\\bnft\\b[^;&|]*\\bflush\\b|\\bsystemctl\\b[^;&|]*\\b(?:stop|disable|mask)\\b[^;&|]*\\b(ufw|firewalld|nftables|iptables)\\b",
       "reason": "Disabling the firewall"
     },
     {
       "id": "security_disable",
-      "pattern": "\\b(setenforce\\s+0|aa-disable|aa-teardown|systemctl\\s+(stop|disable|mask)\\s+\\S*(apparmor|auditd|audit))",
+      "pattern": "\\bsetenforce\\s+0\\b|\\baa-(?:disable|teardown)\\b|\\bsystemctl\\b[^;&|]*\\b(?:stop|disable|mask)\\b[^;&|]*\\b(apparmor|auditd|audit|fail2ban|aide)\\b",
       "reason": "Disabling a security/audit control"
     },
     {
