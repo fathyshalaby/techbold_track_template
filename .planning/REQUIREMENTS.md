@@ -69,23 +69,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LIVE-01 | TBD | Pending |
-| LIVE-02 | TBD | Pending |
-| UAT-01 | TBD | Pending |
-| UAT-02 | TBD | Pending |
-| E2E-01 | TBD | Pending |
-| REAL-01 | TBD | Pending |
-| REAL-02 | TBD | Pending |
-| REAL-03 | TBD | Pending |
-| SUBM-01 | TBD | Pending |
-| PLAN-01 | TBD | Pending |
-| PLAN-02 | TBD | Pending |
+| LIVE-01 | Phase 1 | Pending |
+| LIVE-02 | Phase 1 | Pending |
+| UAT-01 | Phase 2 | Pending |
+| UAT-02 | Phase 2 | Pending |
+| E2E-01 | Phase 3 | Pending |
+| REAL-01 | Phase 4 | Pending |
+| REAL-02 | Phase 4 | Pending |
+| REAL-03 | Phase 4 | Pending |
+| SUBM-01 | Phase 5 | Pending |
+| PLAN-01 | Phase 3 | Pending |
+| PLAN-02 | Phase 5 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 11 total
-- Mapped to phases: 0
-- Unmapped: 11
+- Mapped to phases: 11
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-07*
-*Last updated: 2026-06-07 after v1.2 requirements definition*
+*Last updated: 2026-06-07 after v1.2 roadmap creation*

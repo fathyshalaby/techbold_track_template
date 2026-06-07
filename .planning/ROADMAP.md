@@ -4,151 +4,104 @@
 
 - [x] **v1.0 milestone** - Service Desk Autopilot hackathon submission slice (shipped 2026-06-07)
 - [x] **v1.1 Professional Skeleton Rescue** - skeleton rescue and buildability (completed 2026-06-07)
+- [ ] **v1.2 Professional Skeleton Rescue Follow-up** - live validation, vertical-slice evidence, and submission handoff readiness
 
-## Completed Milestone: v1.1
+## Active Milestone: v1.2
 
-- [x] **Phase 1: Event Contract Repair** - completed 2026-06-07
-- [x] **Phase 2: Frontend Surface Consolidation** - completed 2026-06-07
-- [x] **Phase 3: Tooling Baseline Alignment** - completed 2026-06-07
-- [x] **Phase 4: Store Mode Clarity** - completed 2026-06-07
-- [x] **Phase 5: Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline** - completed 2026-06-07
-- [x] **Phase 6: Primary vertical slice: make the main demo flow work end to end** - completed 2026-06-07
-- [x] **Phase 7: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling** - completed 2026-06-07
-- [x] **Phase 8: Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup** - completed 2026-06-07
+Phase numbering is reset for this milestone.
 
-| # | Phase | Plans | Status | Completed |
-|---|-------|-------|--------|-----------|
-| 01 | Event Contract Repair | 1/1 | Complete | 2026-06-07 |
-| 02 | Frontend Surface Consolidation | 1/1 | Complete | 2026-06-07 |
-| 03 | Tooling Baseline Alignment | 1/1 | Complete | 2026-06-07 |
-| 04 | Store Mode Clarity | 1/1 | Complete | 2026-06-07 |
-| 05 | Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline | 1/1 | Complete | 2026-06-07 |
-| 06 | Primary vertical slice: make the main demo flow work end to end | 1/1 | Complete | 2026-06-07 |
-| 07 | Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling | 1/1 | Complete | 2026-06-07 |
-| 08 | Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup | 1/1 | Complete | 2026-06-07 |
+| # | Phase | Goal | Requirements | Success Criteria |
+|---|-------|------|--------------|------------------|
+| 01 | Fresh-Clone Runtime Validation | Prove the skeleton installs and starts from a clean checkout. | LIVE-01, LIVE-02 | 4 |
+| 02 | Browser SSE UAT | Prove the mounted frontend reflects the primary technician flow and SSE lifecycle. | UAT-01, UAT-02 | 4 |
+| 03 | Vertical-Slice Coverage | Add deterministic coverage for the run, approval, SSE, and activity path. | E2E-01, PLAN-01 | 4 |
+| 04 | Real Integration Validation | Validate or precisely block Phoenix, SSH, and LLM live paths. | REAL-01, REAL-02, REAL-03 | 5 |
+| 05 | Submission and Evidence Handoff | Package demo/submission evidence and clean planning docs. | SUBM-01, PLAN-02 | 4 |
 
 ## Phase Details
 
-### Phase 1: Event Contract Repair
+### Phase 1: Fresh-Clone Runtime Validation
 
-Goal: Normalize event contracts so run state updates are timely and consistent.
+Goal: Prove the skeleton installs and starts from a clean checkout.
 
-Requirements: EVNT-01, EVNT-02
-
-Success criteria:
-1. Backend and frontend share one event-name contract definition.
-2. SSE uses event names as transport channels with stable payload shape.
-3. Approval and activity transitions update frontend state without manual refresh.
-4. A minimal contract smoke test verifies the canonical event set.
-
-Plans:
-- [x] 01-01-PLAN.md - Event contract repair (completed 2026-06-07)
-
-### Phase 2: Frontend Surface Consolidation
-
-Goal: Ensure only one runtime frontend flow is active and complete.
-
-Requirements: FEIN-01, FEIN-02
+Requirements: LIVE-01, LIVE-02
 
 Success criteria:
-1. `frontend/src/main.tsx` renders the intended production App path.
-2. Non-runtime surfaces are deleted or moved behind a deliberate migration plan.
-3. Critical user journey paths render from the mounted tree in clean local runs.
+1. Fresh clone or clean worktree setup uses documented root commands without undocumented package-manager switches.
+2. `docker compose up --build` either succeeds or records exact environment blockers with reproduction details.
+3. Backend and frontend startup output matches documented environment and persistence assumptions.
+4. README or infrastructure docs are corrected only where validation proves drift.
 
 Plans:
-- [x] 02-01-PLAN.md - Frontend surface consolidation (completed 2026-06-07)
+- [ ] 01-01-PLAN.md - Fresh-clone runtime validation
 
-### Phase 3: Tooling Baseline Alignment
+### Phase 2: Browser SSE UAT
 
-Goal: Remove toolchain drift and lock the repo to a single deterministic build strategy.
+Goal: Prove the mounted frontend reflects the primary technician flow and SSE lifecycle.
 
-Requirements: TOOL-01, TOOL-02, TOOL-03
+Requirements: UAT-01, UAT-02
 
 Success criteria:
-1. One package manager policy applies to backend and frontend checks.
-2. Frontend Docker and lockfile path align with root/backend conventions.
-3. CI includes frontend typecheck and build checks with same baseline commands as local docs.
-4. Monorepo scripts document a single install, typecheck, test, and build flow.
+1. Browser UAT starts from the mounted frontend entry path and exercises ticket, run, approval, audit, and activity states.
+2. SSE lifecycle updates appear in the UI without manual refresh.
+3. Any failed browser step records whether the blocker is frontend, backend, test data, environment, or credential related.
+4. UAT evidence is stored in planning artifacts without claiming unverified live behavior.
 
 Plans:
-- [x] 03-01-PLAN.md - Tooling baseline alignment (completed 2026-06-07)
+- [ ] 02-01-PLAN.md - Browser SSE UAT
 
-### Phase 4: Store Mode Clarity
+### Phase 3: Vertical-Slice Coverage
 
-Goal: Make runtime persistence mode explicit and auditable.
+Goal: Add deterministic coverage for the run, approval, SSE, and activity path.
 
-Requirements: STOR-01, STOR-02
+Requirements: E2E-01, PLAN-01
 
 Success criteria:
-1. Startup configuration states active store mode and reason when fallback is active.
-2. Runtime behavior differs clearly between durable and fallback modes and is documented.
-3. Logs include clear warnings when non-persistent behavior is active.
+1. A deterministic test covers run creation, SSE update consumption, approval edit/execute, and activity flow.
+2. The test verifies behavior rather than only checking mocks, source text, or handler existence.
+3. Production changes made for testability trace to `.planning/audits/V1.1-MASTER-DEFECT-MAP.md`.
+4. Root verification commands include the new coverage or clearly document the separate command.
 
 Plans:
-- [x] 04-01-PLAN.md - Store mode clarity (completed 2026-06-07)
+- [ ] 03-01-PLAN.md - Vertical-slice coverage
 
-### Phase 5: Foundation gates: package manager, scripts, formatter, hooks, env example, and clean install baseline
+### Phase 4: Real Integration Validation
 
-Goal: Provide a truthful local verification gate and deterministic package-manager baseline.
+Goal: Validate or precisely block Phoenix, SSH, and LLM live paths.
 
-Requirements: TOOL-01, TOOL-03
+Requirements: REAL-01, REAL-02, REAL-03
 
 Success criteria:
-1. `pnpm check` is the canonical local verification command.
-2. README documents root workspace commands.
-3. No fake formatter or hook automation is claimed.
+1. Phoenix API validation succeeds with real credentials or records the exact missing input, command, and failure mode.
+2. SSH `.pem` validation against a practice VM succeeds or records the exact missing input, command, and failure mode.
+3. Passwordless `sudo -n true` is confirmed for `azureuser` or recorded as a blocker.
+4. Real LLM orchestrator loop validation succeeds or records the exact missing input, command, and failure mode.
+5. Mock-mode behavior remains available and clearly separated from live-validation claims.
 
 Plans:
-- [x] 05-01-PLAN.md - Foundation gates (completed 2026-06-07)
+- [ ] 04-01-PLAN.md - Real integration validation
 
-### Phase 6: Primary vertical slice: make the main demo flow work end to end
+### Phase 5: Submission and Evidence Handoff
 
-Goal: Preserve the main demo path after skeleton cleanup.
+Goal: Package demo/submission evidence and clean planning docs.
 
-Requirements: EVNT-01, EVNT-02, FEIN-02
+Requirements: SUBM-01, PLAN-02
 
 Success criteria:
-1. Active frontend path builds.
-2. Backend route and orchestrator tests remain green.
-3. Event contract test covers the frontend event set.
+1. Demo-video checklist is grounded in verified behavior and explicit blockers.
+2. External submission handoff notes include current setup, validation evidence, and accepted limitations.
+3. Planning/docs artifacts distinguish completed evidence, deferred work, and blocked manual validation.
+4. No stale active requirement or roadmap entry claims work that remains deferred or blocked.
 
 Plans:
-- [x] 06-01-PLAN.md - Primary vertical slice (completed 2026-06-07)
-
-### Phase 7: Senior cleanup: remove AI-slop code, simplify overbuilt layers, improve names, types, boundaries, and error handling
-
-Goal: Clean touched rescue paths without broad unrelated churn.
-
-Requirements: FEIN-01, TOOL-01, STOR-02
-
-Success criteria:
-1. Disconnected frontend layers are removed.
-2. Touched files avoid banned punctuation, empty catch blocks, and lint-suppression comments.
-3. Error handling stays explicit at external boundaries.
-
-Plans:
-- [x] 07-01-PLAN.md - Senior cleanup (completed 2026-06-07)
-
-### Phase 8: Team handoff baseline: smoke tests, docs truth, contribution instructions, and backlog cleanup
-
-Goal: Leave setup, verification, and planning docs truthful for the next developer.
-
-Requirements: TOOL-01, TOOL-02, TOOL-03, STOR-01, STOR-02
-
-Success criteria:
-1. README reflects current scripts and test count.
-2. Infrastructure docs match pnpm Docker and store semantics.
-3. Requirement traceability is complete.
-
-Plans:
-- [x] 08-01-PLAN.md - Team handoff baseline (completed 2026-06-07)
+- [ ] 05-01-PLAN.md - Submission and evidence handoff
 
 ## Traceability Update Rule
 
 After each phase, update `.planning/REQUIREMENTS.md` traceability statuses.
 
-- v1 requirements mapped: 9/9
+- v1.2 requirements mapped: 11/11
 - Unmapped: 0
 
 ---
-*Roadmap updated after v1.1 completion on 2026-06-07*
+*Roadmap created for v1.2 on 2026-06-07*
