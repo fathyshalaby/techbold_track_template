@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "06-01 complete — run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)"
-last_updated: "2026-06-07T01:00:12.698Z"
-last_activity: 2026-06-07 -- Plan 07-03 complete
+stopped_at: "08-01 complete — shared types, API wrappers, pure mappers with Vitest"
+last_updated: "2026-06-07T03:04:00.000Z"
+last_activity: 2026-06-07 -- Phase 08 plan 01 complete
 progress:
   total_phases: 9
-  completed_phases: 6
-  total_plans: 27
-  completed_plans: 24
-  percent: 67
+  completed_phases: 7
+  total_plans: 32
+  completed_plans: 28
+  percent: 78
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-06)
 
 **Core value:** Win B+C (55 pts) — solve hidden Linux-service incidents on fresh VMs, safely and auditably
-**Current focus:** Phase 07 — activity-generation
+**Current focus:** Phase 08 — frontend
 
 ## Current Position
 
-Phase: 07 (activity-generation) — EXECUTING
-Plan: 3 of 3 (complete)
-Status: Ready to execute
-Last activity: 2026-06-07 -- Plan 07-03 complete
+Phase: 08 (frontend) — EXECUTING
+Plan: 2 of 5
+Status: Executing Phase 08
+Last activity: 2026-06-07 -- Phase 08 execution started
 
 Progress: [██░░░░░░░░] 25%
 
