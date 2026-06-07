@@ -9,10 +9,10 @@ Requirements for Product Dashboard, RAG Memory, and Observability. Each requirem
 
 ### Dashboard
 
-- [ ] **DASH-01**: Technician can use a Next.js dashboard as the primary operational UI for tickets, runs, approvals, audit evidence, activity state, memory visibility, and observability status.
-- [ ] **DASH-02**: Technician can view dashboard data loaded from backend APIs and durable state without shadcn sample records, local-only constants, or fake operational metrics on the main path.
-- [ ] **DASH-03**: Technician can navigate from dashboard summaries into the existing run workflow without bypassing safety, approval, SSE, audit, or activity behavior.
-- [ ] **DASH-04**: Maintainer can see a documented ownership decision for the previous Vite frontend path: replaced, retained temporarily with a retirement plan, or explicitly moved out of the main path.
+- [x] **DASH-01**: Technician can use a Next.js dashboard as the primary operational UI for tickets, runs, approvals, audit evidence, activity state, memory visibility, and observability status.
+- [x] **DASH-02**: Technician can view dashboard data loaded from backend APIs and durable state without shadcn sample records, local-only constants, or fake operational metrics on the main path.
+- [x] **DASH-03**: Technician can navigate from dashboard summaries into the existing run workflow without bypassing safety, approval, SSE, audit, or activity behavior.
+- [x] **DASH-04**: Maintainer can see a documented ownership decision for the previous Vite frontend path: replaced, retained temporarily with a retirement plan, or explicitly moved out of the main path.
 
 ### Postgres Store
 
@@ -87,10 +87,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |---|---|---|
-| DASH-01 | Phase 1 | Pending |
-| DASH-02 | Phase 1 | Pending |
-| DASH-03 | Phase 1 | Pending |
-| DASH-04 | Phase 1 | Pending |
+| DASH-01 | Phase 1 | Covered |
+| DASH-02 | Phase 1 | Covered |
+| DASH-03 | Phase 1 | Covered |
+| DASH-04 | Phase 1 | Covered |
 | PG-01 | Phase 2 | Pending |
 | PG-02 | Phase 2 | Pending |
 | PG-03 | Phase 2 | Pending |
@@ -123,4 +123,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-06-07*
-*Last updated: 2026-06-07 after v1.3 roadmap creation*
+*Last updated: 2026-06-07 after Phase 1 dashboard verification*
