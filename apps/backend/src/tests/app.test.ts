@@ -4,8 +4,17 @@
 process.env.MOCK_MODE = "true";
 
 import { Hono } from "hono";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { app, errorHandler } from "../app.js";
+import { makeJsonlAdapter, resetDb, setDb } from "../store/db.js";
+
+beforeEach(() => {
+  setDb(makeJsonlAdapter());
+});
+
+afterEach(() => {
+  resetDb();
+});
 
 describe("GET /health", () => {
   it("returns 200 with status ok and the current mode", async () => {
@@ -14,7 +23,17 @@ describe("GET /health", () => {
     const body = await res.json();
     expect(body.status).toBe("ok");
     expect(body.mode).toBe("mock");
-    expect(body.store).toEqual({ mode: "sqlite", durable: true });
+    expect(body.store).toEqual({ mode: "jsonl", durable: false });
+  });
+});
+
+describe("GET /api/dashboard", () => {
+  it("is mounted on the app", async () => {
+    const res = await app.request("/api/dashboard");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty("generatedAt");
+    expect(body).toHaveProperty("source.type", "mock-backend");
   });
 });
 

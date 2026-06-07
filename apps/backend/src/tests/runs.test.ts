@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../app.js";
+import { createPendingApproval } from "../store/audit.js";
 import { makeJsonlAdapter, resetDb, setDb } from "../store/db.js";
 
 // Force mock mode - no real env or Phoenix needed
@@ -251,11 +252,29 @@ describe("POST /api/runs/:runId/next", () => {
     });
 
     const runId = await createRun();
+    const approval = createPendingApproval(runId, {
+      proposedCommand: "systemctl status nginx",
+      purpose: "Check nginx status",
+      expectedSignal: "service status output",
+      riskLevel: "SAFE_READ_ONLY",
+      safetyNotes: "",
+    });
     const res = await app.request(`/api/runs/${runId}/next`, { method: "POST" });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { status: string; phase: string; pendingApproval: unknown };
+    const body = (await res.json()) as {
+      status: string;
+      phase: string;
+      pendingApproval: { id: string; proposed_command: string } | null;
+    };
     expect(typeof body.status).toBe("string");
     expect("pendingApproval" in body).toBe(true);
+    expect(body.phase).toBe("WAITING_FOR_APPROVAL");
+    expect(body.pendingApproval).toEqual(
+      expect.objectContaining({
+        id: approval.id,
+        proposed_command: "systemctl status nginx",
+      }),
+    );
   });
 
   it("returns 404 for unknown runId", async () => {
@@ -263,6 +282,27 @@ describe("POST /api/runs/:runId/next", () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("run not found");
+  });
+});
+
+describe("GET /api/runs/:runId/events", () => {
+  async function createRun(): Promise<string> {
+    const res = await app.request("/api/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticketId: 1 }),
+    });
+    const body = (await res.json()) as { runId: string };
+    return body.runId;
+  }
+
+  it("keeps the SSE stream available", async () => {
+    const runId = await createRun();
+
+    const res = await app.request(`/api/runs/${runId}/events`);
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
   });
 });
 
