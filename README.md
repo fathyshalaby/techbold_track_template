@@ -46,6 +46,8 @@ docker compose --profile sandbox up sandbox   # 5 fake-VM incidents (SSH :2201-2
 docker compose --profile py up backend-py     # secondary FastAPI backend on :8002
 ```
 
+> **Graded / demo path:** the default `docker compose up` stack — **Node backend (`:8000`) + Next.js dashboard (`:3000`)** — is the primary, graded path. The Python/FastAPI backend (`--profile py`, `:8002`) is a fully-working alternative kept at safety parity; you choose which one to run.
+
 After seeding sandbox VMs, set `MOCK_SCENARIOS=true` in `.env` and restart the backend container so tickets start at `7101`.
 
 **Convenience wrapper** (auto-creates `.env`, generates sandbox SSH keys, health-waits, prints mode):

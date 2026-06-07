@@ -1,4 +1,4 @@
-# Sphinx documentation
+# Documentation
 
 Project overview and quick start: [README.md](../README.md).
 
@@ -6,7 +6,7 @@ Project overview and quick start: [README.md](../README.md).
 
 | Reader | Documents |
 |--------|-----------|
-| Judge / reviewer | [../REPORT.md](../REPORT.md), [pitch/PITCH_DECK.md](pitch/PITCH_DECK.md), [SUBMISSION_HANDOFF.md](SUBMISSION_HANDOFF.md), [RESULTS.md](RESULTS.md), [LIMITATIONS.md](LIMITATIONS.md) |
+| Judge / reviewer | [JUDGES.md](JUDGES.md) (rubric → evidence map), [../REPORT.md](../REPORT.md), [pitch/PITCH_DECK.md](pitch/PITCH_DECK.md), [SUBMISSION_HANDOFF.md](SUBMISSION_HANDOFF.md), [RESULTS.md](RESULTS.md), [LIMITATIONS.md](LIMITATIONS.md) |
 | Developer | [../README.md](../README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [API.md](API.md), [AGENT_PIPELINE.md](AGENT_PIPELINE.md) |
 | Operator | [SAFETY_POLICY.md](SAFETY_POLICY.md), [SECURITY.md](SECURITY.md), [SUBMISSION_HANDOFF.md](SUBMISSION_HANDOFF.md) |
 

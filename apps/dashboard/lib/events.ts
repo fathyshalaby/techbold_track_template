@@ -14,23 +14,20 @@ export type RunEventHandlers = {
 export function subscribeToRunEvents(runId: string, handlers: RunEventHandlers) {
   const eventSource = new EventSource(getRunEventsUrl(runId));
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastEvent: SseEvent | undefined;
 
   const scheduleEvent = () => {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       debounceTimer = undefined;
-      handlers.onEvent?.({
-        type: "observation.added",
-        runId,
-        ts: new Date().toISOString(),
-        payload: null,
-      });
+      if (lastEvent) handlers.onEvent?.(lastEvent);
     }, 250);
   };
 
   const handleEvent = (message: MessageEvent<string>) => {
     try {
-      JSON.parse(message.data) as SseEvent;
+      // Forward the real event (debounced) so the live view reflects actual types.
+      lastEvent = JSON.parse(message.data) as SseEvent;
       scheduleEvent();
     } catch {
       // Ignore malformed SSE payloads; pump/refresh still drives the UI.

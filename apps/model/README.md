@@ -1,6 +1,6 @@
 # TechBold Hackathon Model Sidecar
 
-Part of [Sphinx](../../README.md). Optional training and local-serving sidecar for the MSP troubleshooting adapter.
+Part of [Sphinx](../../README.md). **Experimental, opt-in sidecar — not part of the graded product or the default `docker compose up`** (runs only under `--profile model`). The product's agents reach an LLM through the backend's model layer; this is an optional self-hosted-model path. Training and local-serving for the MSP troubleshooting adapter.
 
 | Item | Value |
 | ---- | ----- |
