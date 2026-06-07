@@ -52,6 +52,24 @@ const REDACTION_PATTERNS: RedactionPattern[] = [
     replacement: "$1«redacted»",
   },
   {
+    name: "db-password-flag",
+    // Attached DB-client password flag, e.g. `mysql -pHUNTER2`. Require a letter in
+    // the value so ports/PIDs like `-p5432` / `-p1234` are left intact.
+    pattern: /(\s-p)(?=\S*[A-Za-z])\S+/g,
+    replacement: "$1«redacted»",
+  },
+  {
+    name: "password-longflag",
+    pattern: /(--pass(?:word)?[=\s]+)\S+/gi,
+    replacement: "$1«redacted»",
+  },
+  {
+    name: "redis-auth-flag",
+    // redis-cli `-a <secret>` — scoped to a redis invocation (`-a` is benign elsewhere).
+    pattern: /(\bredis(?:-cli)?\b[^;|&\n]*?\s-a\s+)\S+/gi,
+    replacement: "$1«redacted»",
+  },
+  {
     name: "token-field",
     pattern: /(token\s*[=:]\s*)\S+/gi,
     replacement: "$1«redacted»",
