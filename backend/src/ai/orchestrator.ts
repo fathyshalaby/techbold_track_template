@@ -396,6 +396,12 @@ async function performSideEffects(effects: SideEffect[], _db: DbAdapter): Promis
         break;
       case 'appendAuditEvent':
         appendAuditEvent(effect.runId, effect.auditType, effect.actor, effect.payload);
+        // Also push to the live SSE bus so run progress (command.completed,
+        // run.started/failed, command.blocked, …) streams in real time, not only
+        // on reconnect-via-backfill. Emit with no listener is a harmless no-op,
+        // so unsubscribed event types cost nothing. (approval.required already
+        // emits via the emitEvent case below — not double-emitted here.)
+        runEventBus.emit(effect.runId, effect.auditType, effect.payload);
         break;
       case 'appendObservation':
         // content is already redacted by the driver before passing to the effect
