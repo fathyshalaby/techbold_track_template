@@ -149,13 +149,11 @@ export function makeJsonlAdapter(): DbAdapter {
     return m?.[1];
   }
 
-  function extractWhere(sql: string, params: unknown[]): string | undefined {
-    // Only handle simple WHERE id = ? patterns
+  function extractWhere(sql: string, params: unknown[]): { column: string; value: unknown } | undefined {
+    // Only handle simple single-column WHERE <column> = ? patterns.
     const m = sql.match(/WHERE\s+(\w+)\s*=\s*\?/i);
     if (!m) return undefined;
-    const col = m[1].toLowerCase();
-    if (col === 'id') return params[0] as string;
-    return undefined;
+    return { column: m[1].toLowerCase(), value: params[0] };
   }
 
   return {
@@ -200,14 +198,15 @@ export function makeJsonlAdapter(): DbAdapter {
         // directly instead: each consumes exactly one positional param, in order.
         const setMatch = sql.match(/SET\s+(.+?)\s+WHERE/is);
         if (!setMatch) return;
-        const assignRe = /(\w+)\s*=\s*(COALESCE\s*\(\s*\?\s*,\s*\w+\s*\)|\?)/gi;
+        const assignRe = /(\w+)\s*=\s*(COALESCE\s*\(\s*\?\s*,\s*\w+\s*\)|\?|\d+)/gi;
         const updated = { ...rows[idx] };
         let paramIdx = 0;
         let am: RegExpExecArray | null;
         while ((am = assignRe.exec(setMatch[1])) !== null) {
           const col = am[1];
-          const value = params[paramIdx++];
           const isCoalesce = /^COALESCE/i.test(am[2]);
+          const isParam = am[2] === '?' || isCoalesce;
+          const value = isParam ? params[paramIdx++] : Number(am[2]);
           // COALESCE(?, col): a null/undefined param keeps the existing value.
           if (isCoalesce && (value === null || value === undefined)) continue;
           updated[col] = value ?? null;
@@ -220,15 +219,13 @@ export function makeJsonlAdapter(): DbAdapter {
       const tableMatch = sql.match(/FROM\s+(\w+)/i);
       if (!tableMatch) return undefined;
       const rows = getTable(tableMatch[1]);
-      const id = extractWhere(sql, params);
-      if (id !== undefined) {
-        return rows.find((r) => r['id'] === id) as T | undefined;
-      }
-      // ORDER BY run_id + most recent (for getActivityDraft)
-      const orderMatch = sql.match(/WHERE\s+run_id\s*=\s*\?/i);
-      if (orderMatch) {
-        const matches = rows.filter((r) => r['run_id'] === params[0]);
-        return matches[matches.length - 1] as T | undefined;
+      const where = extractWhere(sql, params);
+      if (where !== undefined) {
+        const matches = rows.filter((r) => r[where.column] === where.value);
+        if (/ORDER\s+BY\s+\w+\s+DESC\s+LIMIT\s+1/i.test(sql)) {
+          return matches[matches.length - 1] as T | undefined;
+        }
+        return matches[0] as T | undefined;
       }
       return undefined;
     },

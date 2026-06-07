@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeJsonlAdapter } from '../store/db.js';
 
-describe('JSONL adapter — UPDATE with COALESCE', () => {
+describe('JSONL adapter UPDATE with COALESCE', () => {
   it('aligns params correctly across COALESCE expressions (id is last param)', () => {
     const db = makeJsonlAdapter();
     db.run(
@@ -41,6 +41,46 @@ describe('JSONL adapter — UPDATE with COALESCE', () => {
     );
     expect(row?.['status']).toBe('REJECTED');
     expect(row?.['final_command']).toBe('original-cmd');
+  });
+
+  it('get returns the latest row for non-id WHERE clauses', () => {
+    const db = makeJsonlAdapter();
+    db.run(
+      'INSERT INTO command_results (id, approval_id, command, exit_code, created_at) VALUES (?, ?, ?, ?, ?)',
+      ['res_1', 'appr_1', 'systemctl status status-api', 3, '2026-06-07T00:00:00Z'],
+    );
+    db.run(
+      'INSERT INTO command_results (id, approval_id, command, exit_code, created_at) VALUES (?, ?, ?, ?, ?)',
+      ['res_2', 'appr_1', 'sudo systemctl restart status-api', 0, '2026-06-07T00:01:00Z'],
+    );
+
+    const row = db.get<Record<string, unknown>>(
+      'SELECT * FROM command_results WHERE approval_id = ? ORDER BY created_at DESC LIMIT 1',
+      ['appr_1'],
+    );
+
+    expect(row?.['id']).toBe('res_2');
+    expect(row?.['exit_code']).toBe(0);
+  });
+
+  it('applies numeric literal assignments in UPDATE statements', () => {
+    const db = makeJsonlAdapter();
+    db.run(
+      'INSERT INTO activity_drafts (id, submitted, submitted_at) VALUES (?, ?, ?)',
+      ['act_1', 0, null],
+    );
+
+    db.run(
+      'UPDATE activity_drafts SET submitted = 1, submitted_at = ? WHERE id = ?',
+      ['2026-06-07T00:00:00Z', 'act_1'],
+    );
+
+    const row = db.get<Record<string, unknown>>(
+      'SELECT * FROM activity_drafts WHERE id = ?',
+      ['act_1'],
+    );
+    expect(row?.['submitted']).toBe(1);
+    expect(row?.['submitted_at']).toBe('2026-06-07T00:00:00Z');
   });
 
   it('rejects UPDATE and DELETE on audit_events (append-only)', () => {
