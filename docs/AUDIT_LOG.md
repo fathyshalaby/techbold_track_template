@@ -349,7 +349,7 @@ Fourth and final Phase-5 pass: is the custom agent-orchestration the right build
 
 # Phase 6 — Run API + Approvals + SSE (`gsd/phase-06-run-api-approvals-sse`)
 
-**Checked:** `gsd/phase-06-run-api-approvals-sse` @ branch tip, against `main` + all branches. **Status: PLANNING-ONLY — not yet implemented.** The branch adds five `.planning/phases/06-*` docs (`06-CONTEXT` + `06-01..04 PLAN`, **no SUMMARY files**) and **zero `backend/src` changes** (confirmed: `git diff df3b3de..phase-06 -- backend/` is empty). The routes it will build — `runs.ts`, `approvals.ts`, `events.ts` — are still 2-line stubs on `main`; `app.ts` mounts only `/health` + `/api/tickets`. Nothing to land or repair this pass.
+**First check (planning-only): SUPERSEDED — Phase 6 is now implemented & landed; see the "IMPLEMENTED & RECONCILED" subsection below.** *(Original note, kept for history:)* the branch initially added only `.planning/phases/06-*` docs with zero `backend/src` changes; the routes were 2-line stubs.
 
 ### Plan assessment (06-CONTEXT + 06-01..04) — sound
 The design is a thin HTTP/SSE surface over the existing `advance()` driver — **no new business logic**, which is the right call:
@@ -366,6 +366,17 @@ Phase 6 branched from **`df3b3de`** (Julian's phase-05 tip) — **before** the P
 `advance()` returns the new `OrchestratorState`, not a "was the command blocked?" flag. The approve route must distinguish *executed* (→ 200) from *re-gate blocked* (→ 422) — derive it (e.g. phase still `WAITING_FOR_APPROVAL` **and** a fresh `command.blocked` audit row), or have `advance()` surface a result discriminator. Worth deciding before coding the route.
 
 **Verdict.** Phase 6 is well-planned and correctly scoped (HTTP/SSE only, all logic reused from `advance()`); nothing to audit in code yet. The one thing that matters now is **not losing the reconciled `main`** when it's implemented — rebase phase-06 onto `main` first.
+
+### IMPLEMENTED & RECONCILED onto main (merge `f792179` + fix `f72755b`)
+Phase 6 is now built: `routes/runs.ts` (create/get/next/abort), `routes/approvals.ts` (approve/reject), `routes/events.ts` + `events/sse.ts` (per-run SSE), route mounts in `app.ts`, + ~660 lines of route tests (`runs.test`, `approvals.test`, `sse-audit-symmetry.test`). It branched from `df3b3de` (pre-reconciliation) as feared **but only ADDED routes** without re-touching the diverged `ssh`/`orchestrator`/`safety` files — so `git merge` auto-kept `main`'s hardened versions and added the routes on top. **No manual conflict resolution; the feared reversion did not happen** (verified: `signalToExitCode`/`wasFix`/`ROOT_CAUSE_CONFIDENCE_THRESHOLD`/`socat` all present post-merge; the 13 executor failures from Julian's base are gone — my executor + fixed harness won). Full suite **428 → 457 pass / 0 fail**, `tsc` clean.
+
+**Route audit — sound.** `runs.ts`: `POST /api/runs` resolves the ticket + customer system via the Phoenix client, creates the run, transitions to `LOADED_CONTEXT` synchronously (deliberately **not** calling `advance()`, which would auto-recurse into an LLM call and break the 201 contract — good); `GET /:id` aggregate (run + timeline + pending approval + activity draft); `/next` → `advance()`, `/abort` → `advance(abort)`; Phoenix errors mapped 404/502. `approvals.ts`: 404 (missing) / 409 (already-decided, guards double-approve) / 400 (bad body) / **422 (re-gate blocked)** — block detected via `phase === 'WAITING_FOR_APPROVAL'` after `advance()`, which is correct against the hardened orchestrator (a successful approval lands in OBSERVING/VALIDATING; a blocked edit stays WAITING). A1 anti-pattern respected (routes only call `advance()`).
+
+**Issue found & repaired (fix `f72755b`) — live SSE was sparse.** The orchestrator emitted **only `approval.required`** to `runEventBus`; every other event (run.started, command.completed, command.blocked, run.failed, …) was audited but **never pushed live**, so a watching client saw the stream freeze between approvals and only caught up on reconnect (backfill). The Phase-6 tests even document this as known (the symmetry test scopes itself to `approval.required`). For a live demo (scored) that's a real hole. **Fix:** `performSideEffects`'s `appendAuditEvent` case now also `runEventBus.emit(...)` — purely additive (emit with no listener is a no-op), so the SSE layer now receives the matching PRD §9 progress events live; `approval.required` still flows via `emitEvent` (not double-emitted); backfill unchanged. Suite still 457 green incl. the symmetry test.
+
+**Remaining considerations (documented, not changed):** (1) *Backfill→live race* — SSE attaches listeners after the backfill snapshot, so an event firing in that tiny window is missed live (still in audit → visible via `GET /:id` or reconnect). Acceptable; a buffered-then-backfill+dedup design would close it. (2) *Event-name alignment* — some audit type names don't match `SSE_EVENT_TYPES` (`validation.complete` vs `validation.completed`, `activity.draft_ready` vs `activity.drafted`), so those specific types still won't stream live until names are aligned — a Phase-7 polish. (3) `backfill` does `JSON.parse(payload_json)` without a try/catch — controlled data (redaction preserves JSON validity), low risk; a guard would harden it.
+
+**Verdict.** Phase 6 lands cleanly on the hardened `main`: the system now has a complete HTTP/SSE surface and **can be driven end-to-end via the API**. One real demo gap (live event push) fixed; residual items are polish. The system is now demoable in mock mode end-to-end; the **real `docker compose` + VM smoke** remains the one unproven path.
 
 ---
 
@@ -452,7 +463,7 @@ The "AI SRE / incident-remediation agent" space has an explicit maturity model *
 - **Post-freeze: migrate store to `node:sqlite`** (Node 22 built-in) — kills the better-sqlite3 native-build dependency and lets the fragile regex-SQL JSONL fallback be deleted. Experimental today, so not pre-freeze.
 - ✅ **Audit-trail durability across container restart** — fixed (`87307e5`, named volume + node-owned data dir + loud fallback). **Still must be *executed*:** `docker compose up`, run an incident, recreate the container, confirm the trail persists.
 - ✅ **CI (tsc + tests) on push/PR** — added & green (`946b3c4`); lockfile fixed so `--frozen-lockfile` passes.
-- **🔴 Reconcile Phase 6 onto current `main` before/at merge** — it branched off `df3b3de` (pre-reconciliation) and will revert the Phase 3/4/5 hardening if merged naively. Rebase first, or merge keeping `main`'s `ai/`+`ssh/`+`safety/`+tests and taking only the new `routes/`/SSE.
+- ~~**Reconcile Phase 6 onto current `main`**~~ ✅ **done** (`f792179`) — it only added routes (didn't re-touch the diverged files), so `git merge` auto-kept main's hardened engine; verified hardening intact + 457 green. **Phase 7 branched from the same pre-reconciliation lineage — apply the same check at its merge.**
 - ~~**Wire the OBSERVING decision step**~~ ✅ **resolved** (`59feb0a`) — `agentDispatch` OBSERVING now decides root-cause vs more-diagnosis from analyzer confidence; observations now include stderr + exit code.
 - ~~**AI SDK v4 vs v5/v6**~~ ✅ **resolved in Phase 5** — stayed on v4 (`ai@^4.3.16`, `LanguageModelV1`), clean mock-model; no upgrade churn.
 - **`docker compose up` smoke on a real Docker host** — confirm the non-root image + graceful shutdown + (now) the live `createActivity` 422 shape. Mocks ≠ reality.
@@ -471,4 +482,4 @@ The "AI SRE / incident-remediation agent" space has an explicit maturity model *
 
 ---
 
-*Last updated: System-level research/reuse audit — stack + architecture validated vs the live AI-SRE market (L0–L5, Replit postmortem); node:sqlite logged as post-freeze reuse. No code change (correct restraint at freeze). CI green (428 tests). Append a new section per phase as it is audited.*
+*Last updated: Phase 6 IMPLEMENTED & reconciled onto main (HTTP/SSE surface; live-SSE fix) — full suite 457 pass, tsc clean, CI green. System now drivable end-to-end via the API in mock mode. Real docker/VM smoke still owed; Phase 7 (activity gen) is next. Append a new section per phase as it is audited.*
