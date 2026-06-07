@@ -1,0 +1,12 @@
+{
+  "name": "techbold-track-template",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sandbox:up": "bun run --cwd sandbox up",
+    "sandbox:down": "bun run --cwd sandbox down",
+    "sandbox:reset": "bun run --cwd sandbox reset",
+    "sandbox:test": "bun run --cwd sandbox test"
+  }
+}

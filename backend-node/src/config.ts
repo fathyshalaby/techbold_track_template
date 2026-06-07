@@ -10,10 +10,20 @@ for (const p of ["../.env", ".env", "../../.env"]) {
 }
 
 const e = process.env;
+function parseSandboxCaseCount(value: string | undefined): number {
+  const count = Number(value || 0);
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+}
+const sandboxCaseCount = parseSandboxCaseCount(e.SANDBOX_CASE_COUNT);
+const realPhoenixBaseUrl = (e.PHOENIX_API_BASE_URL || "").replace(/\/$/, "");
+const sandboxPhoenixBaseUrl = (e.SANDBOX_PHOENIX_API_BASE_URL || "http://sandbox-phoenix:9000").replace(/\/$/, "");
 
 export const config = {
-  phoenixBaseUrl: (e.PHOENIX_API_BASE_URL || "").replace(/\/$/, ""),
-  phoenixToken: e.PHOENIX_API_TOKEN || "",
+  phoenixBaseUrl: realPhoenixBaseUrl,
+  realPhoenixBaseUrl,
+  phoenixToken: e.PHOENIX_API_TOKEN || "sandbox-local-token",
+  sandboxCaseCount,
+  sandboxPhoenixBaseUrl,
 
   sshKeyPath: e.SSH_PRIVATE_KEY_PATH || "/keys/case1_key.pem",
   sshKeyDir: e.SSH_KEY_DIR || "/keys",

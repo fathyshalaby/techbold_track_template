@@ -1,4 +1,5 @@
 // Phoenix ERP client (mirror of backend-py/app/erp.py) — bearer auth, timeouts, retry on 5xx.
+import { activePhoenixBaseUrl } from "./caseSource";
 import { config } from "./config";
 
 export class ERPError extends Error {
@@ -17,7 +18,7 @@ async function req(
   body?: unknown,
   params?: Record<string, string | undefined>,
 ): Promise<any> {
-  const url = new URL(config.phoenixBaseUrl + path);
+  const url = new URL(activePhoenixBaseUrl() + path);
   if (params) for (const [k, v] of Object.entries(params)) if (v) url.searchParams.set(k, v);
 
   let last: unknown;

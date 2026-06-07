@@ -1,0 +1,6 @@
+{
+  "name": "partner-sync",
+  "services": ["__PARTNER_SERVICE__", "__SYNC_SERVICE__"],
+  "validation": "sudo /opt/hackathon/public-test.sh",
+  "symptom": "The order sync worker reports the partner endpoint as unreachable."
+}

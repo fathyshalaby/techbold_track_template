@@ -1,0 +1,14 @@
+[Unit]
+Description=Sandbox __DASHBOARD_SERVICE__
+After=network.target
+
+[Service]
+Type=simple
+User=azureuser
+Environment=SERVICE_PORT=__DASHBOARD_PORT__
+ExecStart=/usr/bin/python3 /opt/__DASHBOARD_SERVICE__/dashboard.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

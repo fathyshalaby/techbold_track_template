@@ -1,0 +1,15 @@
+[Unit]
+Description=Sandbox __AGENT_SERVICE__
+After=network.target __INGEST_SERVICE__.service
+Wants=__INGEST_SERVICE__.service
+
+[Service]
+Type=simple
+User=azureuser
+Environment=CONFIG_FILE=__CONFIG_FILE__
+ExecStart=/usr/bin/python3 /opt/__AGENT_SERVICE__/signal_agent.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

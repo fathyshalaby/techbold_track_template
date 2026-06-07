@@ -3,6 +3,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { Client, type ConnectConfig } from "ssh2";
+import { selectedCaseSource } from "./caseSource";
 import { config } from "./config";
 
 const MAX_OUTPUT = 20000;
@@ -22,14 +23,24 @@ function cap(s: string): [string, boolean] {
 
 function candidateKeys(primary: string): string[] {
   const out: string[] = [];
-  if (primary) out.push(primary);
-  try {
-    for (const f of readdirSync(config.sshKeyDir)) {
-      if (f.endsWith(".pem")) {
-        const p = join(config.sshKeyDir, f);
-        if (!out.includes(p)) out.push(p);
+  const sandboxKey = join(config.sshKeyDir, "bench_incident_key");
+  if (selectedCaseSource() === "sandbox_cases" && existsSync(sandboxKey)) out.push(sandboxKey);
+  if (primary && !out.includes(primary)) out.push(primary);
+
+  const looksLikePrivateKey = (name: string) => name.endsWith(".pem") || name.endsWith("_key") || name.startsWith("id_");
+  const addCandidateKeys = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        addCandidateKeys(p);
+      } else if (entry.isFile() && looksLikePrivateKey(entry.name) && !entry.name.endsWith(".pub") && !out.includes(p)) {
+        out.push(p);
       }
     }
+  };
+
+  try {
+    addCandidateKeys(config.sshKeyDir);
   } catch {
     /* dir may not exist locally */
   }

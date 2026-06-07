@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+install -d -m 755 /etc/systemd/system/__AGENT_SERVICE__.service.d
+cat > /etc/systemd/system/__AGENT_SERVICE__.service.d/override.conf <<'EOF'
+[Service]
+Environment=METRICS_ENDPOINT=__BAD_ENDPOINT__
+EOF
+systemctl daemon-reload
+systemctl restart __AGENT_SERVICE__.service
+echo "Injected fault: __AGENT_SERVICE__ has a bad METRICS_ENDPOINT override."

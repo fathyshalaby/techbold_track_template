@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+systemctl is-active --quiet postgresql.service
+PGPASSWORD='__APP_PASSWORD__' psql -h 127.0.0.1 -U __APP_ROLE__ -d __DATABASE_NAME__ -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM __TABLE_NAME__;" >/dev/null
+PGPASSWORD='__APP_PASSWORD__' psql -h 127.0.0.1 -U __APP_ROLE__ -d __DATABASE_NAME__ -v ON_ERROR_STOP=1 -c "INSERT INTO __TABLE_NAME__(description) VALUES ('sandbox-public-test-order') RETURNING id;" >/dev/null
+echo "public test ok"

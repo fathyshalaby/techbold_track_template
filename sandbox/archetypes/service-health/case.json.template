@@ -1,0 +1,6 @@
+{
+  "name": "service-health",
+  "service": "__SERVICE_NAME__",
+  "validation": "sudo /opt/hackathon/public-test.sh",
+  "symptom": "Health endpoint is unavailable after the host restarts."
+}

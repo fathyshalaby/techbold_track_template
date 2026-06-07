@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type Health } from "./api";
+import { api, type CaseSourceSelection, type Health } from "./api";
 import type { ActivityDraft, AuditEntry, Employee, Run, Step, SystemInfo, Ticket } from "./types";
 
 const PHASES = ["Analyze", "Diagnose", "Fix", "Validate", "Document"];
@@ -29,6 +29,14 @@ export default function App() {
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const selectedSource: CaseSourceSelection =
+    health?.case_source ?? (health?.erp_source === "sandbox_cases" ? "sandbox_cases" : "real_erp");
+  const sourceLabel =
+    selectedSource === "sandbox_cases"
+      ? "Docker sandbox cases"
+      : health?.erp_source === "local_or_mock"
+        ? "Local/offline ERP cases"
+        : "Real Phoenix ERP cases";
 
   useEffect(() => {
     api.health().then(setHealth).catch(() => {});
@@ -42,7 +50,7 @@ export default function App() {
       .then((t) => { setTickets(t); setError(null); })
       .catch((e) => setError(String(e.message || e)))
       .finally(() => setLoading(false));
-  }, [statusF, priorityF, sort]);
+  }, [statusF, priorityF, sort, selectedSource]);
 
   async function selectTicket(t: Ticket) {
     setSelected(t); setSystem(null); setRun(null); setError(null);
@@ -67,6 +75,15 @@ export default function App() {
     setRun(null);
     api.tickets({ status: statusF, priority: priorityF, sort }).then(setTickets).catch(() => {});
   }
+  async function switchCaseSource(source: CaseSourceSelection) {
+    const next = await guard("switching case source", () => api.setCaseSource(source));
+    if (!next) return;
+    setHealth(next);
+    setSelected(null);
+    setSystem(null);
+    setRun(null);
+    api.me().then(setMe).catch(() => {});
+  }
 
   return (
     <div className="app">
@@ -90,6 +107,23 @@ export default function App() {
       <div className="console">
         {/* ── ticket queue ── */}
         <aside className="queue">
+          <div className="queue-head">
+            <div className="source-control">
+              <div className="micro">Case Source</div>
+              <select
+                className="source-select"
+                value={selectedSource}
+                disabled={!!busy}
+                onChange={(e) => switchCaseSource(e.target.value as CaseSourceSelection)}
+              >
+                <option value="real_erp">{sourceLabel === "Local/offline ERP cases" ? "Local/offline ERP" : "Real Phoenix ERP"}</option>
+                <option value="sandbox_cases" disabled={!health?.sandbox_available}>
+                  Docker sandbox cases{health?.sandbox_case_count ? ` (${health.sandbox_case_count})` : ""}
+                </option>
+              </select>
+            </div>
+            <span className="pill mini">{tickets.length} cases</span>
+          </div>
           <div className="filters">
             <label><div className="micro">Status</div>
               <select value={statusF} onChange={(e) => setStatusF(e.target.value)}>

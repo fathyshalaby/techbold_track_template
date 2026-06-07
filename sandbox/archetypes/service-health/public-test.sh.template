@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+curl -fsS --max-time 3 "http://127.0.0.1:__SERVICE_PORT____HEALTH_PATH__" >/dev/null
+systemctl is-active --quiet __SERVICE_NAME__.service
+systemctl is-enabled --quiet __SERVICE_NAME__.service
+echo "public test ok"

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+pg_ctlcluster 14 main start
+sudo -u postgres psql -v ON_ERROR_STOP=1 <<'SQL'
+CREATE DATABASE __DATABASE_NAME__;
+SQL
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d __DATABASE_NAME__ <<'SQL'
+CREATE ROLE __APP_ROLE__ LOGIN PASSWORD '__APP_PASSWORD__';
+CREATE TABLE __TABLE_NAME__ (
+  id serial PRIMARY KEY,
+  description text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO __TABLE_NAME__(description) VALUES ('seed order');
+GRANT SELECT, INSERT ON TABLE __TABLE_NAME__ TO __APP_ROLE__;
+GRANT USAGE, SELECT ON SEQUENCE __SEQUENCE_NAME__ TO __APP_ROLE__;
+SQL
+pg_ctlcluster 14 main stop
