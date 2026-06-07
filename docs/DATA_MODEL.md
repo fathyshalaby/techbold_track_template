@@ -19,12 +19,12 @@ The persistence layer: what the backend stores, why, and the invariants that mak
 | `ticket_id` | INTEGER | the Phoenix ticket being worked |
 | `customer_system_id` | TEXT | `ip:port` (no secrets) |
 | `status` | TEXT enum | `CREATED \| RUNNING \| COMPLETED \| FAILED \| ABORTED` |
-| `current_phase` | TEXT enum | `CREATED \| ANALYSIS \| DIAGNOSIS \| FIX \| VALIDATION \| REPORT \| COMPLETED` |
+| `current_phase` | TEXT enum | `CREATED \| LOADED_CONTEXT \| TRIAGING \| WAITING_FOR_APPROVAL \| EXECUTING_COMMAND \| OBSERVING \| PLANNING_FIX \| VALIDATING \| DRAFTING_ACTIVITY \| WAITING_FOR_ACTIVITY_REVIEW \| COMPLETED \| FAILED \| ABORTED` |
 | `started_at` / `updated_at` | TEXT | lifecycle timestamps |
 | `completed_at` | TEXT? | set on terminal success |
 | `error_message` | TEXT? | set on `FAILED` |
 
-> **Honest note — two levels of "phase".** The persisted `current_phase` enum above is deliberately **coarse** (7 stable buckets). The conceptual state machine in [ARCHITECTURE.md §4](ARCHITECTURE.md) is **finer** (`TRIAGING`, `WAITING_FOR_APPROVAL`, `EXECUTING_COMMAND`, `OBSERVING`, …). The orchestrator drives the fine-grained machine in memory and maps to the coarse, durable `current_phase` for storage and UI. This keeps the stored state simple and restart-safe while the runtime stays expressive.
+> **Honest note — two levels of "phase".** The persisted `current_phase` is the full run-phase enum the orchestrator drives — one source of truth, written directly to the row (there is no separate coarse/fine mapping). It is restart-safe: a run resumes from its last persisted phase.
 
 ### `audit_events` — append-only event log (the spine)
 | Column | Type | Notes |

@@ -38,14 +38,14 @@ These are the **exact versions resolved in the lockfile** (`pnpm-lock.yaml`), ve
 |---|---|---|
 | Backend runtime | Node.js | **22** (`node:22-slim`) |
 | Backend language | TypeScript (run via **tsx**, no build step in dev) | TS 5.9 · tsx 4.22 |
-| HTTP framework | **Hono** + `@hono/node-server` | hono 4.12 · node-server 1.19 |
-| Request validation | `@hono/zod-validator` + **Zod** | validator 0.4 · zod 3.25 |
+| HTTP framework | **Hono** + `@hono/node-server` | hono 4.7 · node-server 1.13 |
+| Request validation | `@hono/zod-validator` + **Zod** | validator 0.4 · zod 3.24 |
 | Agent / LLM SDK | **Vercel AI SDK** (`ai`) + `@ai-sdk/openai` provider | **ai 4.3.19** · openai-provider 1.3.24 |
-| SSH transport | **ssh2** | 1.17 |
+| SSH transport | **ssh2** | 1.16 |
 | Persistence | **better-sqlite3** (synchronous) + JSONL fallback | better-sqlite3 11.10 |
 | ID generation | **ulid** (sortable run/event IDs) | 3.0 |
 | Tests | **Vitest** | 3.2 |
-| Frontend runtime | Node.js (build/dev only) | **20** (`node:20-slim`) |
+| Frontend runtime | Bun | **1.x** (`oven/bun:1`) |
 | Frontend framework | **React** + **Vite** | react 18.3 · vite 5.4 · TS 5.6 |
 | Package manager | **pnpm** (workspace, via corepack) | pnpm 10.x |
 
@@ -62,7 +62,7 @@ These are the **exact versions resolved in the lockfile** (`pnpm-lock.yaml`), ve
 - Exposes `:8000`.
 
 ### Frontend — `frontend/Dockerfile`
-- Base `node:20-slim`; `npm install`; serves the Vite dev server with `npm run dev` (`vite --host 0.0.0.0 --port 5173`).
+- Base `oven/bun:1`; `bun install`. The primary UI is the Next.js dashboard on `:3000`; the Vite app on `:5173` is a fallback.
 - Exposes `:5173`. This is a **dev server**, intentionally — the brief asks for a working web prototype demonstrated live, not a production CDN build.
 
 ### Compose — `docker-compose.yml`

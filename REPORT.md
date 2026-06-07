@@ -17,7 +17,7 @@ precise activity that is written back to the ERP.
 
 ## Key design decisions
 
-1. **Two interchangeable backends, one shared core.** We ship both a Python (FastAPI/paramiko) and
+1. **Two backends, one shared safety core (Node is the primary graded backend; Python is a secondary mirror at safety parity).** We ship both a Python (FastAPI/paramiko) and
    a Node (Hono/Vercel AI SDK/ssh2) backend implementing the **same** HTTP contract
    (`shared/api-contract.md`), driven by one React frontend. The expensive parts — the safety
    rules, agent spec, and API contract — are written once in `shared/` and consumed by both, so
@@ -46,15 +46,15 @@ precise activity that is written back to the ERP.
    survives a reboot/restart (`systemctl enable --now`, persisted config) — matching the grader's
    reboot/restart persistence check.
 
-5. **Model choice.** Primary is Azure OpenAI `gpt-5.4-nano` (native function calling, cheap, fast).
+5. **Model choice.** Primary is Azure OpenAI `gpt-4o` (native function calling, cheap, fast).
    Because it's a small model, tool defs are simple, tool-call JSON is validated with a repair
    path, and documentation uses structured output. A local model (Qwen3-Coder-30B via LM Studio)
    is a config-switch fallback for offline/rate-limit resilience — not the primary brain.
 
 ## Tech stack
 
-React + Vite + TypeScript · FastAPI + paramiko + OpenAI SDK · Hono + Vercel AI SDK v6 (`@ai-sdk/azure`) +
-ssh2 · Azure OpenAI `gpt-5.4-nano` (+ local Qwen fallback) · Docker Compose.
+React + Vite + TypeScript · FastAPI + paramiko + OpenAI SDK · Hono + Vercel AI SDK v4 (`@ai-sdk/openai`) +
+ssh2 · Azure OpenAI `gpt-4o` (+ local Qwen fallback) · Docker Compose.
 
 ## How it maps to the rubric
 
@@ -75,4 +75,4 @@ ssh2 · Azure OpenAI `gpt-5.4-nano` (+ local Qwen fallback) · Docker Compose.
 - Runs are in-memory (single-user demo); persist to a DB for multi-technician use.
 - SSE progress streaming is deferred — the frontend renders progress from each POST response.
 - Per-VM key mapping is solved by trying all keys; a deterministic map would be marginally faster.
-- `gpt-5.4-nano` is small; a stronger model (or the local 30B) would lift hard-incident accuracy.
+- `gpt-4o` is small; a stronger model (or the local 30B) would lift hard-incident accuracy.

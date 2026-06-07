@@ -14,10 +14,10 @@ This file lists current limits and accepted blockers. It is intentionally conser
 | Hidden VM guarantee | Not claimed. The system is designed for generalization, but this workspace lacks real VM access. |
 | Production frontend hosting | Out of scope. The primary UI is the local Next.js dashboard on port 3000. |
 | Vite frontend ownership | The Vite app is a temporary compatibility fallback on port 5173 until documented dashboard parity and retirement criteria are satisfied. |
-| Postgres and pgvector | Deferred to Phase 2 and Phase 3. Phase 1 still uses the current backend store path. |
-| RAG memory implementation | Deferred to Phase 4. Phase 1 memory panels are read-only deferred statuses. |
-| Observability instrumentation | Deferred to Phase 5. Phase 1 observability panels are read-only deferred or health-only statuses. |
-| Full v1.3 integration | Deferred to Phase 6. Phase 1 does not claim the full dashboard-to-memory-to-observability integration path. |
+| Postgres and pgvector | Deferred (not in this build); uses the current backend store path. |
+| RAG memory implementation | Deferred (not in this build); memory panels show a read-only deferred status. |
+| Observability instrumentation | Deferred (not in this build); observability panels show read-only / health-only status. |
+| Full dashboard + memory + observability integration | Deferred (not in this build). |
 
 ## Current External Blockers
 
@@ -28,7 +28,7 @@ This file lists current limits and accepted blockers. It is intentionally conser
 | VM target | No real host/port from Phoenix | SSH and sudo cannot be validated. |
 | LLM | Placeholder `OPENAI_API_KEY` | Real model loop cannot be validated. |
 
-Exact Phase 4 evidence is in `.planning/phases/04-real-integration-validation/04-VERIFICATION.md`.
+Exact real-integration evidence is in `.planning/phases/04-real-integration-validation/04-VERIFICATION.md`.
 
 ## Mock-Mode Boundaries
 
@@ -65,7 +65,7 @@ The deterministic gate reduces hard-fail risk, but it is not a sandbox.
 - SQLite is the durable store in Docker Compose through the `autopilot-data` volume.
 - The JSONL adapter is an in-memory mock/test fallback and is not durable.
 - `MOCK_MODE=true` is the recommended demo setting until real credentials and keys are provided.
-- The Phase 1 dashboard uses backend contracts for source labels and deferred memory/observability states. It must not present those deferred states as live memory retrieval, live Phoenix validation, live SSH validation, sudo validation, live LLM validation, or real observability telemetry.
+- The dashboard uses backend contracts for source labels and deferred memory/observability states. It must not present those deferred states as live memory retrieval, live Phoenix validation, live SSH validation, sudo validation, live LLM validation, or real observability telemetry.
 
 ## Demo Fallbacks
 
@@ -74,5 +74,5 @@ The deterministic gate reduces hard-fail risk, but it is not a sandbox.
 | Phoenix token missing or expired | Keep `MOCK_MODE=true` and use seeded mock tickets. |
 | SSH key or VM unavailable | Use mock SSH in the deterministic demo path. |
 | LLM key unavailable or rate-limited | Use the built-in mock model path. |
-| Browser plugin unavailable | Use the recorded fallback browser UAT evidence in Phase 2. |
-| Real validation requested | Use Phase 4 blocker notes and list exact missing inputs. |
+| Browser plugin unavailable | Use the recorded fallback browser UAT evidence. |
+| Real validation requested | Use the real-integration blocker notes and list exact missing inputs. |

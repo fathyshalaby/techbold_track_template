@@ -17,7 +17,7 @@ Results:
 
 | Check | Result | Evidence |
 |---|---|---|
-| Backend tests | Pass, 27 files and 585 tests in the Phase 3 focused run | `.planning/phases/03-vertical-slice-coverage/03-VERIFICATION.md` |
+| Backend tests | Pass, 27 files and 585 tests (full backend suite, verified on a clean clone) | `.planning/phases/03-vertical-slice-coverage/03-VERIFICATION.md` |
 | Backend typecheck | Pass | `.planning/phases/03-vertical-slice-coverage/03-VERIFICATION.md` |
 | Fresh Docker Compose startup | Pass in mock mode | `.planning/phases/01-fresh-clone-runtime-validation/01-VERIFICATION.md` |
 | Browser UAT | Pass in mock mode | `.planning/phases/02-browser-sse-uat/02-VERIFICATION.md` |

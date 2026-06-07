@@ -176,3 +176,13 @@ The backend keeps **rich run phases** internally (state machine in [ARCHITECTURE
 ---
 
 *Companions: [DATA_MODEL.md](DATA_MODEL.md) (what gets persisted) · [SECURITY.md](SECURITY.md) (auth/secret posture) · [PRD.md §9](PRD.md) (the locked contract) · [phoenix-openapi.yaml](phoenix-openapi.yaml) (the upstream ERP).*
+
+## System endpoints
+
+| Method | Path | Returns | Notes |
+|--------|------|---------|-------|
+| GET | `/api/me` | `Employee` | The logged-in technician (Phoenix `/api/v1/me`). |
+| GET | `/api/case-source` | `{ case_source, erp_source, sandbox_case_count, sandbox_available }` | Whether tickets come from the sandbox catalog or the real ERP. |
+| POST | `/api/reset` | `{ message }` | Clears this team's activities and reboots the VMs (Phoenix `/api/v1/me/reset`) — used to retest that a fix survives a reboot. |
+| GET | `/api/tickets/:id/system` | `CustomerSystem` | Alias of `/customer-system` (path parity with the Python backend). |
+| GET | `/api/tickets/:id/connection` | `{ reachable, latencyMs }` | SSH connectivity preflight for the ticket's VM (multi-key). |
