@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "07-03 complete — activityRouter mounted in app.ts; full test suite green (473 tests, 20 files)"
-last_updated: "2026-06-07T02:28:30Z"
-last_activity: 2026-06-07 -- Phase 07 Plan 03 complete (phase complete)
+stopped_at: "06-01 complete — run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)"
+last_updated: "2026-06-07T01:00:12.698Z"
+last_activity: 2026-06-07 -- Plan 07-03 complete
 progress:
   total_phases: 9
   completed_phases: 6
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-06)
 
 Phase: 07 (activity-generation) — EXECUTING
 Plan: 3 of 3 (complete)
-Status: Phase 07 complete — ready for Phase 08
+Status: Ready to execute
 Last activity: 2026-06-07 -- Plan 07-03 complete
 
 Progress: [██░░░░░░░░] 25%
