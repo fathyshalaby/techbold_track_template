@@ -2,12 +2,15 @@ import { cn } from "@/lib/utils";
 import type * as React from "react";
 
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <section className={cn("panel p-4", className)} {...props} />;
+  return <section className={cn("panel min-w-0 p-4", className)} {...props} />;
 }
 
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("mb-3 flex items-start justify-between gap-4", className)} {...props} />
+    <div
+      className={cn("mb-3 flex min-w-0 items-start justify-between gap-4", className)}
+      {...props}
+    />
   );
 }
 
@@ -23,5 +26,5 @@ export function CardDescription({
 }
 
 export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn(className)} {...props} />;
+  return <div className={cn("min-w-0", className)} {...props} />;
 }

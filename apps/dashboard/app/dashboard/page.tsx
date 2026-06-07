@@ -64,13 +64,15 @@ export default async function DashboardPage() {
                 dashboard.tickets.items.slice(0, 5).map((ticket) => (
                   <Link
                     key={ticket.id}
-                    className="flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2"
+                    className="flex min-h-11 min-w-0 items-center justify-between gap-3 rounded-md border px-3 py-2"
                     href={`/dashboard/tickets/${ticket.id}`}
                   >
-                    <span className="font-semibold">
+                    <span className="min-w-0 flex-1 truncate font-semibold">
                       #{ticket.id} {ticket.title}
                     </span>
-                    <Badge tone="live">{sourceLabel(ticket.source)}</Badge>
+                    <Badge className="shrink-0" tone="live">
+                      {sourceLabel(ticket.source)}
+                    </Badge>
                   </Link>
                 ))
               )}
@@ -91,13 +93,15 @@ export default async function DashboardPage() {
                 allRuns.slice(0, 5).map((run) => (
                   <Link
                     key={run.runId}
-                    className="flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2"
+                    className="flex min-h-11 min-w-0 items-center justify-between gap-3 rounded-md border px-3 py-2"
                     href={`/dashboard/runs/${run.runId}`}
                   >
-                    <span>
+                    <span className="min-w-0 flex-1 truncate">
                       <code>{run.runId.slice(0, 12)}</code> {run.phase}
                     </span>
-                    <Badge tone={run.hasPendingApproval ? "warning" : "live"}>{run.status}</Badge>
+                    <Badge className="shrink-0" tone={run.hasPendingApproval ? "warning" : "live"}>
+                      {run.status}
+                    </Badge>
                   </Link>
                 ))
               )}
@@ -203,11 +207,13 @@ function SummaryList({
           items.slice(0, 5).map((item) => (
             <Link
               key={item.key}
-              className="flex min-h-11 items-center justify-between gap-3 rounded-md border px-3 py-2"
+              className="flex min-h-11 min-w-0 items-center justify-between gap-3 rounded-md border px-3 py-2"
               href={item.href}
             >
-              <span className="truncate">{item.label}</span>
-              <Badge tone={item.source === "Deferred" ? "warning" : "live"}>{item.source}</Badge>
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              <Badge className="shrink-0" tone={item.source === "Deferred" ? "warning" : "live"}>
+                {item.source}
+              </Badge>
             </Link>
           ))
         )}
