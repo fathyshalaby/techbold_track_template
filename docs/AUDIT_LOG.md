@@ -479,6 +479,19 @@ The PRD rule is "draft the ERP activity **only from the audit trail**." Verified
 
 **Verdict.** Phase 7 lands cleanly with no reversion and respects the audit-trail-only + redaction invariants. **The full incident lifecycle is now wired end to end: ticket → diagnose → approve → execute → validate → draft activity → submit.** All 7 phases are on `main`, 473 tests green, CI live.
 
+### Phase 7 — Deep Audit (test-strategy / regression-prevention pass, commit `723b5dc`)
+Second pass found the merge had **turned CI red** — and the CI gate I added in the system-level audit *correctly caught a real regression that the local suite (JSONL fallback) masked*. Three issues, all repaired:
+
+1. **🔴 CI red — transient unhandled rejection (the regression).** `activity-log-generator.test`'s timeout test did `const p = run(...); await advanceTimersByTimeAsync(31s); await expect(p).rejects…` — the promise rejected *during* the timer advance while no `.rejects` handler was attached yet, so for one tick it was an **unhandled rejection**. CI's timing flagged it (exit 1); my local run (and the phase-07 branch's own runs) didn't. **Fix:** attach the assertion *before* advancing timers. Also added `clearTimeout()` in the agent's `Promise.race` `finally` so the 30 s timer doesn't orphan after the model resolves (hygiene). *Lesson: "reject-during-fake-timer-advance, assert-after" is an unhandled-rejection trap — assert-handle first.*
+2. **🟠 Non-portable submit SQL.** The submit route used `UPDATE activity_drafts … ORDER BY created_at DESC LIMIT 1` — only *some* better-sqlite3 builds compile `SQLITE_ENABLE_UPDATE_DELETE_LIMIT` (CI's tolerated it, so `activity.test` passed there), and the **JSONL adapter can't parse it** → the `submitted` flag silently never persisted in fallback mode. **Fix:** target the draft by `id` (`WHERE id = ?`) — works on every backend. This is the *exact* "works-in-(some-)SQLite, breaks-in-fallback" trap the project keeps hitting.
+3. **🟠 No submit idempotency → duplicate ERP activities.** Submit had no guard, so a double-click created **two Phoenix activities for one incident** (audit-integrity / ERP-correctness violation). **Fix:** a `COMPLETED` run returns **409**. +regression test (Test 6b: second submit → 409).
+
+**Activity-generation re-confirmed correct** (from the Phase-7 landing audit): drafted only from the audit trail; every field re-redacted before save *and* before Phoenix submit; phase-gated; agent-unavailable → 502. The redaction invariant holds end-to-end through submission.
+
+**Test gaps noted (deferred):** the same `Promise.race` orphan-timer pattern exists in the other 4 agents (problem-analyzer/customer-system-analyzer/problem-solver/validator) — harmless today (no fake-timer tests exercise them), low-priority `clearTimeout` cleanup. No test asserts `submitted = 1` *content* after submit (only status) — covered indirectly now by the idempotency test.
+
+**Verdict.** CI is green again (verified on the real environment that caught the regression); two real route bugs (non-portable SQL, duplicate-submit) fixed with the redaction/audit-trail invariants intact. Full suite **473 → 474**, `tsc` clean, CI ✅.
+
 ---
 
 ## Cross-phase open items (carry forward)
@@ -504,4 +517,4 @@ The PRD rule is "draft the ERP activity **only from the audit trail**." Verified
 
 ---
 
-*Last updated: Phase 7 (ERP activity generation) landed on main — clean merge, no divergence; full suite 473 pass, tsc clean. ALL 7 PHASES on main; full incident lifecycle wired end to end. Remaining: real docker compose + VM smoke (the one unproven path). Append a new section per phase as it is audited.*
+*Last updated: Phase 7 deep audit — fixed CI-red (transient unhandled rejection the local JSONL run masked), non-portable submit SQL, and submit idempotency (dup ERP activity). Full suite 474 pass, tsc clean, CI ✅ green. ALL 7 phases on main; lifecycle wired end to end. Remaining: real docker compose + VM smoke. Append a new section per phase as it is audited.*
