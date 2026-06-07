@@ -538,6 +538,64 @@ A from-scratch review of all of `main` (ignoring the per-phase history above): 4
 
 ---
 
+## Knowledge ingestion · dead-stub verdict · branch capability scan (commit `eacd287`)
+
+Three-part request: (a) understand/rebuild the deleted tool stubs if useful, (b) ingest & encode
+`knowledge/` into the agent, (c) capability-diff every branch vs `main`.
+
+### (a) Dead tool stubs — VERDICT: correctly deleted, do **not** rebuild
+`git log --follow` proves `ai/tools/{audit,phoenix,safety}-tools.ts` were **always** 2-line `export {}`
+placeholders (`bc7f2e9` … `fcc80d7` deletion) — never implemented in any branch or commit. Intent
+recovered from `docs/ARCHITECTURE.md` §6/§8: they were envisioned as **AI-SDK `tool()` wrappers** the
+model would call — `phoenix-tools` (listTickets/getTicket/getCustomerSystem/createActivity/setStatus),
+`audit-tools` (writeAuditEvent/listObservations/getRunState), `safety-tools`
+(classifyCommandRisk/validateCommandAgainstPolicy/redactSecrets).
+**Why not built:** the as-built design supersedes them and is *safer*. The orchestrator owns the loop and
+calls phoenix/client, store/audit, and safety/* **directly as deterministic backend functions**; agents
+use `generateObject` structured output, **not** model tool-calling. Re-introducing these as model tools
+would (1) duplicate logic that already exists and is tested, and (2) **weaken the safety boundary** —
+exposing `createActivity`/`setStatus`/`writeAuditEvent` as model-callable tools lets the model trigger
+ERP/audit writes, violating the same "model never holds a side-effecting tool" rule that keeps
+`executeApprovedCommand` off the model. Deletion stands. The only architecture-listed capability still
+worth having — `read_local_docs` (man/`--help`/`systemctl cat`) — needs no new tool: the agent already
+reaches it through the existing read-only `proposeSshCommand` flow, now reinforced by the runbooks.
+
+### (b) Knowledge ingestion — BUILT (supersedes the earlier "left as reference" call)
+Wired `knowledge/` into the diagnostic harness per its own README wiring guide (method in the system
+prompt; relevant runbook routed by symptom). New `ai/knowledge.ts`: `DIAGNOSTIC_METHOD` (USE method, 60s
+sweep, recent-changes-first, hypothesize→test→bisect, root-cause≠symptom, durable-fix/persistence rule,
+customer-benefit+persistence validate) embedded in the analyzer/solver/validator prompts; four per-symptom
+`RUNBOOK` digests (systemd · networking-web-tls · resource-exhaustion · data-access-scheduling) routed by
+`selectRunbooks()` (keyword score, top ≤2 — "retrieve the slice, don't dump all four") into the
+analyzer/solver per-incident context. Generalisation preserved (method + runbooks only; a test asserts no
+incident fixtures anywhere in the corpus). **Verified: 486 pass (475→+11) · tsc clean.** `knowledge/`
+stays the human-readable source of truth; `knowledge.ts` is the machine-encoded slice the agents run on.
+
+### (c) Branch capability scan vs `main` — full list of what branches can do that main can't
+All `gsd/phase-01..07` branches are **0 ahead** (fully merged). Five branches carry unique commits:
+- **`claude/festive-hamilton-NgEDu`** (+3, docs only): a built **pitch deck** (`docs/pitch/PITCH_DECK.html`
+  2640 lines + `.md`) and reference docs (API/DATA_MODEL/SECURITY/GLOSSARY/RESULTS). *Capability:* a ready
+  submission/demo deck main lacks. No code.
+- **`feat/ai-service-desk-autopilot`** (+9) & **`feat/backend-node`** (+6, a subset): the **original
+  pre-GSD implementation** (divergent architecture). Real capabilities main does not have:
+  1. **LLM input guard** — a defense that screens untrusted ticket text + command output for injected
+     instructions (prompt-injection). Main has output *redaction* but no *input* guard. **Genuine gap.**
+  2. **Local service-desk sandbox** (`sandbox/seed.ts`) — a seedable broken-VM environment to test
+     incidents end-to-end without a live VM. Directly addresses main's "real-VM smoke" gap.
+  3. **Data-driven safety ruleset** (`shared/safety-rules.json`) + **cross-language safety test corpus**
+     (`shared/tests/{safety-cases.json,check_safety.mjs,check_safety.py}`) — main's policy is code-only.
+  4. **Demo-video pipeline** (Playwright + Remotion, VO + music) for the submission.
+  5. **Azure AI Foundry endpoint support** — main's model layer targets OpenAI-style endpoints only.
+  6. **Two backends** (node + python `mocks/phoenix_mock.py`) + **shared specs** (agent-spec, api-contract).
+- **`julian`** (+2) & **`minam`** (+5, superset): planning/docs only — `.planning/*`, `docs/SAFETY_POLICY.md`,
+  `docs/BUILD.md`, diagnostic knowledge notes. No runtime capability.
+
+**Recommended ports (highest value, generalisation-safe), pending go-ahead:** (1) **LLM input guard** —
+real security win for B/C scoring; (2) **local sandbox/seed** — lets us actually exercise the loop before
+the freeze. The rest (deck, demo pipeline, Azure endpoint, safety-cases corpus) are situational.
+
+---
+
 ## Cross-phase open items (carry forward)
 - ~~Missing technician UI~~ ✅ **built** (`4778e89`) — needs a browser smoke against a running backend.
 - ~~SSE event-name drift~~ ✅ **fixed** (`dad9810`, wildcard channel).
