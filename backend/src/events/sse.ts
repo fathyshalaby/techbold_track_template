@@ -33,7 +33,10 @@ export function createSseStream(c: Context, runId: string) {
           ts: event.ts,
           payload: JSON.parse(event.payload_json),
         }),
-        event: event.type,
+        // No `event:` field — a default (unnamed) frame reaches EventSource.onmessage.
+        // Naming the frame (event:<type>) would only deliver to addEventListener(type),
+        // which the generic client doesn't register, so live updates would be lost.
+        // The event type is in the JSON `type` field instead.
         id: event.id,
       });
     }
@@ -52,7 +55,7 @@ export function createSseStream(c: Context, runId: string) {
           ts: new Date().toISOString(),
           payload,
         })),
-        event: eventType,
+        // Unnamed frame (see backfill note) so it reaches onmessage; type is in JSON.
         id: ulid(),
       });
     };

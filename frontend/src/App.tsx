@@ -49,7 +49,7 @@ interface RunView {
   runId: string;
   status: string;
   phase: string;
-  timeline: Array<{ id: string; type: string; actor: string; ts: string }>;
+  timeline: Array<{ id: string; type: string; actor: string; ts: string; payload_json?: string }>;
   pendingApproval: Approval | null;
   activityDraft: ActivityDraft | null;
 }
@@ -199,9 +199,22 @@ export default function App() {
       setDraft(d);
     });
   const submitActivity = () =>
-    act(() =>
-      api(`/api/runs/${run!.runId}/activity/submit`, { method: 'POST', body: JSON.stringify(draft ?? {}) }),
-    );
+    act(() => {
+      // The draft is snake_case (mirrors the DB row); the submit endpoint expects
+      // camelCase. Map explicitly so technician edits to ALL fields reach Phoenix
+      // (a silent snake/camel mismatch previously dropped 4 of 5 edited fields).
+      const d = draft ?? run!.activityDraft;
+      const body = d
+        ? {
+            summary: d.summary,
+            rootCause: d.root_cause,
+            actionsTaken: d.actions_taken,
+            commandsSummary: d.commands_summary,
+            validationResult: d.validation_result,
+          }
+        : {};
+      return api(`/api/runs/${run!.runId}/activity/submit`, { method: 'POST', body: JSON.stringify(body) });
+    });
 
   const closeRun = () => {
     esRef.current?.close();
@@ -312,9 +325,11 @@ export default function App() {
             />
           )}
 
+          <AuditTrail card={card} timeline={run.timeline} />
+
           <div style={card}>
             <h3 style={{ marginTop: 0 }}>Live events</h3>
-            <div style={{ maxHeight: 260, overflow: 'auto', fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>
+            <div style={{ maxHeight: 200, overflow: 'auto', fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>
               {events.length === 0 && <span style={{ color: '#666' }}>Waiting for events…</span>}
               {events.map((e) => (
                 <div key={e.id}>
@@ -326,6 +341,62 @@ export default function App() {
         </section>
       )}
     </main>
+  );
+}
+
+// One-line, human-readable summary of an audit event's (already-redacted) payload.
+function summarizePayload(payloadJson?: string): string {
+  if (!payloadJson) return '';
+  try {
+    const p = JSON.parse(payloadJson) as Record<string, unknown>;
+    const pick = (k: string) => (p[k] === undefined || p[k] === null ? '' : String(p[k]));
+    if (p.command !== undefined) return `$ ${pick('command')}`;
+    if (p.exitCode !== undefined) return `exit ${pick('exitCode')}`;
+    if (p.reason !== undefined) return pick('reason');
+    if (p.status !== undefined) return pick('status');
+    if (p.hypothesis !== undefined) return pick('hypothesis');
+    if (p.message !== undefined) return pick('message');
+    if (p.ticketDescription !== undefined) return pick('ticketDescription').slice(0, 120);
+    if (p.proposal !== undefined && typeof p.proposal === 'object') {
+      const c = (p.proposal as Record<string, unknown>).command;
+      if (c) return `$ ${String(c)}`;
+    }
+    const keys = Object.keys(p);
+    return keys.length ? keys.map((k) => `${k}=${pick(k)}`).join(' ').slice(0, 120) : '';
+  } catch {
+    return '';
+  }
+}
+
+const ACTOR_COLORS: Record<string, string> = {
+  system: '#57606a',
+  technician: '#0969da',
+  agent: '#8250df',
+  ssh: '#bc4c00',
+  phoenix: '#1a7f37',
+};
+
+// The audit trail — the persisted, redacted source of truth (rubric C). Rendered
+// from GET /api/runs/:id `timeline`, so it shows even if the live SSE stream is idle.
+function AuditTrail({ card, timeline }: { card: React.CSSProperties; timeline: RunView['timeline'] }) {
+  return (
+    <div style={card}>
+      <h3 style={{ marginTop: 0 }}>Audit trail <span style={{ color: '#666', fontWeight: 400, fontSize: 13 }}>· {timeline.length} events · redacted, append-only</span></h3>
+      <div style={{ maxHeight: 300, overflow: 'auto', fontFamily: 'ui-monospace, monospace', fontSize: 12.5 }}>
+        {timeline.length === 0 && <span style={{ color: '#666' }}>No audit events yet.</span>}
+        {timeline.map((e) => {
+          const summary = summarizePayload(e.payload_json);
+          return (
+            <div key={e.id} style={{ padding: '3px 0', borderBottom: '1px solid #f0f0f0' }}>
+              <span style={{ color: '#666' }}>{new Date(e.ts).toLocaleTimeString()}</span>{' '}
+              <span style={{ color: ACTOR_COLORS[e.actor] ?? '#666', fontWeight: 600 }}>{e.actor}</span>{' '}
+              <span>{e.type}</span>
+              {summary && <span style={{ color: '#444' }}> — {summary}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

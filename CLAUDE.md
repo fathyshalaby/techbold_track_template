@@ -24,6 +24,11 @@ For: service-desk technicians (primary driver) and hackathon judges (decisive ev
 
 ## Technology Stack
 
+> ⚠️ **STALE — auto-generated from an earlier Python/FastAPI skeleton.** The as-built stack is
+> **Node 22 · Hono · TypeScript** (backend) + **React 18 · Vite** (frontend) + Vercel AI SDK v5
+> (`@ai-sdk/openai`, `gpt-4o`) + ssh2 + better-sqlite3 + Zod. See `README.md` / `docs/ARCHITECTURE.md`.
+> Ignore the Python/FastAPI/uvicorn/paramiko details below.
+
 ## Languages
 
 - Python 3.11 - Backend (`backend/`)
