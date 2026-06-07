@@ -525,7 +525,22 @@ Final Phase-7 lens: validate the activity-logging / incident-closure design agai
 
 ---
 
+# Fresh-Eyes Full-Repo Audit + Repairs (commits `fcc80d7` · `4778e89` · `dad9810`)
+A from-scratch review of all of `main` (ignoring the per-phase history above): 41 source files (~4.1k LOC), **475 tests / 20 files green**, `tsc` clean, CI on push/PR, all 7 phase branches merged. Verdict: the **backend engine is strong and complete** (safety gate at 4 sites, redaction at 4 sinks, `proposeSshCommand` has no `execute`, append-only audit) — the gaps were at the **edges**: a missing demo UI, a drifted SSE allowlist, and 3 dead stubs. Repaired the fixable ones:
+
+1. **🔴 Missing technician UI → built it (`4778e89`).** The frontend was a 17-line placeholder — the #1 product gap for a demo-scored case. Implemented a complete single-file `App.tsx` against the real API: ticket list → start run → **Advance agent (/next)** → **approval card** (purpose/expected/safety/risk colour-coded, command **editable** before approve; Approve/Reject-with-reason — the HITL gate) → **live SSE event log** → **ERP activity** draft → edit → submit (closes ticket). `VITE_API_BASE`-driven, no new deps. Verified `tsc -b` + `vite build` succeed. *(Browser-smoke still owed — can't run a browser here.)*
+2. **🟠 SSE allowlist drift → wildcard channel (`dad9810`).** `sse.ts` subscribed to a fixed `SSE_EVENT_TYPES` list that had drifted from the orchestrator's real event names (`validation.complete` vs `…completed`, `diagnosis.*`, `command.approved/rejected`, `run.aborted`, `activity.draft_ready`) — those never streamed live, only via reconnect-backfill. Replaced with a `'*'` wildcard channel on `runEventBus` (emit fans out to `'*'`; SSE subscribes once via `onAny`) so **every** emitted event streams live, drift-proof, with one listener per connection instead of ~14.
+3. **🟢 Dead code → removed (`fcc80d7`).** Deleted 3 unimported tool stubs (`ai/tools/{audit,phoenix,safety}-tools.ts`); the orchestrator calls those subsystems directly.
+
+**Considered, deliberately NOT changed:** `knowledge/` runbook corpus is unused-by-code — left as **reference material** (wiring it as agent grounding risks the generalisation constraint; out of scope at freeze); `node:sqlite` migration (post-freeze); `fast-check` property tests (dep add at freeze — deferred). **Cannot fix from here (no Docker/VM/mentors):** the real `docker compose` + live VM/Phoenix smoke; passwordless-sudo + attended-grading confirmation.
+
+**Verified:** backend **475 pass / tsc clean / CI green**; frontend **tsc + vite build pass**.
+
+---
+
 ## Cross-phase open items (carry forward)
+- ~~Missing technician UI~~ ✅ **built** (`4778e89`) — needs a browser smoke against a running backend.
+- ~~SSE event-name drift~~ ✅ **fixed** (`dad9810`, wildcard channel).
 - **Post-freeze: migrate store to `node:sqlite`** (Node 22 built-in) — kills the better-sqlite3 native-build dependency and lets the fragile regex-SQL JSONL fallback be deleted. Experimental today, so not pre-freeze.
 - ✅ **Audit-trail durability across container restart** — fixed (`87307e5`, named volume + node-owned data dir + loud fallback). **Still must be *executed*:** `docker compose up`, run an incident, recreate the container, confirm the trail persists.
 - ✅ **CI (tsc + tests) on push/PR** — added & green (`946b3c4`); lockfile fixed so `--frozen-lockfile` passes.
@@ -548,4 +563,4 @@ Final Phase-7 lens: validate the activity-logging / incident-closure design agai
 
 ---
 
-*Last updated: Phase 7 research/reuse audit — activity record validated as an ITIL incident-closure record; generator matches AI-SRE grounded+HITL best practice. No code change (restraint at freeze). ALL 7 phases on main, 475 tests, CI ✅, full lifecycle wired (resolve→log→close ticket→audit). Remaining: real docker compose + VM/ERP smoke. Append a new section per phase as it is audited.*
+*Last updated: Fresh-eyes full-repo audit — built the technician UI (frontend was a stub), fixed SSE event-name drift (wildcard channel), removed dead tool stubs. Backend 475 pass + tsc clean + CI ✅; frontend tsc + vite build pass. Remaining: browser-smoke the UI + the real docker compose + VM/ERP smoke. Append a new section per phase as it is audited.*
