@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import { cors } from "hono/cors";
 import { activityRouter } from "./routes/activity.js";
 import { approvalsRouter } from "./routes/approvals.js";
+import { dashboardRouter } from "./routes/dashboard.js";
 import { eventsRouter } from "./routes/events.js";
 import { healthRouter } from "./routes/health.js";
 import { runsRouter } from "./routes/runs.js";
@@ -21,6 +22,7 @@ export const app = new Hono();
 app.use("*", cors());
 
 app.route("/health", healthRouter);
+app.route("/api/dashboard", dashboardRouter);
 app.route("/api/tickets", ticketsRouter);
 app.route("/api/runs", runsRouter);
 app.route("/api/runs", approvalsRouter);

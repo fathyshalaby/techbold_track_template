@@ -62,7 +62,7 @@ function summarizePayload(payloadJson: string): string {
       .slice(0, 4)
       .map(([key, value]) => {
         if (/token|secret|private|key|password|error|message|detail/i.test(key)) {
-          return `${key}: [redacted]`;
+          return "sensitive field: [redacted]";
         }
         if (value === null || value === undefined) return `${key}: ${value}`;
         if (typeof value === "object")
