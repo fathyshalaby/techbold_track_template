@@ -58,12 +58,12 @@ Requirements for the hackathon submission (code freeze Sun Jun 7, 14:00). Each m
 ### Technician UX (Frontend)
 
 - [ ] **UX-01**: Ticket overview (list) is easy to understand and drives navigation — *D*
-- [ ] **UX-02**: Ticket detail view shows the customer system information — *D*
-- [ ] **UX-03**: Run page shows visible agent progress via a live SSE timeline — *D*
-- [ ] **UX-04**: Approval card shows command, purpose, expected signal, risk level, and safety notes with approve / edit-then-approve / reject-with-reason — *C/D*
-- [ ] **UX-05**: Audit timeline shows followable logs and actions — *C/D*
+- [x] **UX-02**: Ticket detail view shows the customer system information — *D*
+- [x] **UX-03**: Run page shows visible agent progress via a live SSE timeline — *D*
+- [x] **UX-04**: Approval card shows command, purpose, expected signal, risk level, and safety notes with approve / edit-then-approve / reject-with-reason — *C/D*
+- [x] **UX-05**: Audit timeline shows followable logs and actions — *C/D*
 - [ ] **UX-06**: Activity editor lets the technician edit and submit the generated draft — *A/D*
-- [ ] **UX-07**: Retry and abort controls are available in the UI — *D*
+- [x] **UX-07**: Retry and abort controls are available in the UI — *D*
 
 ### Engineering & Submission
 
@@ -142,12 +142,12 @@ Explicitly excluded (PRD §6.3, §11). Documented to prevent scope creep.
 | ACT-01 | Phase 7 | Pending |
 | ACT-02 | Phase 7 | Pending |
 | UX-01 | Phase 8 | Pending |
-| UX-02 | Phase 8 | Pending |
-| UX-03 | Phase 8 | Pending |
-| UX-04 | Phase 8 | Pending |
-| UX-05 | Phase 8 | Pending |
+| UX-02 | Phase 8 | Complete |
+| UX-03 | Phase 8 | Complete |
+| UX-04 | Phase 8 | Complete |
+| UX-05 | Phase 8 | Complete |
 | UX-06 | Phase 8 | Pending |
-| UX-07 | Phase 8 | Pending |
+| UX-07 | Phase 8 | Complete |
 | ENG-01 | Phase 9 | Pending |
 | ENG-02 | Phase 9 | Pending |
 | ENG-03 | Phase 9 | Pending |

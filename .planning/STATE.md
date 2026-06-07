@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "08-03 complete — App.tsx view-state shell, TicketListView component, RunView/ActivityView stubs"
-last_updated: "2026-06-07T03:00:00.000Z"
-last_activity: 2026-06-07 -- Phase 08 plan 03 complete
+stopped_at: "06-01 complete — run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)"
+last_updated: "2026-06-07T01:27:48.473Z"
+last_activity: 2026-06-07 -- Phase 08 execution started
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 32
-  completed_plans: 30
-  percent: 81
+  completed_plans: 31
+  percent: 78
 ---
 
 # Project State
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-06-06)
 ## Current Position
 
 Phase: 08 (frontend) — EXECUTING
-Plan: 4 of 5
-Status: Executing Phase 08
+Plan: 5 of 5
+Status: Ready to execute
 Last activity: 2026-06-07 -- Phase 08 execution started
 
 Progress: [██░░░░░░░░] 25%
@@ -53,6 +53,7 @@ Progress: [██░░░░░░░░] 25%
 | Phase 04-ssh-executor P03 | 25min | 2 tasks | 2 files |
 | Phase 05 P03 | 2min | 2 tasks | 4 files |
 | Phase 06 P02 | 65 | 2 tasks | 2 files |
+| Phase 08 P04 | 4min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,8 @@ Recent decisions affecting current work:
 - [Phase 06-01]: vi.clearAllMocks() used in afterEach instead of vi.restoreAllMocks() — restoreAllMocks resets vi.fn() instances created inside vi.mock() back to originals, breaking mocks for subsequent tests in the same file
 - [Phase ?]: approvalsRouter mounts at /api/runs prefix alongside runsRouter — Hono matches specific paths first so no collisions
 - [Phase ?]: Blocked-command 422 detection uses state.phase === WAITING_FOR_APPROVAL after advance() — no extra audit query; reduce() leaves phase unchanged on command_blocked
+- [Phase 08]: ApprovalCard uses three-mode internal state (default/edit/reject); 422 detection via err.message includes 'blocked'|'safety' pattern — Keeps approval flow self-contained; backend sends human-readable 422 body so client-side re-mapping is minimal
+- [Phase 08]: RunView derives pendingApproval and phase from useRun().run, not from useRunEvents; refresh() called after approve/reject and on key SSE event types — SSE events are stream-only; run state (phase, pendingApproval) must be authoritative from the server REST response
 
 ### Pending Todos
 
@@ -95,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-06T22:53:40.470Z
+Last session: 2026-06-07T01:25:40.125Z
 Stopped at: 06-01 complete — run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)
 Resume file: .planning/phases/06-run-api-approvals-sse/06-01-SUMMARY.md

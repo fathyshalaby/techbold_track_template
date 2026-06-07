@@ -234,7 +234,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 08-04-PLAN.md — RunView + ApprovalCard + abort/advance controls
+- [x] 08-04-PLAN.md — RunView + ApprovalCard + abort/advance controls
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -272,5 +272,5 @@ Note: Phases 2 and 3 can run in parallel lanes (ERP client is independent of saf
 | 5. Agent Loop + Orchestrator | 4/5 | In Progress|  |
 | 6. Run API + Approvals + SSE | 4/4 | Complete   | 2026-06-06 |
 | 7. Activity Generation | 3/3 | Complete   | 2026-06-07 |
-| 8. Frontend | 2/5 | In Progress|  |
+| 8. Frontend | 4/5 | In Progress|  |
 | 9. Tests + Submission Polish | 0/TBD | Not started | - |
