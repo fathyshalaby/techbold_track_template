@@ -1,72 +1,91 @@
 # Requirements: Service Desk Autopilot
 
 **Defined:** 2026-06-07
+**Milestone:** v1.2 Professional Skeleton Rescue Follow-up
 **Core Value:** Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs, safely and auditably.
 
-## v1 Requirements
+## v1.2 Requirements
 
-### Event Contract and Transport
+Requirements for the current follow-up milestone. Each maps to one roadmap phase.
 
-- [x] **EVNT-01**: Standardize backend SSE event names for run lifecycle state transitions.
-- [x] **EVNT-02**: Publish event payloads from a single shared contract used by backend and frontend.
+### Live Validation
 
-### Frontend Wiring
+- [ ] **LIVE-01**: Operator can run a fresh clone through `docker compose up --build` without hidden manual repair steps.
+- [ ] **LIVE-02**: Operator can follow documented setup commands that match the actual package, Docker, and environment baseline.
 
-- [x] **FEIN-01**: Remove or migrate disconnected frontend app trees not mounted by `frontend/src/main.tsx`.
-- [x] **FEIN-02**: Ensure technician workflow rendering uses one runtime path with complete route handling.
+### Browser Workflow
 
-### Tooling Baseline
+- [ ] **UAT-01**: Operator can complete a browser UAT pass for the primary technician ticket, run, approval, audit, and activity flow.
+- [ ] **UAT-02**: Operator can observe backend SSE lifecycle updates in the mounted frontend without manual refresh.
 
-- [x] **TOOL-01**: Align package-manager assumptions and lockfile strategy across backend, frontend, and CI.
-- [x] **TOOL-02**: Normalize frontend Dockerfile and workspace build assumptions to the repository baseline.
-- [x] **TOOL-03**: Add and document monorepo scripts for install, typecheck, test, and build.
+### Vertical-Slice Coverage
 
-### Store Behavior
+- [ ] **E2E-01**: Developer can run deterministic vertical-slice coverage for run creation, SSE updates, approval edit/execute, and activity flow.
 
-- [x] **STOR-01**: Make persistence mode explicit in startup configuration and runtime logs.
-- [x] **STOR-02**: Document and enforce fallback semantics when durable persistence is disabled.
+### Real Integrations
 
-## v2 Requirements
+- [ ] **REAL-01**: Operator can validate Phoenix API access with real credentials or record the exact blocker.
+- [ ] **REAL-02**: Operator can validate SSH `.pem` access and passwordless `sudo -n true` against a practice VM or record the exact blocker.
+- [ ] **REAL-03**: Operator can validate the real LLM orchestrator loop or record the exact blocker.
 
-Deferred to future releases. Tracked but not in current roadmap.
+### Submission Handoff
 
-### Quality and Coverage
+- [ ] **SUBM-01**: Operator has a demo-video checklist and external submission handoff notes grounded in verified behavior.
 
-- **E2E-01**: Add deterministic vertical-slice coverage for run creation, SSE updates, approval edit/execute, and activity flow.
-- **PLAN-01**: Remove stale planning artifacts and regenerate evidence-only docs after milestone close.
+### Planning Hygiene
+
+- [ ] **PLAN-01**: Developer can trace every v1.2 production change back to `.planning/audits/V1.1-MASTER-DEFECT-MAP.md`.
+- [ ] **PLAN-02**: Developer can rely on planning/docs artifacts that distinguish completed evidence, deferred work, and blocked manual validation.
+
+## Future Requirements
+
+Deferred to future releases. Tracked but not in the current roadmap.
+
+### Product Expansion
+
+- **HCR-01..06**: Human-control extensions.
+- **BOOST-01..06**: UX and safety boosters.
+
+### Architecture and Operations
+
+- **STORE-FUTURE-01**: Durable store selection, migration guidance, and production persistence policy.
+- **GRAPH-FUTURE-01**: Automated planning graph refresh or drift check.
 
 ## Out of Scope
 
+Explicit exclusions for this milestone.
+
 | Feature | Reason |
 |---------|--------|
-| Full RAG/knowledge graph | Outside this v1.1 skeleton rescue scope and requires data pipeline work |
-| OAuth/social authentication flows | Not required for scoring path and adds extra identity complexity |
-| Native desktop or mobile clients | Scope remains web-first technician demo and fix workflow |
-| Generic system-administration command catalog beyond this incident domain | Product focus is incident repair sequence, not admin tooling |
+| New product features | v1.2 is a rescue follow-up focused on proof, validation, and evidence cleanup. |
+| Enterprise hardening | Auth, RBAC, SSO, queues, Redis, Kubernetes, and multi-tenant controls do not support the current scoring path. |
+| Fully autonomous remediation | The project invariant remains human approval before command execution. |
+| Generic Linux admin assistant | The product remains focused on the incident ticket and service-restoration workflow. |
+| Speculative architecture rewrites | The goal is a clean skeleton foundation, not a broad redesign. |
 
 ## Traceability
 
-Which phases cover which requirements.
+Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EVNT-01 | Phase 1 | Complete |
-| EVNT-02 | Phase 1 | Complete |
-| FEIN-01 | Phase 2 | Complete |
-| FEIN-02 | Phase 2 | Complete |
-| TOOL-01 | Phase 3 | Complete |
-| TOOL-02 | Phase 3 | Complete |
-| TOOL-03 | Phase 3 | Complete |
-| STOR-01 | Phase 4 | Complete |
-| STOR-02 | Phase 4 | Complete |
-| E2E-01 | v2 | Deferred |
-| PLAN-01 | v2 | Deferred |
+| LIVE-01 | TBD | Pending |
+| LIVE-02 | TBD | Pending |
+| UAT-01 | TBD | Pending |
+| UAT-02 | TBD | Pending |
+| E2E-01 | TBD | Pending |
+| REAL-01 | TBD | Pending |
+| REAL-02 | TBD | Pending |
+| REAL-03 | TBD | Pending |
+| SUBM-01 | TBD | Pending |
+| PLAN-01 | TBD | Pending |
+| PLAN-02 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 9 total
-- Mapped to phases: 9
-- Unmapped: 0
+- v1.2 requirements: 11 total
+- Mapped to phases: 0
+- Unmapped: 11
 
 ---
 *Requirements defined: 2026-06-07*
-*Last updated: 2026-06-07 after v1.1 completion*
+*Last updated: 2026-06-07 after v1.2 requirements definition*
