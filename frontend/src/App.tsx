@@ -72,9 +72,9 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="glyph">A</span>
+          <span className="glyph">S</span>
           <div>
-            <b>Autopilot</b> <span className="sub">service-desk console</span>
+            <b>Sphinx</b> <span className="sub">· AI Service Desk Autopilot</span>
           </div>
         </div>
         <div className="spacer" />

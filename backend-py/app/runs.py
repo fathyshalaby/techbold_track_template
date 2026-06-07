@@ -10,6 +10,8 @@ In-memory store (single-user hackathon demo). Swap RUNS for a DB to persist.
 """
 from __future__ import annotations
 
+import queue
+import threading
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -88,6 +90,7 @@ class Run:
         self.pending_step_id: Optional[str] = None
         self._ssh: Optional[SSHRunner] = None
         self._auto = 0
+        self._subscribers: list["queue.Queue"] = []
 
     def touch(self) -> None:
         self.updated_at = _now()
@@ -95,6 +98,26 @@ class Run:
     def log(self, actor: str, type_: str, **kw) -> None:
         self.audit.append(AuditEntry(ts=_now(), actor=actor, type=type_, **kw))
         self.touch()
+
+    def subscribe(self) -> "queue.Queue":
+        q: "queue.Queue" = queue.Queue(maxsize=200)
+        self._subscribers.append(q)
+        return q
+
+    def unsubscribe(self, q: "queue.Queue") -> None:
+        try:
+            self._subscribers.remove(q)
+        except ValueError:
+            pass
+
+    def emit(self) -> None:
+        """Push a full run snapshot to every SSE subscriber (live streaming)."""
+        snap = self.as_dict()
+        for q in list(self._subscribers):
+            try:
+                q.put_nowait(snap)
+            except queue.Full:
+                pass
 
     def as_dict(self) -> dict:
         return {
