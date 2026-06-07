@@ -1,0 +1,10 @@
+{
+  "name": "techbold-track-template",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "pnpm --dir backend test && pnpm --dir frontend test",
+    "build": "pnpm --dir frontend build"
+  }
+}
