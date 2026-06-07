@@ -90,9 +90,9 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-06-07T01:25:40.125Z
-Stopped at: 06-01 complete - run lifecycle routes (POST /, GET /:runId, POST /:runId/next, POST /:runId/abort)
-Resume file: .planning/phases/06-run-api-approvals-sse/06-01-SUMMARY.md
+Last session: 2026-06-07T05:51:24+0200
+Stopped at: Resumed project state; v1.1 complete and awaiting next milestone selection.
+Resume file: .planning/STATE.md
 
 ## Operator Next Steps
 
