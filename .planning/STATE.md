@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Professional Skeleton Rescue Follow-up
-status: complete
-last_updated: "2026-06-07T04:30:00Z"
+status: archived
+last_updated: "2026-06-07T04:32:00Z"
 last_activity: 2026-06-07
 progress:
   total_phases: 5
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-07)
 
 **Core value:** Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs, safely and auditably
-**Current focus:** v1.2 complete - final audit and archive
+**Current focus:** No active milestone
 
 ## Current Position
 
 Phase: -
 Plan: -
-Status: v1.2 phases complete
-Last activity: 2026-06-07 - Phase 5 completed
+Status: v1.2 archived
+Last activity: 2026-06-07 - v1.2 archived
 
 ## Performance Metrics
 
@@ -98,4 +98,4 @@ Resume file: .planning/STATE.md
 
 ## Operator Next Steps
 
-- Run final milestone audit and archive v1.2 when ready.
+- Start the next milestone with `$gsd-new-milestone` after choosing the next objective.

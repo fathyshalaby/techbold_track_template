@@ -1,5 +1,31 @@
 # Milestones
 
+## v1.2 Professional Skeleton Rescue Follow-up (Shipped: 2026-06-07)
+
+**Phases completed:** 5 phases, 5 plans
+
+**Archive:**
+
+- Roadmap: `.planning/milestones/v1.2-ROADMAP.md`
+- Requirements: `.planning/milestones/v1.2-REQUIREMENTS.md`
+- Audit: `.planning/milestones/v1.2-MILESTONE-AUDIT.md`
+- Phase artifacts: `.planning/milestones/v1.2-phases/`
+
+**Key accomplishments:**
+
+- Proved fresh-clone Docker Compose startup in mock mode.
+- Completed browser UAT and SSE lifecycle validation in mock mode.
+- Added deterministic vertical-slice coverage for run creation, SSE, approval edit/execute, validation, and activity submission.
+- Fixed JSONL mock-store query/update drift exposed by vertical-slice coverage.
+- Recorded exact real integration blockers for Phoenix, SSH, sudo, and LLM.
+- Packaged current results, limitations, and submission handoff docs.
+
+**Audit status:** passed
+
+Known external blockers at close: real Phoenix token, SSH key and VM target, passwordless sudo confirmation, and real LLM credentials.
+
+---
+
 ## v1.1 (Shipped: 2026-06-07)
 
 **Phases completed:** 8 phases, 8 plans, 0 tasks

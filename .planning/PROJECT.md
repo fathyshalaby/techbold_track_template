@@ -1,17 +1,14 @@
 # Service Desk Autopilot
 
-## Current Milestone: v1.2 Professional Skeleton Rescue Follow-up
+## Current State
 
-**Goal:** Close the remaining skeleton-readiness gaps left after v1.1 by validating the live/demo path, adding evidence-backed vertical-slice confidence, and cleaning planning/docs artifacts without adding new product features.
+**Latest shipped milestone:** v1.2 Professional Skeleton Rescue Follow-up
 
-**Target features:**
+**Status:** Skeleton is clean, connected, buildable, and documented for team handoff.
 
-- Fresh-clone Docker Compose validation for the current skeleton.
-- Browser SSE and primary technician workflow UAT.
-- Deterministic vertical-slice coverage for run creation, SSE updates, approval edit/execute, and activity flow.
-- Real Phoenix, SSH, and LLM validation where credentials, keys, and practice VMs are available.
-- Demo video and external submission handoff readiness.
-- Planning and docs cleanup tied back to `.planning/audits/V1.1-MASTER-DEFECT-MAP.md`.
+**Primary verified path:** mock-mode demo and deterministic backend vertical slice.
+
+**Real integration status:** blocked by missing external inputs, recorded in `.planning/milestones/v1.2-MILESTONE-AUDIT.md`.
 
 ## What This Is
 
@@ -21,9 +18,11 @@ The AI never acts on its own. It proposes structured outputs; the backend owns s
 
 ## Core Value
 
-Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs, safely and auditably. The highest-value proof is a real run that restores customer benefit, survives persistence checks, and leaves a complete redacted audit trail.
+Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs, safely and auditably. The highest-value proof remains a real run that restores customer benefit, survives persistence checks, and leaves a complete redacted audit trail.
 
-## Validated in v1.0
+## Validated Milestones
+
+### v1.0
 
 - Node 22 + Hono + TypeScript backend with Zod-validated environment configuration.
 - React 18 + Vite frontend technician workspace.
@@ -33,49 +32,33 @@ Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs
 - Deterministic safety layer with blocklist, classifier, redaction, and edited-command recheck.
 - Append-only run/audit store with SQLite and JSONL fallback.
 - ssh2 single-command executor with timeout, output cap, redaction, mock mode, and preflight behavior.
-- Specialist AI roles: problem analyzer, customer-system analyzer, problem solver, validator, and activity log generator.
-- Deterministic orchestrator state machine with approval, rejection, blocked-command, validation, and activity handoff paths.
+- Specialist AI roles and deterministic orchestrator state machine.
 - Run API, approval API, SSE stream, and activity draft/submit routes.
 - Frontend ticket list, run view, approval card, audit timeline, retry/abort controls, and activity editor.
-- Root `pnpm test`, README, REPORT, and reviewed secret scan.
 
-## Manual Validation Debt
+### v1.1
 
-- Fresh-clone `docker compose up --build` check.
-- Real Phoenix token validation.
-- Real SSH `.pem` validation against practice VMs.
-- Real LLM loop validation.
-- Browser SSE/UAT pass.
-- Demo video recording and external submission form.
-- Passwordless `sudo -n true` confirmation for `azureuser`.
+- Standardized backend/frontend SSE event contracts and canonical event names.
+- Removed disconnected frontend surfaces so the mounted app has one runtime path.
+- Aligned package manager, root scripts, CI checks, frontend Docker build, and lockfile ownership on pnpm.
+- Exposed store durability through startup logs and `/health`.
+- Updated README, infrastructure docs, requirements traceability, and phase artifacts.
 
-## Requirements
+### v1.2
 
-Completed in v1.1:
+- Proved fresh-clone Docker Compose startup in mock mode.
+- Completed browser UAT for the mounted frontend and SSE lifecycle in mock mode.
+- Added deterministic backend vertical-slice coverage for run creation, SSE, approval edit/execute, validation, and activity submission.
+- Fixed JSONL mock-store query/update drift exposed by the vertical-slice test.
+- Recorded exact real integration blockers for Phoenix, SSH, sudo, and LLM.
+- Added submission handoff docs and refreshed active result/limitation docs.
 
-- [x] **EVNT-01**: Standardize backend SSE event names for run lifecycle state transitions.
-- [x] **EVNT-02**: Publish event payloads from a single shared contract used by backend and frontend.
-- [x] **FEIN-01**: Remove or migrate disconnected frontend app trees not mounted by `frontend/src/main.tsx`.
-- [x] **FEIN-02**: Ensure technician workflow rendering uses one runtime path with complete route handling.
-- [x] **TOOL-01**: Align package-manager assumptions and lockfile strategy across backend, frontend, and CI.
-- [x] **TOOL-02**: Normalize frontend Dockerfile and workspace build assumptions to the repository baseline.
-- [x] **TOOL-03**: Add and document monorepo scripts for install, typecheck, test, and build.
-- [x] **STOR-01**: Make persistence mode explicit in startup configuration and runtime logs.
-- [x] **STOR-02**: Document and enforce fallback semantics when durable persistence is disabled.
+## Current External Blockers
 
-Deferred:
-
-- **E2E-01**: Add deterministic vertical-slice coverage for run creation, SSE updates, approval edit/execute, and activity flow.
-- **PLAN-01**: Remove stale planning artifacts and regenerate evidence-only docs after milestone close.
-
-Active in v1.2:
-
-- [ ] **LIVE-01**: Operator can run a fresh clone through `docker compose up --build` with documented setup and no hidden manual repair steps.
-- [ ] **LIVE-02**: Operator can complete a browser UAT pass for the primary technician run flow with SSE updates visible in the mounted frontend.
-- [ ] **E2E-01**: Developer can run deterministic vertical-slice coverage for run creation, SSE updates, approval edit/execute, and activity flow.
-- [ ] **REAL-01**: Operator can validate Phoenix, SSH, and LLM paths against real credentials, keys, and practice VMs when those inputs are available.
-- [ ] **SUBM-01**: Operator has evidence needed for demo video recording and external submission handoff.
-- [ ] **PLAN-01**: Developer can rely on evidence-only planning/docs artifacts that trace unresolved work back to `.planning/audits/V1.1-MASTER-DEFECT-MAP.md`.
+- Phoenix real access needs a real `PHOENIX_API_TOKEN`.
+- SSH real validation needs a private key mounted at the configured `SSH_PRIVATE_KEY_PATH`.
+- SSH and sudo validation need real VM host/port from Phoenix customer-system data.
+- Real LLM validation needs credentials for the selected provider.
 
 ## Out Of Scope
 
@@ -90,7 +73,7 @@ Active in v1.2:
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
-| --- | --- | --- |
+|---|---|---|
 | Node 22 + Hono replaced the FastAPI skeleton | Same language across API, agents, safety, and frontend types | Good |
 | Mock mode is first-class | Demo and tests must survive missing live credentials | Good |
 | Deterministic state machine owns truth | Keeps AI useful without making it dangerous | Good |
@@ -98,31 +81,13 @@ Active in v1.2:
 | SSE instead of WebSockets | One-way event stream matches the product flow | Good |
 | SQLite with JSONL fallback | Durable local audit trail without extra services | Good |
 | Audit trail is the activity source | Prevents invented actions in Phoenix reports | Good |
-| Event and store repair work was completed as a controlled v1.1 objective | Reduced skeleton risk before new feature expansion | Good |
+| v1.1 and v1.2 rescue milestones were run before feature expansion | Reduced skeleton risk before new product work | Good |
 
-## Evolution
+## Next Milestone Candidates
 
-PROJECT.md evolves at phase transitions and milestone boundaries.
-
-### After each phase transition
-
-1. Requirements invalidated? Move to Out of Scope with reason.
-2. Requirements validated? Move to Validated with phase reference.
-3. New requirements emerged? Add to Active.
-4. Decisions to log? Add to Key Decisions.
-5. "What This Is" still accurate? Update if drifted.
-
-### After each milestone
-
-1. Full review of all sections.
-2. Core Value check to confirm priority is still right.
-3. Audit Out of Scope and keep reasons current.
-4. Update context with what changed in usage and validation state.
-
-## Next Milestone Goals
-
-- Complete v1.2 follow-up validation and evidence cleanup before adding new product features.
-- Start a new product requirements cycle only after the skeleton is proven clean, connected, buildable, and team-ready.
+- Real Phoenix, SSH, sudo, and LLM validation after credentials and key material are available.
+- Demo recording and external submission execution using `docs/SUBMISSION_HANDOFF.md`.
+- Product expansion only after real integration blockers are cleared or explicitly deferred.
 
 ---
-*Last updated: 2026-06-07 after v1.2 milestone start*
+*Last updated: 2026-06-07 after v1.2 archive*
