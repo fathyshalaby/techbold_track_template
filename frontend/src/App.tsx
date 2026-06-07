@@ -43,6 +43,23 @@ export default function App() {
     api.me().then(setMe).catch((e) => setError(String(e.message || e)));
   }, []);
 
+  // Live trace via Server-Sent Events: stream run snapshots as the agent works.
+  const runId = run?.id ?? null;
+  useEffect(() => {
+    if (!runId) return;
+    const es = new EventSource(`${api.base}/api/runs/${runId}/events`);
+    es.onmessage = (e) => {
+      try {
+        const r = JSON.parse(e.data) as Run;
+        setRun(r);
+        if (["done", "aborted", "error"].includes(r.status)) es.close();
+      } catch {
+        /* ignore malformed frame */
+      }
+    };
+    return () => es.close();
+  }, [runId]);
+
   useEffect(() => {
     setLoading(true);
     api

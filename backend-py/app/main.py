@@ -7,8 +7,12 @@ Keep the Phoenix token + SSH key on the backend — never in the browser.
 """
 from __future__ import annotations
 
+import json
+import queue
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from . import runs
@@ -146,6 +150,37 @@ def create_run(body: CreateRunBody):
 @app.get("/api/runs/{run_id}")
 def get_run(run_id: str):
     return _guard_run(lambda: runs._get(run_id).as_dict())
+
+
+@app.get("/api/runs/{run_id}/events")
+def run_events(run_id: str):
+    """Server-Sent Events: stream a full run snapshot on every state change (live trace)."""
+    try:
+        run = runs._get(run_id)
+    except runs.RunError as exc:
+        raise HTTPException(status_code=exc.status, detail={"error": {"code": "run_error", "message": str(exc)}})
+    q = run.subscribe()
+
+    def gen():
+        try:
+            yield f"data: {json.dumps(run.as_dict())}\n\n"
+            while True:
+                try:
+                    snap = q.get(timeout=15)
+                except queue.Empty:
+                    yield ": ping\n\n"
+                    continue
+                yield f"data: {json.dumps(snap)}\n\n"
+                if snap.get("status") in ("done", "aborted", "error"):
+                    break
+        finally:
+            run.unsubscribe(q)
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )
 
 
 @app.post("/api/runs/{run_id}/approve")

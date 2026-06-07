@@ -172,7 +172,8 @@ def create_run(ticket_id: int) -> Run:
         key_path=resolve_key_path(ticket, system),
     )
     run.log("system", "run_created", note=f"ticket {ticket_id}")
-    _advance(run)
+    run.emit()
+    threading.Thread(target=_drive, args=(run,), daemon=True).start()
     return run
 
 
@@ -294,6 +295,27 @@ def _execute(run: Run, step: Step, command: str, auto: bool) -> None:
     run.emit()
 
 
+def _drive(run: Run) -> None:
+    """Run the agent loop in a background thread so SSE clients see steps stream live."""
+    try:
+        _advance(run)
+    except Exception as exc:  # noqa: BLE001
+        run.status = "error"
+        run.log("system", "error", note=str(exc))
+    run.emit()
+
+
+def _resume(run: Run, step: Step, command: str) -> None:
+    """Execute an approved command then continue the loop, in the background."""
+    try:
+        _execute(run, step, command, auto=False)
+        _advance(run)
+    except Exception as exc:  # noqa: BLE001
+        run.status = "error"
+        run.log("system", "error", note=str(exc))
+    run.emit()
+
+
 def approve_step(run_id: str, step_id: str, edited_command: Optional[str] = None) -> Run:
     run = _get(run_id)
     step = _find_step(run, step_id)
@@ -317,11 +339,14 @@ def approve_step(run_id: str, step_id: str, edited_command: Optional[str] = None
         run.messages.append(
             agent.tool_result_message(step.tool_call_id, f"BLOCKED by safety layer: {verdict['reason']}. Propose a safer approach.")
         )
-        _advance(run)
+        run.emit()
+        threading.Thread(target=_drive, args=(run,), daemon=True).start()
         return run
 
-    _execute(run, step, command, auto=False)
-    _advance(run)
+    run.status = "running"
+    run.pending_step_id = None
+    run.emit()
+    threading.Thread(target=_resume, args=(run, step, command), daemon=True).start()
     return run
 
 
@@ -341,7 +366,8 @@ def reject_step(run_id: str, step_id: str, reason: Optional[str] = None) -> Run:
             f"REJECTED by technician: {reason or 'no reason given'}. Propose a different approach.",
         )
     )
-    _advance(run)
+    run.emit()
+    threading.Thread(target=_drive, args=(run,), daemon=True).start()
     return run
 
 
@@ -352,6 +378,7 @@ def abort(run_id: str) -> Run:
     run.status = "aborted"
     run.pending_step_id = None
     run.log("technician", "aborted")
+    run.emit()
     return run
 
 

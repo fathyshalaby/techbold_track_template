@@ -22,6 +22,8 @@ Both backends implement the identical contract in [`shared/api-contract.md`](sha
 and load the **same** safety rules ([`shared/safety-rules.json`](shared/safety-rules.json)) and
 agent spec ([`shared/agent-spec.md`](shared/agent-spec.md)).
 
+📚 **Docs:** [Architecture](docs/ARCHITECTURE.md) · [Infrastructure](docs/INFRASTRUCTURE.md) · [Report](REPORT.md) · [Scorecard](docs/SCORECARD.md) · [Local model & QLoRA roadmap](docs/LOCAL-MODEL.md) · [Scoring rubric](docs/scoring.md)
+
 ---
 
 ## 1. Architecture
