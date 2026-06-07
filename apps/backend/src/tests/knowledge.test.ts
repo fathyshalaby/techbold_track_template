@@ -14,7 +14,11 @@ describe("encoded knowledge - diagnostic method", () => {
     expect(DIAGNOSTIC_METHOD).toMatch(/Root cause != symptom/i);
     expect(DIAGNOSTIC_METHOD).toMatch(/does NOT survive/i); // persistence rule
     expect(DIAGNOSTIC_METHOD).toMatch(/Recent changes first/i);
-    expect(DIAGNOSTIC_METHOD).toMatch(/customer-benefit functional test/i);
+    expect(DIAGNOSTIC_METHOD).toMatch(/customer operation/i);
+    // partial-failure bisection (reads-work-writes-fail class) + data preservation
+    expect(DIAGNOSTIC_METHOD).toMatch(/PARTIAL failure/);
+    expect(DIAGNOSTIC_METHOD).toMatch(/bisect by OPERATION/i);
+    expect(DIAGNOSTIC_METHOD).toMatch(/data\s+was\s+preserved/i);
   });
 
   it("exposes exactly the four runbook domains", () => {
@@ -48,6 +52,46 @@ describe("encoded knowledge - runbook routing (selectRunbooks)", () => {
 
   it("returns empty string when nothing matches (method alone applies)", () => {
     expect(selectRunbooks("the quick brown fox jumps over")).toBe("");
+  });
+});
+
+describe("encoded knowledge - fault-family completeness (covers the real incident space)", () => {
+  // Each case is a GENERAL symptom for one fault family the grader exercises;
+  // selectRunbooks must surface the runbook slice that carries the right technique.
+  it("disabled-service: routes to systemd lifecycle with persistence (is-enabled / enable --now)", () => {
+    const d = selectRunbooks("the service is stopped and disabled, won't start on boot");
+    expect(d).toMatch(/is-enabled/);
+    expect(d).toMatch(/enable --now/);
+  });
+
+  it("name-resolution: routes to networking with /etc/hosts + getent technique", () => {
+    const d = selectRunbooks(
+      "cannot reach the partner dependency host, name resolves to a wrong ip",
+    );
+    expect(d).toMatch(/\/etc\/hosts/);
+    expect(d).toMatch(/getent hosts/);
+  });
+
+  it("db-privilege partial failure: reads-work-writes-fail surfaces the sequence-grant fix", () => {
+    const d = selectRunbooks("reads work but insert fails, permission denied for sequence");
+    expect(d).toMatch(/SEQUENCE/);
+    expect(d).toMatch(/GRANT USAGE/);
+  });
+
+  it("file-ownership: writable-dir + preserve-existing-data guidance is present", () => {
+    const d = selectRunbooks(
+      "uploads return a server error, the directory is not writable by the service user",
+    );
+    expect(d).toMatch(/chown/);
+    expect(d).toMatch(/preserve existing|existing data is intact|existing files/i);
+  });
+
+  it("bad drop-in override: systemctl cat reveals the override as the cause", () => {
+    const d = selectRunbooks(
+      "service is active but shows stale data, a bad environment override is set",
+    );
+    expect(d).toMatch(/drop-in|override/i);
+    expect(d).toMatch(/systemctl cat/);
   });
 });
 

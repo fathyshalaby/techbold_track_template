@@ -57,6 +57,9 @@ export const CommandApprovalSchema = z
     safety_notes: z.string(),
     status: z.enum(["PENDING", "APPROVED", "REJECTED", "EXECUTED", "BLOCKED"]),
     technician_reason: z.string().nullable(),
+    // The exact command that undoes this change (fixes only) — used for
+    // automatic rollback-on-failure. Null for diagnostics / rollback steps.
+    rollback_command: z.string().nullable(),
     created_at: z.string(),
     decided_at: z.string().nullable(),
     executed_at: z.string().nullable(),

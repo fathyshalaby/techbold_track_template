@@ -54,6 +54,7 @@ const CREATE_TABLES = `
     safety_notes TEXT,
     status TEXT,
     technician_reason TEXT,
+    rollback_command TEXT,
     created_at TEXT,
     decided_at TEXT,
     executed_at TEXT

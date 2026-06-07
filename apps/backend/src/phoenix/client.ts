@@ -86,6 +86,18 @@ export class PhoenixClient {
     return this.request(TicketSchema, "PATCH", `/api/v1/tickets/${ticketId}/status`, { status });
   }
 
+  // Clears this team's activities and REBOOTS the VMs — the grader's persistence
+  // mirror. Useful to retest that a fix survives a reboot (scoring B). Tolerant
+  // response schema: the ERP returns a message/detail envelope.
+  async reset(): Promise<{ message?: string; detail?: string }> {
+    return this.request(
+      z.object({ message: z.string().optional(), detail: z.string().optional() }).passthrough(),
+      "POST",
+      "/api/v1/me/reset",
+      {},
+    );
+  }
+
   private validateTicketId(ticketId: number): void {
     if (!Number.isInteger(ticketId) || ticketId <= 0) {
       throw new TypeError(`ticketId must be a positive integer, got: ${ticketId}`);
