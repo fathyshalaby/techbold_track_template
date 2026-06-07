@@ -11,7 +11,7 @@ import {
 import MockPhoenixClient from "../phoenix/mock.js";
 import { appendObservation, getActivityDraft, getAuditEvents } from "../store/audit.js";
 import { getDb, makeJsonlAdapter, setDb } from "../store/db.js";
-import { createRun, getRunById, updateRunPhase } from "../store/runs.js";
+import { createRun, getRunById, parseSafeTarget, updateRunPhase } from "../store/runs.js";
 import { CommandApprovalSchema } from "../store/schema.js";
 
 export const runsRouter = new Hono();
@@ -123,6 +123,29 @@ runsRouter.get("/:runId", async (c) => {
   const timeline = getAuditEvents(runId);
   const pendingApproval = getPendingApproval(runId);
   const activityDraft = getActivityDraft(runId) ?? null;
+  const source = resolveClientMode("phoenix") === "mock" ? "mock-backend" : "live-backend";
+  let ticket: {
+    id: number;
+    title: string;
+    priority: string;
+    status: string;
+    customer_name: string;
+    source: typeof source;
+  } | null = null;
+
+  try {
+    const loaded = await getPhoenixClient().getTicket(run.ticket_id);
+    ticket = {
+      id: loaded.id,
+      title: loaded.title,
+      priority: loaded.priority,
+      status: loaded.status,
+      customer_name: loaded.customer_name,
+      source,
+    };
+  } catch {
+    ticket = null;
+  }
 
   return c.json({
     runId: run.id,
@@ -131,6 +154,11 @@ runsRouter.get("/:runId", async (c) => {
     timeline,
     pendingApproval,
     activityDraft,
+    ticketId: run.ticket_id,
+    customerSystemId: run.customer_system_id,
+    ticket,
+    target: parseSafeTarget(run.customer_system_id),
+    source,
   });
 });
 
@@ -147,6 +175,22 @@ runsRouter.post("/:runId/next", async (c) => {
   }
 
   const state = await advance(runId);
+
+  // An agent (LLM) failure carries a message back on the state without changing
+  // phase. Surface it as a 502 so the technician sees "AI agent unavailable"
+  // instead of a /next call that silently does nothing (a frozen-looking run).
+  if (state.errorMessage) {
+    return c.json(
+      {
+        error: "AI agent unavailable",
+        detail: state.errorMessage,
+        status: state.status,
+        phase: state.phase,
+      },
+      502,
+    );
+  }
+
   const pendingApproval = getPendingApproval(runId);
 
   return c.json({

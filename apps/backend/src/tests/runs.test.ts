@@ -160,6 +160,16 @@ describe("GET /api/runs/:runId", () => {
       timeline: unknown[];
       pendingApproval: unknown;
       activityDraft: unknown;
+      ticketId: number;
+      customerSystemId: string;
+      ticket: {
+        id: number;
+        title: string;
+        customer_name: string;
+        source: string;
+      } | null;
+      target: { ip: string; port: number } | null;
+      source: string;
     };
     expect(body.runId).toBe(runId);
     expect(typeof body.status).toBe("string");
@@ -167,6 +177,47 @@ describe("GET /api/runs/:runId", () => {
     expect(Array.isArray(body.timeline)).toBe(true);
     expect("pendingApproval" in body).toBe(true);
     expect("activityDraft" in body).toBe(true);
+    expect(body.ticketId).toBe(1);
+    expect(body.customerSystemId).toBe("10.0.0.1:22");
+    expect(body.target).toEqual(expect.objectContaining({ ip: "10.0.0.1", port: 22 }));
+    expect(body.ticket).toEqual(
+      expect.objectContaining({
+        id: 1,
+        title: "Service unavailable",
+        customer_name: "Acme Corp",
+        source: "mock-backend",
+      }),
+    );
+    expect(body.source).toBe("mock-backend");
+
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain("token");
+    expect(serialized).not.toContain("privateKey");
+    expect(serialized).not.toContain("PHOENIX_API_TOKEN");
+    expect(serialized).not.toContain("/keys");
+  });
+
+  it("keeps run detail available when Phoenix ticket lookup fails", async () => {
+    const runId = await createRun();
+    const phoenixModule = await import("../phoenix/mock.js");
+    vi.spyOn(phoenixModule.default.prototype, "getTicket").mockRejectedValueOnce(
+      new Error("PHOENIX_API_TOKEN should stay server-side"),
+    );
+
+    const res = await app.request(`/api/runs/${runId}`);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      runId: string;
+      ticket: unknown;
+      ticketId: number;
+      customerSystemId: string;
+    };
+    expect(body.runId).toBe(runId);
+    expect(body.ticket).toBeNull();
+    expect(body.ticketId).toBe(1);
+    expect(body.customerSystemId).toBe("10.0.0.1:22");
+    expect(JSON.stringify(body)).not.toContain("PHOENIX_API_TOKEN");
   });
 
   it("returns 404 for unknown runId", async () => {
