@@ -7,6 +7,7 @@ import { dashboardRouter } from "./routes/dashboard.js";
 import { eventsRouter } from "./routes/events.js";
 import { healthRouter } from "./routes/health.js";
 import { runsRouter } from "./routes/runs.js";
+import { systemRouter } from "./routes/system.js";
 import { ticketsRouter } from "./routes/tickets.js";
 
 // Log details server-side; return a generic message so internal details (and any
@@ -28,5 +29,6 @@ app.route("/api/runs", runsRouter);
 app.route("/api/runs", approvalsRouter);
 app.route("/api/runs", eventsRouter);
 app.route("/api/runs", activityRouter);
+app.route("/api", systemRouter);
 
 app.onError(errorHandler);

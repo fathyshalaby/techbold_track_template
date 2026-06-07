@@ -142,6 +142,10 @@ export default class MockPhoenixClient {
     return Promise.resolve(cs);
   }
 
+  async reset(): Promise<{ message?: string; detail?: string }> {
+    return Promise.resolve({ message: "mock reset: activities cleared, VMs rebooted" });
+  }
+
   async getMe(): Promise<Employee> {
     return Promise.resolve({
       id: 1,

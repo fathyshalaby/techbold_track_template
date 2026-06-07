@@ -812,6 +812,8 @@ export async function advance(
         // No placeholder default: env.ts requires SSH_PRIVATE_KEY_PATH in real
         // SSH mode, so a missing key fails loudly at startup, not silently here.
         privateKeyPath: process.env.SSH_PRIVATE_KEY_PATH ?? "",
+        // Multi-key fallback dir (defaults to the primary key's directory).
+        keyDir: process.env.SSH_KEY_DIR || undefined,
       };
 
       const cmdResult = await exec.executeApprovedCommand(

@@ -3,6 +3,15 @@ export interface SshTarget {
   port: number;
   username: string;
   privateKeyPath: string;
+  // Optional directory of fallback keys (multi-key SSH). Defaults to the
+  // directory of privateKeyPath when unset.
+  keyDir?: string;
+}
+
+export interface ConnectionTestResult {
+  reachable: boolean;
+  latencyMs: number;
+  error?: string;
 }
 
 export interface CommandResult {
@@ -39,4 +48,7 @@ export interface SshExecutor {
     target: SshTarget,
   ): Promise<CommandResult>;
   runPreflight(target: SshTarget): Promise<PreflightResult>;
+  // Connectivity preflight (merged from the python backend): open + close a
+  // connection, measure latency. Surfaces VM reachability in the UI before a run.
+  testConnection(target: SshTarget): Promise<ConnectionTestResult>;
 }

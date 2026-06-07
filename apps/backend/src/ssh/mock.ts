@@ -1,5 +1,11 @@
 // Mock SSH executor - no ssh2 dependency. Used for offline demo and CI.
-import type { CommandResult, PreflightResult, SshExecutor, SshTarget } from "./types.js";
+import type {
+  CommandResult,
+  ConnectionTestResult,
+  PreflightResult,
+  SshExecutor,
+  SshTarget,
+} from "./types.js";
 
 export const MOCK_SSH_FIXTURES: Record<string, CommandResult> = {
   "uname -a": {
@@ -119,6 +125,10 @@ export class MockSshExecutor implements SshExecutor {
     };
     this.preflightCache.set(cacheKey, result);
     return result;
+  }
+
+  async testConnection(_target: SshTarget): Promise<ConnectionTestResult> {
+    return Promise.resolve({ reachable: true, latencyMs: 1 });
   }
 }
 

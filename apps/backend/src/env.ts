@@ -33,6 +33,9 @@ const EnvSchema = z
     // missing key fails loudly at startup instead of silently targeting a wrong
     // key at execution time.
     SSH_PRIVATE_KEY_PATH: z.string().default(""),
+    // Directory of fallback SSH keys for multi-key auth (the contest ships 5
+    // case keys). Defaults to the primary key's directory when unset.
+    SSH_KEY_DIR: z.string().default("/keys"),
     SSH_USERNAME: z.string().default("azureuser"),
     PORT: z.coerce.number().int().positive().default(8000),
     MOCK_MODE: booleanFromString.default(false),

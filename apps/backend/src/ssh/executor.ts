@@ -5,7 +5,13 @@
 import type { ClientChannel } from "ssh2";
 import { REDACTION_CAP_BYTES } from "../safety/redaction.js";
 import { openSshConnection } from "./client.js";
-import type { CommandResult, PreflightResult, SshExecutor, SshTarget } from "./types.js";
+import type {
+  CommandResult,
+  ConnectionTestResult,
+  PreflightResult,
+  SshExecutor,
+  SshTarget,
+} from "./types.js";
 
 export const COMMAND_TIMEOUT_MS = 30_000;
 // Reuse the redaction cap as the per-stream output cap (16 KB) - a single
@@ -163,6 +169,24 @@ export async function runPreflight(target: SshTarget): Promise<PreflightResult> 
   };
 }
 
+// Connectivity preflight: open + immediately close a connection, measure latency.
+// Never throws — returns reachable:false with a redacted message instead, so a UI
+// preflight can't crash the run.
+export async function testConnection(target: SshTarget): Promise<ConnectionTestResult> {
+  const start = Date.now();
+  try {
+    const client = await openSshConnection(target);
+    client.end();
+    return { reachable: true, latencyMs: Date.now() - start };
+  } catch (err) {
+    return {
+      reachable: false,
+      latencyMs: Date.now() - start,
+      error: err instanceof Error ? err.message : "connection failed",
+    };
+  }
+}
+
 export class RealSshExecutor implements SshExecutor {
   executeApprovedCommand(
     approvalId: string,
@@ -174,6 +198,10 @@ export class RealSshExecutor implements SshExecutor {
 
   runPreflight(target: SshTarget): Promise<PreflightResult> {
     return runPreflight(target);
+  }
+
+  testConnection(target: SshTarget): Promise<ConnectionTestResult> {
+    return testConnection(target);
   }
 }
 
