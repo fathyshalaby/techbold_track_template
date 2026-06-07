@@ -30,12 +30,12 @@ Requirements for the current follow-up milestone. Each maps to one roadmap phase
 
 ### Submission Handoff
 
-- [ ] **SUBM-01**: Operator has a demo-video checklist and external submission handoff notes grounded in verified behavior.
+- [x] **SUBM-01**: Operator has a demo-video checklist and external submission handoff notes grounded in verified behavior.
 
 ### Planning Hygiene
 
 - [x] **PLAN-01**: Developer can trace every v1.2 production change back to `.planning/audits/V1.1-MASTER-DEFECT-MAP.md`.
-- [ ] **PLAN-02**: Developer can rely on planning/docs artifacts that distinguish completed evidence, deferred work, and blocked manual validation.
+- [x] **PLAN-02**: Developer can rely on planning/docs artifacts that distinguish completed evidence, deferred work, and blocked manual validation.
 
 ## Future Requirements
 
@@ -77,9 +77,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REAL-01 | Phase 4 | Complete - blocked by placeholder Phoenix token |
 | REAL-02 | Phase 4 | Complete - blocked by missing key and host |
 | REAL-03 | Phase 4 | Complete - blocked by placeholder LLM key |
-| SUBM-01 | Phase 5 | Pending |
+| SUBM-01 | Phase 5 | Complete |
 | PLAN-01 | Phase 3 | Complete |
-| PLAN-02 | Phase 5 | Pending |
+| PLAN-02 | Phase 5 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 11 total

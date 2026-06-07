@@ -11,7 +11,7 @@ A technician-controlled AI troubleshooting copilot for the techbold START Hack V
 
 **The AI never acts on its own.** Every command is approved (or edited / rejected) by a human, and re-checked by the safety layer before it can run. Blocklisted or secret-leaking commands never execute.
 
-> Status: **built and runnable.** Node/Hono backend + React/Vite frontend, 557 passing tests. Boots fully offline in mock mode - no credentials needed to demo.
+> Status: **built and runnable.** Node/Hono backend + React/Vite frontend, 559 passing backend tests in the latest Phase 3 verification run. Boots fully offline in mock mode - no credentials needed to demo.
 
 ---
 
@@ -79,7 +79,7 @@ Set the relevant vars in `.env` and flip the matching mock flag off (or set `MOC
 | `PHOENIX_API_BASE_URL`, `PHOENIX_API_TOKEN` | The ERP and your team Bearer token |
 | `SSH_PRIVATE_KEY_PATH`, `SSH_USERNAME` | SSH to the customer VM (default user `azureuser`); mount the `.pem` into `keys/` |
 | `OPENAI_API_KEY`, `LLM_PROVIDER`, `LLM_MODEL` | Bring-your-own LLM (default `openai` / `gpt-4o`) - none is provided by organisers |
-| `MOCK_MODE` / `MOCK_PHOENIX` / `MOCK_SSH` / `MOCK_LLM` | Per-service mock toggles (all default `true` via `.env.example`) |
+| `MOCK_MODE` / `MOCK_PHOENIX` / `MOCK_SSH` / `MOCK_LLM` | `MOCK_MODE=true` in `.env.example` makes all services run offline; per-service flags can override when `MOCK_MODE=false` |
 | `VITE_API_BASE` | URL the browser uses to reach the backend (default `http://localhost:8000`) |
 | `PORT` | Backend port (default `8000`) |
 
@@ -131,7 +131,7 @@ Base `http://localhost:8000`.
 - **B | Troubleshooting** - an orchestrator state machine drives diagnose -> root-cause -> fix -> validate, one command per step, generalised (no incident hardcoding); diagnostic method + symptom-routed runbooks from `knowledge/` are encoded into the agents.
 - **C | Safety & audit** - deterministic blocklist + risk classifier + secret redaction; every command gated at proposal **and** re-checked after a human edit; append-only audit trail (the source of truth for the activity); the model can never execute - it only proposes.
 - **D | Technician UX** - `frontend/src/App.tsx`: ticket overview, run view with per-command approve / edit / reject / abort, risk badges, live event stream, the **audit trail**, and the editable activity before submit.
-- **E | Engineering** - modular separation, 557 Vitest tests + mocks for all three dependencies, fail-fast env, Docker, durable SQLite volume.
+- **E | Engineering** - modular separation, 559 backend tests in the latest Phase 3 verification run, mocks for all three dependencies, fail-fast env, Docker, durable SQLite volume.
 
 ### The human-in-the-loop loop
 `load ticket -> analyse -> propose ONE command -> human approves/edits/rejects -> safety re-check -> run over SSH -> observe -> repeat -> validate -> draft activity -> submit -> set status DONE`.

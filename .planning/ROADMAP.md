@@ -4,7 +4,7 @@
 
 - [x] **v1.0 milestone** - Service Desk Autopilot hackathon submission slice (shipped 2026-06-07)
 - [x] **v1.1 Professional Skeleton Rescue** - skeleton rescue and buildability (completed 2026-06-07)
-- [ ] **v1.2 Professional Skeleton Rescue Follow-up** - live validation, vertical-slice evidence, and submission handoff readiness
+- [x] **v1.2 Professional Skeleton Rescue Follow-up** - live validation, vertical-slice evidence, and submission handoff readiness
 
 ## Active Milestone: v1.2
 
@@ -14,7 +14,7 @@ Phase numbering is reset for this milestone.
 - [x] **Phase 2: Browser SSE UAT** - completed 2026-06-07
 - [x] **Phase 3: Vertical-Slice Coverage** - completed 2026-06-07
 - [x] **Phase 4: Real Integration Validation** - completed 2026-06-07
-- [ ] **Phase 5: Submission and Evidence Handoff**
+- [x] **Phase 5: Submission and Evidence Handoff** - completed 2026-06-07
 
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|------------------|
@@ -22,7 +22,7 @@ Phase numbering is reset for this milestone.
 | 02 | Browser SSE UAT | Prove the mounted frontend reflects the primary technician flow and SSE lifecycle. | UAT-01, UAT-02 | Complete |
 | 03 | Vertical-Slice Coverage | Add deterministic coverage for the run, approval, SSE, and activity path. | E2E-01, PLAN-01 | Complete |
 | 04 | Real Integration Validation | Validate or precisely block Phoenix, SSH, and LLM live paths. | REAL-01, REAL-02, REAL-03 | Complete |
-| 05 | Submission and Evidence Handoff | Package demo/submission evidence and clean planning docs. | SUBM-01, PLAN-02 | 4 |
+| 05 | Submission and Evidence Handoff | Package demo/submission evidence and clean planning docs. | SUBM-01, PLAN-02 | Complete |
 
 ## Phase Details
 
@@ -100,7 +100,7 @@ Success criteria:
 4. No stale active requirement or roadmap entry claims work that remains deferred or blocked.
 
 Plans:
-- [ ] 05-01-PLAN.md - Submission and evidence handoff
+- [x] 05-01-PLAN.md - Submission and evidence handoff
 
 ## Traceability Update Rule
 

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Professional Skeleton Rescue Follow-up
-status: planning
-last_updated: "2026-06-07T04:24:00Z"
+status: complete
+last_updated: "2026-06-07T04:30:00Z"
 last_activity: 2026-06-07
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-07)
 
 **Core value:** Win B+C on the scoring rubric: solve hidden Linux-service incidents on fresh VMs, safely and auditably
-**Current focus:** Phase 5 - Submission and Evidence Handoff
+**Current focus:** v1.2 complete - final audit and archive
 
 ## Current Position
 
-Phase: 5 - Submission and Evidence Handoff
+Phase: -
 Plan: -
-Status: Ready to plan
-Last activity: 2026-06-07 - Phase 4 completed
+Status: v1.2 phases complete
+Last activity: 2026-06-07 - Phase 5 completed
 
 ## Performance Metrics
 
@@ -69,6 +69,7 @@ Recent decisions affecting current work:
 - Phase 2 completed browser-level UAT after fixing built-in mock agent outputs.
 - Phase 3 completed deterministic vertical-slice coverage and fixed JSONL mock-store query/update drift exposed by that coverage.
 - Phase 4 completed real integration validation as exact blockers: Phoenix placeholder token, missing SSH key/VM host, and placeholder LLM key.
+- Phase 5 completed submission handoff docs and refreshed active status docs.
 
 ### Blockers/Concerns
 
@@ -97,4 +98,4 @@ Resume file: .planning/STATE.md
 
 ## Operator Next Steps
 
-- Continue autonomous execution with Phase 5.
+- Run final milestone audit and archive v1.2 when ready.
